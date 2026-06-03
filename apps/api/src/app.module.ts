@@ -10,6 +10,9 @@ import { RbacModule } from './rbac/rbac.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { StorageModule } from './storage/storage.module';
+import { CartModule } from './cart/cart.module';
+import { CouponsModule } from './coupons/coupons.module';
+import { CheckoutModule } from './checkout/checkout.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
 import { PermissionsGuard } from './rbac/guards/permissions.guard';
@@ -29,6 +32,9 @@ import { envValidation } from './config/env.validation';
     CategoriesModule,
     ProductsModule,
     StorageModule,
+    CartModule,
+    CouponsModule,
+    CheckoutModule,
   ],
   controllers: [AppController],
   providers: [

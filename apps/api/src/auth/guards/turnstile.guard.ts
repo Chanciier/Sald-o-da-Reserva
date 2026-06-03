@@ -10,9 +10,7 @@ export class TurnstileGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
 
     const token: string =
-      (req.body?.turnstileToken as string) ||
-      (req.headers['x-turnstile-token'] as string) ||
-      '';
+      (req.body?.turnstileToken as string) || (req.headers['x-turnstile-token'] as string) || '';
 
     const ip: string =
       (req.headers['cf-connecting-ip'] as string) ||

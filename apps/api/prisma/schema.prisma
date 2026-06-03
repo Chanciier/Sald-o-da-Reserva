@@ -19,6 +19,19 @@ enum ProductStatus {
   OUT_OF_STOCK
 }
 
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -33,6 +46,7 @@ model User {
   passwordResets PasswordReset[]
   auditLogs      AuditLog[]
   images         Image[]
+  orders         Order[]
 
   @@map("users")
 }
@@ -98,8 +112,9 @@ model Product {
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  images   Image[]
+  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images     Image[]
+  orderItems OrderItem[]
 
   @@index([categoryId])
   @@index([status])
@@ -145,4 +160,65 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@map("audit_logs")
+}
+
+model Coupon {
+  id            String     @id @default(cuid())
+  code          String     @unique
+  description   String?
+  type          CouponType
+  value         Decimal    @db.Decimal(10, 2)
+  minOrderValue Decimal?   @map("min_order_value") @db.Decimal(10, 2)
+  maxDiscount   Decimal?   @map("max_discount") @db.Decimal(10, 2)
+  usageLimit    Int?       @map("usage_limit")
+  usageCount    Int        @default(0) @map("usage_count")
+  isActive      Boolean    @default(true) @map("is_active")
+  expiresAt     DateTime?  @map("expires_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@map("coupons")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String      @map("user_id")
+  couponId        String?     @map("coupon_id")
+  status          OrderStatus @default(PENDING)
+  subtotal        Decimal     @db.Decimal(10, 2)
+  discount        Decimal     @default(0) @db.Decimal(10, 2)
+  shipping        Decimal     @default(0) @db.Decimal(10, 2)
+  total           Decimal     @db.Decimal(10, 2)
+  shippingAddress Json        @map("shipping_address")
+  shippingMethod  String      @map("shipping_method")
+  notes           String?
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items  OrderItem[]
+
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String  @map("order_id")
+  productId String  @map("product_id")
+  name      String
+  sku       String
+  price     Decimal @db.Decimal(10, 2)
+  quantity  Int
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
 }

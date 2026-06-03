@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getProduct } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
+import { AddToCartButton } from '@/components/products/add-to-cart-button';
 import type { Metadata } from 'next';
 
 interface PageProps {
@@ -151,6 +152,10 @@ export default async function ProductPage({ params }: PageProps) {
               </h2>
               <p className="whitespace-pre-line text-sm leading-relaxed">{product.description}</p>
             </div>
+          )}
+
+          {product.status === 'ACTIVE' && (
+            <AddToCartButton productId={product.id} stock={product.stock} />
           )}
         </div>
       </div>

@@ -83,7 +83,11 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { user: authUser, accessToken, refreshToken } = await this.authService.refresh(
+    const {
+      user: authUser,
+      accessToken,
+      refreshToken,
+    } = await this.authService.refresh(
       user.id,
       user.refreshToken,
       this.getIp(req),
