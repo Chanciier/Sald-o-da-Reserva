@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { HashService } from './services/hash.service';
 import { TokenService } from './services/token.service';
@@ -43,7 +44,7 @@ export class AuthService {
       data: { email: dto.email, name: dto.name, passwordHash },
     });
 
-    const tokens = await this.issueTokenPair(user.id, user.email, ip, userAgent);
+    const tokens = await this.issueTokenPair(user.id, user.email, user.role, ip, userAgent);
 
     await this.auditService.log(AuditAction.REGISTER, {
       userId: user.id,
@@ -51,7 +52,7 @@ export class AuthService {
       userAgent,
     });
 
-    return { user: { id: user.id, email: user.email }, ...tokens };
+    return { user: { id: user.id, email: user.email, role: user.role }, ...tokens };
   }
 
   async login(dto: LoginDto, ip: string, userAgent: string): Promise<AuthResult> {
@@ -69,9 +70,10 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
-    if (!user.isActive) throw new ForbiddenException('Conta desativada. Entre em contato com o suporte.');
+    if (!user.isActive)
+      throw new ForbiddenException('Conta desativada. Entre em contato com o suporte.');
 
-    const tokens = await this.issueTokenPair(user.id, user.email, ip, userAgent);
+    const tokens = await this.issueTokenPair(user.id, user.email, user.role, ip, userAgent);
 
     await this.auditService.log(AuditAction.LOGIN, {
       userId: user.id,
@@ -79,7 +81,7 @@ export class AuthService {
       userAgent,
     });
 
-    return { user: { id: user.id, email: user.email }, ...tokens };
+    return { user: { id: user.id, email: user.email, role: user.role }, ...tokens };
   }
 
   async logout(userId: string, refreshToken: string, ip: string, userAgent: string): Promise<void> {
@@ -141,11 +143,20 @@ export class AuthService {
       data: { isRevoked: true },
     });
 
-    const tokens = await this.issueTokenPair(stored.user.id, stored.user.email, ip, userAgent);
+    const tokens = await this.issueTokenPair(
+      stored.user.id,
+      stored.user.email,
+      stored.user.role,
+      ip,
+      userAgent,
+    );
 
     await this.auditService.log(AuditAction.REFRESH_TOKEN, { userId, ipAddress: ip, userAgent });
 
-    return { user: { id: stored.user.id, email: stored.user.email }, ...tokens };
+    return {
+      user: { id: stored.user.id, email: stored.user.email, role: stored.user.role },
+      ...tokens,
+    };
   }
 
   async forgotPassword(dto: ForgotPasswordDto, ip: string): Promise<void> {
@@ -219,20 +230,23 @@ export class AuthService {
     });
   }
 
-  async getMe(userId: string): Promise<AuthenticatedUser & { name: string | null; createdAt: Date }> {
+  async getMe(
+    userId: string,
+  ): Promise<AuthenticatedUser & { name: string | null; createdAt: Date }> {
     return this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, email: true, name: true, createdAt: true },
+      select: { id: true, email: true, role: true, name: true, createdAt: true },
     });
   }
 
   private async issueTokenPair(
     userId: string,
     email: string,
+    role: Role,
     ip: string,
     userAgent: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const accessToken = this.tokenService.generateAccessToken({ sub: userId, email });
+    const accessToken = this.tokenService.generateAccessToken({ sub: userId, email, role });
     const refreshToken = this.tokenService.generateRefreshToken(userId);
     const tokenHash = this.hashService.hashToken(refreshToken);
     const expiresAt = this.tokenService.getRefreshTokenExpiry();
