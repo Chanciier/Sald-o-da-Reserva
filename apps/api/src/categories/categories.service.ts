@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { StorageService } from '../storage/storage.service';
 import { slugify } from '../utils/slugify';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -15,6 +16,7 @@ export class CategoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly storage: StorageService,
   ) {}
 
   async create(dto: CreateCategoryDto) {
@@ -91,8 +93,14 @@ export class CategoriesService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.category.findUnique({ where: { id } });
+    const existing = await this.prisma.category.findUnique({
+      where: { id },
+      include: { images: { select: { key: true } } },
+    });
     if (!existing) throw new NotFoundException('Categoria não encontrada.');
+
+    const keys = existing.images.map((i) => i.key);
+    if (keys.length) await this.storage.deleteManyByKeys(keys);
 
     await this.prisma.category.delete({ where: { id } });
     await this.redis.delPattern('categories:*');

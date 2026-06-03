@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { StorageService } from '../storage/storage.service';
 import { slugify } from '../utils/slugify';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -30,6 +31,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly storage: StorageService,
   ) {}
 
   async create(dto: CreateProductDto) {
@@ -57,8 +59,12 @@ export class ProductsService {
         status: dto.status,
         categoryId: dto.categoryId,
       },
-      include: { category: true },
+      include: { category: true, images: true },
     });
+
+    if (dto.imageIds?.length) {
+      await this.storage.connectImages(dto.imageIds, 'productId', product.id);
+    }
 
     await this.redis.delPattern('products:*');
     return serializeProduct(product);
@@ -109,7 +115,7 @@ export class ProductsService {
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        include: { category: true },
+        include: { category: true, images: true },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
@@ -135,7 +141,7 @@ export class ProductsService {
 
     const product = await this.prisma.product.findUnique({
       where: { slug },
-      include: { category: true },
+      include: { category: true, images: true },
     });
     if (!product) throw new NotFoundException('Produto não encontrado.');
 
@@ -158,25 +164,42 @@ export class ProductsService {
       if (conflict) throw new ConflictException('SKU já em uso.');
     }
 
-    const slug = dto.name && !dto.slug ? slugify(dto.name) : (dto.slug ?? existing.slug);
+    const { imageIds, dimensions, ...rest } = dto;
+    const slug = rest.name && !rest.slug ? slugify(rest.name) : (rest.slug ?? existing.slug);
 
     const updated = await this.prisma.product.update({
       where: { id },
       data: {
-        ...dto,
+        ...rest,
         slug,
-        dimensions: dto.dimensions as unknown as Prisma.InputJsonValue | undefined,
+        dimensions: dimensions as unknown as Prisma.InputJsonValue | undefined,
       },
-      include: { category: true },
+      include: { category: true, images: true },
     });
+
+    if (imageIds?.length) {
+      await this.storage.connectImages(imageIds, 'productId', id);
+      const withImages = await this.prisma.product.findUnique({
+        where: { id },
+        include: { category: true, images: true },
+      });
+      await this.redis.delPattern('products:*');
+      return serializeProduct(withImages!);
+    }
 
     await this.redis.delPattern('products:*');
     return serializeProduct(updated);
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.product.findUnique({ where: { id } });
+    const existing = await this.prisma.product.findUnique({
+      where: { id },
+      include: { images: { select: { key: true } } },
+    });
     if (!existing) throw new NotFoundException('Produto não encontrado.');
+
+    const keys = existing.images.map((i) => i.key);
+    if (keys.length) await this.storage.deleteManyByKeys(keys);
 
     await this.prisma.product.delete({ where: { id } });
     await this.redis.delPattern('products:*');

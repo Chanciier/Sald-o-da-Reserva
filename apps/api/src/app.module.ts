@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
+import { StorageModule } from './storage/storage.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
 import { PermissionsGuard } from './rbac/guards/permissions.guard';
@@ -27,6 +28,7 @@ import { envValidation } from './config/env.validation';
     RbacModule,
     CategoriesModule,
     ProductsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [

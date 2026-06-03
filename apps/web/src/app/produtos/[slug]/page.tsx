@@ -62,9 +62,31 @@ export default async function ProductPage({ params }: PageProps) {
       </nav>
 
       <div className="grid gap-8 md:grid-cols-2">
-        <div className="flex h-80 items-center justify-center rounded-xl border border-dashed border-border bg-muted text-muted-foreground">
-          Imagem do produto
-        </div>
+        {product.images?.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-border bg-muted">
+            <img
+              src={product.images[0].url}
+              alt={product.name}
+              className="h-80 w-full object-contain"
+            />
+            {product.images.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto p-2">
+                {product.images.slice(1).map((img) => (
+                  <img
+                    key={img.id}
+                    src={img.url}
+                    alt=""
+                    className="h-16 w-16 shrink-0 rounded-lg object-cover opacity-70 hover:opacity-100"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex h-80 items-center justify-center rounded-xl border border-dashed border-border bg-muted text-muted-foreground">
+            Sem imagem
+          </div>
+        )}
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">

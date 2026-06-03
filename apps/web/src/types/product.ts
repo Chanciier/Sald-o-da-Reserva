@@ -1,5 +1,14 @@
 export type ProductStatus = 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
 
+export interface ProductImage {
+  id: string;
+  url: string;
+  key: string;
+  width: number | null;
+  height: number | null;
+  size: number;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -32,6 +41,7 @@ export interface Product {
   status: ProductStatus;
   categoryId: string | null;
   category: Category | null;
+  images: ProductImage[];
   createdAt: string;
   updatedAt: string;
 }
