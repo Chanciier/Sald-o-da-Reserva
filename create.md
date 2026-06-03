@@ -4,17 +4,17 @@
 
 Sistema de e-commerce para venda de produtos físicos com entrega nacional, possuindo:
 
-* Painel Administrativo
-* Painel de Vendas
-* Painel de Usuário
-* Sistema próprio de autenticação
-* Integração com Mercado Pago
-* Integração com Melhor Envio
-* Sistema completo de gestão de produtos
-* Sistema completo de pedidos
-* Dashboard analítico
-* Controle de estoque
-* Gestão de usuários e permissões
+- Painel Administrativo
+- Painel de Vendas
+- Painel de Usuário
+- Sistema próprio de autenticação
+- Integração com Mercado Pago
+- Integração com Melhor Envio
+- Sistema completo de gestão de produtos
+- Sistema completo de pedidos
+- Dashboard analítico
+- Controle de estoque
+- Gestão de usuários e permissões
 
 ---
 
@@ -22,39 +22,39 @@ Sistema de e-commerce para venda de produtos físicos com entrega nacional, poss
 
 ## Frontend
 
-* Next.js (App Router)
+- Next.js (App Router)
 
 ## Backend
 
-* NestJS
+- NestJS
 
 ## Banco de Dados
 
-* PostgreSQL
+- PostgreSQL
 
 ## Cache
 
-* Redis
+- Redis
 
 ## Armazenamento
 
-* Amazon S3
+- Amazon S3
 
 ## Hospedagem
 
 Frontend:
 
-* Vercel
+- Vercel
 
 Backend:
 
-* VPS Linux Ubuntu
+- VPS Linux Ubuntu
 
 ## Infraestrutura
 
-* Cloudflare
-* SSL/TLS
-* DNS Cloudflare
+- Cloudflare
+- SSL/TLS
+- DNS Cloudflare
 
 ---
 
@@ -68,12 +68,12 @@ Sistema próprio de login.
 
 Utilizar:
 
-* Argon2id
+- Argon2id
 
 Nunca armazenar:
 
-* Senha em texto puro
-* Senha criptografada reversível
+- Senha em texto puro
+- Senha criptografada reversível
 
 ### Sessões
 
@@ -81,17 +81,17 @@ JWT Access Token
 
 Expiração:
 
-* 15 minutos
+- 15 minutos
 
 JWT Refresh Token
 
 Expiração:
 
-* 30 dias
+- 30 dias
 
 Refresh Token armazenado:
 
-* Hash no banco
+- Hash no banco
 
 ---
 
@@ -101,32 +101,32 @@ Implementar:
 
 ### SQL Injection
 
-* Prisma ORM
-* Queries parametrizadas
+- Prisma ORM
+- Queries parametrizadas
 
 ### XSS
 
-* Sanitização de entradas
-* CSP
+- Sanitização de entradas
+- CSP
 
 ### CSRF
 
-* CSRF Tokens
-* SameSite Cookies
+- CSRF Tokens
+- SameSite Cookies
 
 ### SSRF
 
-* Validação de URLs
+- Validação de URLs
 
 ### Path Traversal
 
-* Bloqueio de caminhos externos
+- Bloqueio de caminhos externos
 
 ### Upload Malicioso
 
-* Validação MIME Type
-* Validação extensão
-* Antivírus opcional
+- Validação MIME Type
+- Validação extensão
+- Antivírus opcional
 
 ---
 
@@ -138,15 +138,15 @@ Limites:
 
 Login:
 
-* 5 tentativas / minuto
+- 5 tentativas / minuto
 
 Cadastro:
 
-* 5 tentativas / minuto
+- 5 tentativas / minuto
 
 API:
 
-* 100 requisições / minuto
+- 100 requisições / minuto
 
 ---
 
@@ -172,9 +172,9 @@ Cloudflare Turnstile
 
 Aplicar em:
 
-* Login
-* Cadastro
-* Recuperação de senha
+- Login
+- Cadastro
+- Recuperação de senha
 
 ---
 
@@ -182,14 +182,14 @@ Aplicar em:
 
 Registrar:
 
-* Login
-* Logout
-* Criação produto
-* Edição produto
-* Exclusão produto
-* Alteração estoque
-* Alteração pedido
-* Alteração permissões
+- Login
+- Logout
+- Criação produto
+- Edição produto
+- Exclusão produto
+- Alteração estoque
+- Alteração pedido
+- Alteração permissões
 
 ---
 
@@ -221,15 +221,15 @@ Perfil
 
 Indicadores:
 
-* Faturamento do dia
-* Faturamento semanal
-* Faturamento mensal
-* Ticket médio
-* Pedidos concluídos
-* Pedidos pendentes
-* Produtos mais vendidos
-* Produtos menos vendidos
-* Clientes recorrentes
+- Faturamento do dia
+- Faturamento semanal
+- Faturamento mensal
+- Ticket médio
+- Pedidos concluídos
+- Pedidos pendentes
+- Produtos mais vendidos
+- Produtos menos vendidos
+- Clientes recorrentes
 
 ---
 
@@ -237,10 +237,10 @@ Indicadores:
 
 Vendas por:
 
-* Dia
-* Semana
-* Mês
-* Ano
+- Dia
+- Semana
+- Mês
+- Ano
 
 ---
 
@@ -474,9 +474,9 @@ Resend
 
 Motivos:
 
-* Simples
-* Barato
-* Excelente API
+- Simples
+- Barato
+- Excelente API
 
 ---
 
@@ -610,53 +610,53 @@ Testes automáticos
 
 Fase 1
 
-* Infraestrutura
-* Banco
-* NestJS
-* Next.js
+- Infraestrutura
+- Banco
+- NestJS
+- Next.js
 
 Fase 2
 
-* Autenticação
-* RBAC
-* Segurança
+- Autenticação
+- RBAC
+- Segurança
 
 Fase 3
 
-* Produtos
-* Categorias
-* Upload S3
+- Produtos
+- Categorias
+- Upload S3
 
 Fase 4
 
-* Carrinho
-* Checkout
+- Carrinho
+- Checkout
 
 Fase 5
 
-* Mercado Pago
+- Mercado Pago
 
 Fase 6
 
-* Melhor Envio
+- Melhor Envio
 
 Fase 7
 
-* Painéis
+- Painéis
 
 Fase 8
 
-* Relatórios
+- Relatórios
 
 Fase 9
 
-* Auditoria
+- Auditoria
 
 Fase 10
 
-* Testes
-* Deploy
-* Produção
+- Testes
+- Deploy
+- Produção
 
 ---
 
@@ -664,8 +664,8 @@ Fase 10
 
 Capacidade inicial:
 
-* 10.000 produtos
-* 100.000 usuários
-* 5.000 pedidos/dia
+- 10.000 produtos
+- 100.000 usuários
+- 5.000 pedidos/dia
 
 Arquitetura preparada para crescimento sem necessidade de reescrita estrutural.

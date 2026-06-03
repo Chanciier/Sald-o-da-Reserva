@@ -24,8 +24,17 @@
     "turbo": "^2.0.6",
     "typescript": "^5.4.5"
   },
+  "packageManager": "npm@11.16.0",
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
+  },
+  "allowScripts": {
+    "argon2@0.40.3": true,
+    "prisma@5.22.0": true,
+    "unrs-resolver@1.12.2": true,
+    "@nestjs/core@10.4.22": true,
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true
   }
 }
