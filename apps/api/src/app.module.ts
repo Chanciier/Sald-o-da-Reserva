@@ -7,6 +7,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ProductsModule } from './products/products.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
 import { PermissionsGuard } from './rbac/guards/permissions.guard';
@@ -23,6 +25,8 @@ import { envValidation } from './config/env.validation';
     RedisModule,
     AuthModule,
     RbacModule,
+    CategoriesModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [

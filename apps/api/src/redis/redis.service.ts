@@ -56,6 +56,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.flushdb();
   }
 
+  async delPattern(pattern: string): Promise<void> {
+    const keys = await this.client.keys(pattern);
+    if (keys.length > 0) {
+      await this.client.del(...keys);
+    }
+  }
+
   // Atomic increment with TTL set only on first call (for rate limiting)
   async increment(key: string, ttlSeconds?: number): Promise<number> {
     const count = await this.client.incr(key);

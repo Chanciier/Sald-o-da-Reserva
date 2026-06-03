@@ -13,6 +13,12 @@ enum Role {
   CLIENTE
 }
 
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_STOCK
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -58,6 +64,43 @@ model PasswordReset {
 
   @@index([userId])
   @@map("password_resets")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String        @id @default(cuid())
+  name        String
+  slug        String        @unique
+  sku         String        @unique
+  brand       String?
+  description String?
+  price       Decimal       @db.Decimal(10, 2)
+  salePrice   Decimal?      @map("sale_price") @db.Decimal(10, 2)
+  weight      Decimal?      @db.Decimal(8, 3)
+  dimensions  Json?
+  stock       Int           @default(0)
+  status      ProductStatus @default(ACTIVE)
+  categoryId  String?       @map("category_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("products")
 }
 
 model AuditLog {

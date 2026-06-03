@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class LoginDto {
@@ -10,7 +10,7 @@ export class LoginDto {
   @IsNotEmpty({ message: 'Senha é obrigatória.' })
   password: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Token de segurança é obrigatório.' })
-  turnstileToken: string;
+  turnstileToken?: string;
 }
