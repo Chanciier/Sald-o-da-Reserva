@@ -27,9 +27,30 @@ enum CouponType {
 enum OrderStatus {
   PENDING
   CONFIRMED
+  PAID
   SHIPPED
   DELIVERED
   CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  BOLETO
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  AUTHORIZED
+  IN_PROCESS
+  IN_MEDIATION
+  REJECTED
+  CANCELLED
+  REFUNDED
+  CHARGED_BACK
 }
 
 model User {
@@ -197,9 +218,10 @@ model Order {
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coupon Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  items  OrderItem[]
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon  Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items   OrderItem[]
+  payment Payment?
 
   @@index([userId])
   @@map("orders")
@@ -221,4 +243,47 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String        @unique @map("order_id")
+  mpPaymentId     String?       @unique @map("mp_payment_id")
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  amount          Decimal       @db.Decimal(10, 2)
+  idempotencyKey  String        @unique @map("idempotency_key")
+  pixQrCode       String?       @map("pix_qr_code") @db.Text
+  pixQrCodeBase64 String?       @map("pix_qr_code_base64") @db.Text
+  pixExpiresAt    DateTime?     @map("pix_expires_at")
+  boletoUrl       String?       @map("boleto_url")
+  boletoCode      String?       @map("boleto_code") @db.Text
+  boletoExpiresAt DateTime?     @map("boleto_expires_at")
+  cardBrand       String?       @map("card_brand")
+  cardLast4       String?       @map("card_last_4")
+  installments    Int?
+  rawStatus       String?       @map("raw_status")
+  statusDetail    String?       @map("status_detail")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  order Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  logs  PaymentLog[]
+
+  @@index([mpPaymentId])
+  @@map("payments")
+}
+
+model PaymentLog {
+  id        String   @id @default(cuid())
+  paymentId String   @map("payment_id")
+  event     String
+  status    String?
+  rawData   Json?    @map("raw_data")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@map("payment_logs")
 }

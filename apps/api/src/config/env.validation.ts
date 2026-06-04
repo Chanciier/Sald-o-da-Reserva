@@ -48,6 +48,18 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   TURNSTILE_SECRET_KEY: string = 'skip';
+
+  @IsString()
+  @IsOptional()
+  MERCADO_PAGO_ACCESS_TOKEN: string = '';
+
+  @IsString()
+  @IsOptional()
+  MERCADO_PAGO_WEBHOOK_SECRET: string = '';
+
+  @IsString()
+  @IsOptional()
+  MERCADO_PAGO_WEBHOOK_URL: string = '';
 }
 
 export function envValidation(config: Record<string, unknown>) {

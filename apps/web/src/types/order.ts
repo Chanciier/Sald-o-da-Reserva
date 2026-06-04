@@ -1,4 +1,11 @@
-export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type OrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PAID'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'REFUNDED';
 
 export interface ShippingAddress {
   name: string;
@@ -38,6 +45,12 @@ export interface Order {
   notes: string | null;
   coupon: { code: string; type?: string; value?: number } | null;
   items: OrderItem[];
+  payment?: {
+    id: string;
+    method: string;
+    status: string;
+    amount: number;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

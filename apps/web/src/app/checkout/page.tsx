@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import { createOrder, getShippingOptions } from '@/lib/cart-api';
 import type { ShippingOption } from '@/types/cart';
+import type { PaymentMethod } from '@/types/payment';
 
 function formatBRL(n: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
@@ -64,6 +65,32 @@ const STATES = [
   'TO',
 ];
 
+const PAYMENT_METHODS: {
+  method: PaymentMethod;
+  label: string;
+  description: string;
+  icon: string;
+}[] = [
+  {
+    method: 'PIX',
+    label: 'PIX',
+    description: 'Aprovação imediata • 24h',
+    icon: '⚡',
+  },
+  {
+    method: 'CREDIT_CARD',
+    label: 'Cartão de crédito',
+    description: 'Visa, Mastercard, Elo e outros',
+    icon: '💳',
+  },
+  {
+    method: 'BOLETO',
+    label: 'Boleto bancário',
+    description: 'Vence em 3 dias úteis',
+    icon: '🏦',
+  },
+];
+
 export default function CheckoutPage() {
   const { user, token } = useAuth();
   const { cart, refresh } = useCart();
@@ -72,6 +99,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<string>('');
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('PIX');
   const [cepLoading, setCepLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -142,7 +170,7 @@ export default function CheckoutPage() {
         couponCode: cart.couponCode ?? undefined,
       });
       await refresh();
-      router.push(`/pedidos/${order.id}`);
+      router.push(`/pagamento/${order.id}?method=${selectedPayment}`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -190,6 +218,7 @@ export default function CheckoutPage() {
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
+            {/* Shipping address */}
             <section className="rounded-xl border border-border p-5 space-y-4">
               <h2 className="font-semibold">Endereço de entrega</h2>
 
@@ -295,6 +324,7 @@ export default function CheckoutPage() {
               </div>
             </section>
 
+            {/* Shipping method */}
             <section className="rounded-xl border border-border p-5 space-y-3">
               <h2 className="font-semibold">Frete</h2>
               {shippingOptions.length === 0 ? (
@@ -326,8 +356,36 @@ export default function CheckoutPage() {
                 </div>
               )}
             </section>
+
+            {/* Payment method */}
+            <section className="rounded-xl border border-border p-5 space-y-3">
+              <h2 className="font-semibold">Forma de pagamento</h2>
+              <div className="space-y-2">
+                {PAYMENT_METHODS.map((pm) => (
+                  <label
+                    key={pm.method}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      value={pm.method}
+                      checked={selectedPayment === pm.method}
+                      onChange={() => setSelectedPayment(pm.method)}
+                      className="accent-primary"
+                    />
+                    <span className="text-lg">{pm.icon}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{pm.label}</p>
+                      <p className="text-xs text-muted-foreground">{pm.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </section>
           </div>
 
+          {/* Order summary */}
           <div className="space-y-4">
             <div className="rounded-xl border border-border p-5 space-y-3">
               <h2 className="font-semibold">Resumo</h2>
@@ -366,6 +424,15 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {selectedPayment && (
+                <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                  Pagamento via{' '}
+                  <span className="font-medium text-foreground">
+                    {PAYMENT_METHODS.find((p) => p.method === selectedPayment)?.label}
+                  </span>
+                </div>
+              )}
+
               {error && (
                 <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {error}
@@ -374,10 +441,10 @@ export default function CheckoutPage() {
 
               <button
                 type="submit"
-                disabled={submitting || !selectedShipping}
+                disabled={submitting || !selectedShipping || !selectedPayment}
                 className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
               >
-                {submitting ? 'Processando...' : 'Confirmar pedido'}
+                {submitting ? 'Processando...' : 'Confirmar e ir para pagamento'}
               </button>
             </div>
           </div>

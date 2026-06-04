@@ -13,6 +13,7 @@ import { StorageModule } from './storage/storage.module';
 import { CartModule } from './cart/cart.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { CheckoutModule } from './checkout/checkout.module';
+import { PaymentsModule } from './payments/payments.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
 import { PermissionsGuard } from './rbac/guards/permissions.guard';
@@ -35,6 +36,7 @@ import { envValidation } from './config/env.validation';
     CartModule,
     CouponsModule,
     CheckoutModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
