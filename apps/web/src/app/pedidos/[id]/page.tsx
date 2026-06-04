@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
-import type { Order } from '@/types/order';
+import { purchaseLabel } from '@/lib/shipping';
+import { TrackingDisplay } from '@/components/shipping/tracking-display';
+import type { Order, Shipment } from '@/types/order';
 
 function formatBRL(n: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
@@ -20,6 +22,10 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
     label: 'Confirmado',
     color: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
   },
+  PAID: {
+    label: 'Pago',
+    color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+  },
   SHIPPED: {
     label: 'Enviado',
     color: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300',
@@ -32,6 +38,10 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
     label: 'Cancelado',
     color: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
   },
+  REFUNDED: {
+    label: 'Reembolsado',
+    color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  },
 };
 
 export default function OrderDetailPage() {
@@ -40,6 +50,10 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [labelLoading, setLabelLoading] = useState(false);
+  const [labelError, setLabelError] = useState('');
+
+  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => {
     if (!token || !params.id) return;
@@ -48,6 +62,25 @@ export default function OrderDetailPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [token, params.id]);
+
+  async function handlePurchaseLabel() {
+    if (!token || !order) return;
+    setLabelError('');
+    setLabelLoading(true);
+    try {
+      const result = await purchaseLabel(order.id, token);
+      // Refresh order to get updated shipment
+      const updated = await getOrder(token, order.id);
+      setOrder(updated);
+      if (result.labelUrl) {
+        window.open(result.labelUrl, '_blank');
+      }
+    } catch (e) {
+      setLabelError((e as Error).message);
+    } finally {
+      setLabelLoading(false);
+    }
+  }
 
   if (!user) {
     return (
@@ -87,6 +120,7 @@ export default function OrderDetailPage() {
 
   const status = STATUS_LABEL[order.status] ?? STATUS_LABEL.PENDING;
   const address = order.shippingAddress;
+  const shipment = order.shipment as Shipment | null | undefined;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -111,6 +145,7 @@ export default function OrderDetailPage() {
       </div>
 
       <div className="space-y-4">
+        {/* Items */}
         <section className="rounded-xl border border-border p-5">
           <h2 className="mb-3 font-semibold">Itens</h2>
           <div className="space-y-3">
@@ -142,7 +177,34 @@ export default function OrderDetailPage() {
           </div>
         </section>
 
+        {/* Shipment / Tracking */}
+        {shipment && (
+          <section className="rounded-xl border border-border p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold">Envio e Rastreamento</h2>
+              {isAdmin && shipment.status === 'PENDING' && shipment.serviceId > 0 && (
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    onClick={handlePurchaseLabel}
+                    disabled={labelLoading}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+                  >
+                    {labelLoading ? 'Processando...' : 'Comprar etiqueta'}
+                  </button>
+                  {labelError && (
+                    <p className="text-xs text-destructive max-w-[200px] text-right">
+                      {labelError}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <TrackingDisplay shipment={shipment} />
+          </section>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
+          {/* Address */}
           <section className="rounded-xl border border-border p-5">
             <h2 className="mb-3 font-semibold">Endereço de entrega</h2>
             <div className="space-y-0.5 text-sm text-muted-foreground">
@@ -158,6 +220,7 @@ export default function OrderDetailPage() {
             </div>
           </section>
 
+          {/* Financial summary */}
           <section className="rounded-xl border border-border p-5">
             <h2 className="mb-3 font-semibold">Resumo financeiro</h2>
             <div className="space-y-1 text-sm">

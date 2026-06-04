@@ -8,9 +8,9 @@ export class CheckoutController {
   constructor(private readonly checkout: CheckoutService) {}
 
   @Get('checkout/shipping')
-  getShipping(@Query('subtotal') subtotal: string) {
+  getShipping(@Query('subtotal') subtotal: string, @Query('cep') cep?: string) {
     const amount = parseFloat(subtotal) || 0;
-    return this.checkout.getShippingOptions(amount);
+    return this.checkout.getShippingOptions(amount, cep);
   }
 
   @Post('checkout')

@@ -34,6 +34,15 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum ShipmentStatus {
+  PENDING
+  LABEL_PURCHASED
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
 enum PaymentMethod {
   PIX
   CREDIT_CARD
@@ -218,10 +227,11 @@ model Order {
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coupon  Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  items   OrderItem[]
-  payment Payment?
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon   Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items    OrderItem[]
+  payment  Payment?
+  shipment Shipment?
 
   @@index([userId])
   @@map("orders")
@@ -272,6 +282,48 @@ model Payment {
 
   @@index([mpPaymentId])
   @@map("payments")
+}
+
+model Shipment {
+  id           String         @id @default(cuid())
+  orderId      String         @unique @map("order_id")
+  meOrderId    String?        @unique @map("me_order_id")
+  carrier      String
+  service      String
+  serviceId    Int            @map("service_id")
+  trackingCode String?        @map("tracking_code")
+  status       ShipmentStatus @default(PENDING)
+  labelUrl     String?        @map("label_url") @db.Text
+  price        Decimal        @db.Decimal(10, 2)
+  deliveryMin  Int?           @map("delivery_min")
+  deliveryMax  Int?           @map("delivery_max")
+  rawQuote     Json?          @map("raw_quote")
+  rawData      Json?          @map("raw_data")
+  shippedAt    DateTime?      @map("shipped_at")
+  deliveredAt  DateTime?      @map("delivered_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  order  Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events ShipmentEvent[]
+
+  @@map("shipments")
+}
+
+model ShipmentEvent {
+  id          String   @id @default(cuid())
+  shipmentId  String   @map("shipment_id")
+  event       String
+  status      String?
+  description String?
+  location    String?
+  rawData     Json?    @map("raw_data")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+  @@map("shipment_events")
 }
 
 model PaymentLog {

@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
-import { createOrder, getShippingOptions } from '@/lib/cart-api';
+import { createOrder } from '@/lib/cart-api';
+import { getShippingQuote } from '@/lib/shipping';
 import type { ShippingOption } from '@/types/cart';
 import type { PaymentMethod } from '@/types/payment';
 
@@ -71,24 +72,14 @@ const PAYMENT_METHODS: {
   description: string;
   icon: string;
 }[] = [
-  {
-    method: 'PIX',
-    label: 'PIX',
-    description: 'Aprovação imediata • 24h',
-    icon: '⚡',
-  },
+  { method: 'PIX', label: 'PIX', description: 'Aprovação imediata • 24h', icon: '⚡' },
   {
     method: 'CREDIT_CARD',
     label: 'Cartão de crédito',
     description: 'Visa, Mastercard, Elo e outros',
     icon: '💳',
   },
-  {
-    method: 'BOLETO',
-    label: 'Boleto bancário',
-    description: 'Vence em 3 dias úteis',
-    icon: '🏦',
-  },
+  { method: 'BOLETO', label: 'Boleto bancário', description: 'Vence em 3 dias úteis', icon: '🏦' },
 ];
 
 export default function CheckoutPage() {
@@ -98,24 +89,13 @@ export default function CheckoutPage() {
 
   const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
-  const [selectedShipping, setSelectedShipping] = useState<string>('');
+  const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('PIX');
   const [cepLoading, setCepLoading] = useState(false);
+  const [shippingLoading, setShippingLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!token || !cart) return;
-    getShippingOptions(token, cart.subtotal)
-      .then(setShippingOptions)
-      .catch(() => {});
-  }, [token, cart?.subtotal]);
-
-  useEffect(() => {
-    if (shippingOptions.length && !selectedShipping) {
-      setSelectedShipping(shippingOptions[0].method);
-    }
-  }, [shippingOptions]);
+  const lastQuotedCep = useRef('');
 
   function set(field: keyof AddressForm, value: string) {
     setAddress((prev) => ({ ...prev, [field]: value }));
@@ -143,15 +123,81 @@ export default function CheckoutPage() {
     } finally {
       setCepLoading(false);
     }
+    await fetchShippingQuotes(cleaned);
   }
 
-  const selectedOption = shippingOptions.find((o) => o.method === selectedShipping);
-  const shippingCost = selectedOption?.price ?? 0;
+  async function fetchShippingQuotes(cep: string) {
+    const cleaned = cep.replace(/\D/g, '');
+    if (cleaned.length !== 8 || !token || cleaned === lastQuotedCep.current) return;
+    lastQuotedCep.current = cleaned;
+    setShippingLoading(true);
+    setSelectedShipping(null);
+    try {
+      const options = await getShippingQuote(cleaned, token);
+
+      // Prepend free shipping if eligible
+      const FREE_THRESHOLD = 300;
+      const subtotal = cart?.subtotal ?? 0;
+      const allOptions: ShippingOption[] =
+        subtotal >= FREE_THRESHOLD
+          ? [
+              {
+                serviceId: 0,
+                method: 'FREE',
+                name: 'Frete Grátis',
+                carrier: '',
+                description: '5–8 dias úteis',
+                price: 0,
+                deliveryMin: 5,
+                deliveryMax: 8,
+              },
+              ...options,
+            ]
+          : options;
+
+      setShippingOptions(allOptions);
+      if (allOptions.length) setSelectedShipping(allOptions[0]);
+    } catch {
+      // ignore — user can still proceed with empty options
+    } finally {
+      setShippingLoading(false);
+    }
+  }
+
+  // Load initial options when cart loads (no CEP yet = fallback)
+  useEffect(() => {
+    if (!token || !cart || shippingOptions.length) return;
+    getShippingQuote('', token)
+      .then((opts) => {
+        const FREE_THRESHOLD = 300;
+        const allOptions: ShippingOption[] =
+          cart.subtotal >= FREE_THRESHOLD
+            ? [
+                {
+                  serviceId: 0,
+                  method: 'FREE',
+                  name: 'Frete Grátis',
+                  carrier: '',
+                  description: '5–8 dias úteis',
+                  price: 0,
+                  deliveryMin: 5,
+                  deliveryMax: 8,
+                },
+                ...opts,
+              ]
+            : opts;
+        setShippingOptions(allOptions);
+        if (allOptions.length && !selectedShipping) setSelectedShipping(allOptions[0]);
+      })
+      .catch(() => {});
+  }, [token, cart?.subtotal]);
+
+  const shippingCost = selectedShipping?.price ?? 0;
   const total = (cart?.total ?? 0) + shippingCost;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token || !cart) return;
+    if (!token || !cart || !selectedShipping) return;
     setError('');
     setSubmitting(true);
     try {
@@ -166,7 +212,12 @@ export default function CheckoutPage() {
           city: address.city,
           state: address.state,
         },
-        shippingMethod: selectedShipping,
+        shippingMethod: selectedShipping.name,
+        shippingPrice: selectedShipping.price,
+        meServiceId: selectedShipping.serviceId || undefined,
+        meCarrier: selectedShipping.carrier || undefined,
+        deliveryMin: selectedShipping.deliveryMin,
+        deliveryMax: selectedShipping.deliveryMax,
         couponCode: cart.couponCode ?? undefined,
       });
       await refresh();
@@ -324,28 +375,46 @@ export default function CheckoutPage() {
               </div>
             </section>
 
-            {/* Shipping method */}
+            {/* Shipping options */}
             <section className="rounded-xl border border-border p-5 space-y-3">
-              <h2 className="font-semibold">Frete</h2>
-              {shippingOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Calculando opções...</p>
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold">Frete</h2>
+                {shippingLoading && (
+                  <span className="text-xs text-muted-foreground animate-pulse">Calculando...</span>
+                )}
+              </div>
+
+              {shippingOptions.length === 0 && !shippingLoading ? (
+                <p className="text-sm text-muted-foreground">
+                  Informe o CEP para ver as opções de frete.
+                </p>
               ) : (
                 <div className="space-y-2">
                   {shippingOptions.map((opt) => (
                     <label
-                      key={opt.method}
+                      key={`${opt.method}-${opt.serviceId}`}
                       className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5"
                     >
                       <input
                         type="radio"
                         name="shipping"
-                        value={opt.method}
-                        checked={selectedShipping === opt.method}
-                        onChange={() => setSelectedShipping(opt.method)}
+                        checked={
+                          selectedShipping?.method === opt.method &&
+                          selectedShipping?.serviceId === opt.serviceId
+                        }
+                        onChange={() => setSelectedShipping(opt)}
                         className="accent-primary"
                       />
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{opt.name}</p>
+                        <p className="text-sm font-medium">
+                          {opt.name}
+                          {opt.carrier && opt.carrier !== opt.name ? (
+                            <span className="text-muted-foreground font-normal">
+                              {' '}
+                              · {opt.carrier}
+                            </span>
+                          ) : null}
+                        </p>
                         <p className="text-xs text-muted-foreground">{opt.description}</p>
                       </div>
                       <span className="text-sm font-semibold">
@@ -416,7 +485,13 @@ export default function CheckoutPage() {
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Frete</span>
-                  <span>{shippingCost === 0 ? 'Grátis' : formatBRL(shippingCost)}</span>
+                  <span>
+                    {selectedShipping
+                      ? selectedShipping.price === 0
+                        ? 'Grátis'
+                        : formatBRL(selectedShipping.price)
+                      : '—'}
+                  </span>
                 </div>
                 <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
                   <span>Total</span>

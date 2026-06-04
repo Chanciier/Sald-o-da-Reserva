@@ -45,8 +45,11 @@ export const applyCoupon = (token: string, code: string) =>
 export const removeCoupon = (token: string) =>
   apiFetch<Cart>('/cart/coupon', token, { method: 'DELETE' });
 
-export const getShippingOptions = (token: string, subtotal: number) =>
-  apiFetch<ShippingOption[]>(`/checkout/shipping?subtotal=${subtotal}`, token);
+export const getShippingOptions = (token: string, subtotal: number, cep?: string) =>
+  apiFetch<ShippingOption[]>(
+    `/checkout/shipping?subtotal=${subtotal}${cep ? `&cep=${cep}` : ''}`,
+    token,
+  );
 
 export const createOrder = (token: string, body: unknown) =>
   apiFetch<Order>('/checkout', token, {

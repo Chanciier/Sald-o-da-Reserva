@@ -7,6 +7,14 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'REFUNDED';
 
+export type ShipmentStatus =
+  | 'PENDING'
+  | 'LABEL_PURCHASED'
+  | 'SHIPPED'
+  | 'IN_TRANSIT'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
 export interface ShippingAddress {
   name: string;
   cep: string;
@@ -31,6 +39,35 @@ export interface OrderItem {
   };
 }
 
+export interface ShipmentEvent {
+  id: string;
+  event: string;
+  status: string | null;
+  description: string | null;
+  location: string | null;
+  createdAt: string;
+}
+
+export interface Shipment {
+  id: string;
+  orderId: string;
+  meOrderId: string | null;
+  carrier: string;
+  service: string;
+  serviceId: number;
+  trackingCode: string | null;
+  status: ShipmentStatus;
+  labelUrl: string | null;
+  price: number;
+  deliveryMin: number | null;
+  deliveryMax: number | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  events: ShipmentEvent[];
+}
+
 export interface Order {
   id: string;
   userId: string;
@@ -51,6 +88,7 @@ export interface Order {
     status: string;
     amount: number;
   } | null;
+  shipment?: Shipment | null;
   createdAt: string;
   updatedAt: string;
 }

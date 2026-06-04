@@ -1,12 +1,14 @@
 import {
-  IsEnum,
+  IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
-  MaxLength,
-  ValidateNested,
   Length,
   Matches,
+  MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -50,15 +52,39 @@ export class ShippingAddressDto {
   state: string;
 }
 
-export type ShippingMethod = 'PAC' | 'SEDEX' | 'FREE';
-
 export class CreateOrderDto {
   @ValidateNested()
   @Type(() => ShippingAddressDto)
   shippingAddress: ShippingAddressDto;
 
-  @IsEnum(['PAC', 'SEDEX', 'FREE'])
-  shippingMethod: ShippingMethod;
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  shippingMethod: string;
+
+  @IsNumber()
+  @Min(0)
+  shippingPrice: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  meServiceId?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  meCarrier?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  deliveryMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  deliveryMax?: number;
 
   @IsOptional()
   @IsString()

@@ -2,22 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
-import type { CreateOrderDto, ShippingMethod } from './dto/create-order.dto';
-
-export interface ShippingOption {
-  method: ShippingMethod;
-  name: string;
-  description: string;
-  price: number;
-}
-
-const SHIPPING: Record<string, { name: string; description: string; price: number }> = {
-  PAC: { name: 'PAC', description: '5 a 8 dias úteis', price: 19.9 },
-  SEDEX: { name: 'SEDEX', description: '1 a 3 dias úteis', price: 34.9 },
-  FREE: { name: 'Frete Grátis', description: '5 a 8 dias úteis', price: 0 },
-};
-
-const FREE_THRESHOLD = 300;
+import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
+import type { CreateOrderDto } from './dto/create-order.dto';
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
@@ -45,16 +31,30 @@ export class CheckoutService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cartService: CartService,
+    private readonly shippingService: ShippingService,
   ) {}
 
-  getShippingOptions(subtotal: number): ShippingOption[] {
-    const options: ShippingOption[] = [
-      { method: 'PAC', ...SHIPPING.PAC },
-      { method: 'SEDEX', ...SHIPPING.SEDEX },
-    ];
+  async getShippingOptions(subtotal: number, cep?: string): Promise<ShippingQuoteOption[]> {
+    const options = cep
+      ? await this.shippingService.quote(cep)
+      : this.shippingService['fallbackOptions']();
+
+    // Add free shipping if eligible
+    const FREE_THRESHOLD = 300;
     if (subtotal >= FREE_THRESHOLD) {
-      options.unshift({ method: 'FREE', ...SHIPPING.FREE });
+      const free: ShippingQuoteOption = {
+        serviceId: 0,
+        method: 'FREE',
+        name: 'Frete Grátis',
+        carrier: '',
+        description: '5–8 dias úteis',
+        price: 0,
+        deliveryMin: 5,
+        deliveryMax: 8,
+      };
+      return [free, ...options];
     }
+
     return options;
   }
 
@@ -80,17 +80,9 @@ export class CheckoutService {
       }
     }
 
-    // Shipping cost
-    let shippingCost = 0;
-    if (dto.shippingMethod === 'PAC') shippingCost = SHIPPING.PAC.price;
-    else if (dto.shippingMethod === 'SEDEX') shippingCost = SHIPPING.SEDEX.price;
-    else if (dto.shippingMethod === 'FREE') {
-      if (cart.subtotal < FREE_THRESHOLD) {
-        throw new BadRequestException('Pedido não elegível para frete grátis.');
-      }
-    }
+    const shippingCost = round2(Math.max(0, dto.shippingPrice));
 
-    // Coupon (prefer DTO over cart)
+    // Coupon
     const couponCode = dto.couponCode?.toUpperCase() ?? cart.couponCode ?? null;
     let couponId: string | null = null;
     let discount = 0;
@@ -167,6 +159,19 @@ export class CheckoutService {
         });
       }
 
+      // Create shipment record
+      await tx.shipment.create({
+        data: {
+          orderId: newOrder.id,
+          serviceId: dto.meServiceId ?? 0,
+          carrier: dto.meCarrier ?? 'N/A',
+          service: dto.shippingMethod,
+          price: shippingCost,
+          deliveryMin: dto.deliveryMin ?? null,
+          deliveryMax: dto.deliveryMax ?? null,
+        },
+      });
+
       return newOrder;
     });
 
@@ -176,37 +181,57 @@ export class CheckoutService {
   }
 
   async findUserOrders(userId: string) {
-    const orders = await this.prisma.order.findMany({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prismaAny = this.prisma as any;
+    const orders = await prismaAny.order.findMany({
       where: { userId },
       include: {
         items: true,
         coupon: { select: { code: true } },
+        shipment: { select: { status: true, trackingCode: true, carrier: true, service: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    return orders.map((o) => serializeOrder(o as unknown as Record<string, unknown>));
+    return (orders as Record<string, unknown>[]).map((o) =>
+      serializeOrder(o as unknown as Record<string, unknown>),
+    );
   }
 
   async findOrderById(userId: string, orderId: string) {
-    const order = await this.prisma.order.findFirst({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prismaAny = this.prisma as any;
+    const order = await prismaAny.order.findFirst({
       where: { id: orderId, userId },
       include: {
-        items: {
-          include: { product: { include: { images: { take: 1 } } } },
-        },
+        items: { include: { product: { include: { images: { take: 1 } } } } },
         coupon: { select: { code: true, type: true, value: true } },
+        shipment: {
+          select: {
+            id: true,
+            status: true,
+            carrier: true,
+            service: true,
+            trackingCode: true,
+            labelUrl: true,
+            meOrderId: true,
+            deliveryMin: true,
+            deliveryMax: true,
+            shippedAt: true,
+            deliveredAt: true,
+          },
+        },
       },
     });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
+    const o = order as Record<string, unknown> & {
+      coupon: { code: string; type: string; value: { toNumber(): number } } | null;
+    };
+
     return {
-      ...serializeOrder(order as unknown as Record<string, unknown>),
-      coupon: order.coupon
-        ? {
-            code: order.coupon.code,
-            type: order.coupon.type,
-            value: order.coupon.value.toNumber(),
-          }
+      ...serializeOrder(o),
+      coupon: o.coupon
+        ? { code: o.coupon.code, type: o.coupon.type, value: o.coupon.value.toNumber() }
         : null,
     };
   }

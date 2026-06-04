@@ -29,8 +29,12 @@ export interface Cart {
 }
 
 export interface ShippingOption {
-  method: 'PAC' | 'SEDEX' | 'FREE';
+  serviceId: number;
+  method: string;
   name: string;
+  carrier: string;
   description: string;
   price: number;
+  deliveryMin: number;
+  deliveryMax: number;
 }

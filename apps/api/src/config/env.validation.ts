@@ -60,6 +60,62 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   MERCADO_PAGO_WEBHOOK_URL: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_TOKEN: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_SANDBOX: string = 'true';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_WEBHOOK_TOKEN: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_NAME: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_EMAIL: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_DOCUMENT: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_PHONE: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_CEP: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_ADDRESS: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_NUMBER: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_COMPLEMENT: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_DISTRICT: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_CITY: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_STATE: string = '';
 }
 
 export function envValidation(config: Record<string, unknown>) {
