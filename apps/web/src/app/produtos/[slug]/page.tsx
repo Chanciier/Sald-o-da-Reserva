@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const product = await getProduct(params.slug).catch(() => null);
   if (!product) return { title: 'Produto não encontrado' };
   return {
-    title: `${product.name} | Saldão da Reserva`,
+    title: `${product.name} | Saldão da Reversa`,
     description: product.description ?? undefined,
   };
 }

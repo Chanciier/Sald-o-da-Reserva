@@ -9,8 +9,8 @@ import { CartDrawer } from '@/components/cart/cart-drawer';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Saldão da Reserva',
-  description: 'Plataforma de vendas Saldão da Reserva',
+  title: 'Saldão da Reversa',
+  description: 'Plataforma de vendas Saldão da Reversa',
 };
 
 export default function RootLayout({
