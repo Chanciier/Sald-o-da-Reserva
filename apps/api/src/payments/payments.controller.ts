@@ -38,6 +38,12 @@ export class PaymentsController {
     return this.payments.getByOrder(orderId, userId);
   }
 
+  /** Dedicated status endpoint for post-card-payment verification */
+  @Get(':paymentId/status')
+  getStatus(@Param('paymentId') paymentId: string, @CurrentUser('id') userId: string) {
+    return this.payments.getStatus(paymentId, userId);
+  }
+
   @Get('admin/all')
   @Roles(Role.ADMIN)
   findAll(

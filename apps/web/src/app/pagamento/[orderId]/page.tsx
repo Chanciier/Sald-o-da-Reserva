@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { createPayment, getPayment } from '@/lib/payments';
+import { createPayment, getPayment, getPaymentStatus } from '@/lib/payments';
 import { PixDisplay } from '@/components/payment/pix-display';
 import { BoletoDisplay } from '@/components/payment/boleto-display';
 import { CardForm } from '@/components/payment/card-form';
@@ -23,6 +23,93 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
 
 const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'REFUNDED']);
 const POLL_INTERVAL = 5000;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatBRL(n: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+}
+
+function formatCpf(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+function validateCpf(raw: string): boolean {
+  const d = raw.replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(d[i]) * (10 - i);
+  let r = (sum * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  if (r !== parseInt(d[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(d[i]) * (11 - i);
+  r = (sum * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  return r === parseInt(d[10]);
+}
+
+// ── CPF collection step (shown before boleto is created) ──────────────────────
+
+function CpfForm({ onSubmit }: { onSubmit: (cpf: string) => void }) {
+  const [value, setValue] = useState('');
+  const [touched, setTouched] = useState(false);
+  const clean = value.replace(/\D/g, '');
+  const valid = validateCpf(clean);
+  const showError = touched && value.length > 0 && !valid;
+
+  return (
+    <div className="space-y-5 py-4">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-2xl">
+          🏦
+        </div>
+        <p className="font-semibold">Informe seu CPF</p>
+        <p className="text-sm text-muted-foreground">
+          O Stripe exige o CPF do pagador para emitir o boleto.
+        </p>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">CPF</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="000.000.000-00"
+          value={value}
+          onChange={(e) => setValue(formatCpf(e.target.value))}
+          onBlur={() => setTouched(true)}
+          maxLength={14}
+          className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring ${
+            showError ? 'border-destructive' : 'border-input bg-background'
+          }`}
+        />
+        {showError && (
+          <p className="mt-1 text-xs text-destructive">
+            CPF inválido. Verifique e tente novamente.
+          </p>
+        )}
+      </div>
+
+      <button
+        onClick={() => {
+          setTouched(true);
+          if (valid) onSubmit(clean);
+        }}
+        disabled={!valid}
+        className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+      >
+        Gerar boleto
+      </button>
+    </div>
+  );
+}
+
+// ── Status badge ──────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
@@ -43,19 +130,20 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function formatBRL(n: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
-}
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function PaymentPage({ params }: PageProps) {
   const { user, token } = useAuth();
   const searchParams = useSearchParams();
-  const method = (searchParams.get('method') ?? 'PIX') as PaymentMethod;
+  const method = (searchParams.get('method') ?? 'CREDIT_CARD') as PaymentMethod;
   const { orderId } = params;
 
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  /** CPF collected before boleto creation; null = not yet collected */
+  const [taxId, setTaxId] = useState<string | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
@@ -77,7 +165,7 @@ export default function PaymentPage({ params }: PageProps) {
           setPayment(updated);
           if (TERMINAL_STATUSES.has(updated.status)) stopPolling();
         } catch {
-          // ignore transient errors
+          // ignore transient polling errors
         }
       }, POLL_INTERVAL);
     },
@@ -87,6 +175,12 @@ export default function PaymentPage({ params }: PageProps) {
   useEffect(() => {
     if (!token) return;
 
+    // BOLETO: wait for CPF before creating
+    if (method === 'BOLETO' && taxId === null) {
+      setLoading(false);
+      return;
+    }
+
     async function init() {
       setLoading(true);
       try {
@@ -95,7 +189,7 @@ export default function PaymentPage({ params }: PageProps) {
         if (existing && !['REJECTED', 'CANCELLED'].includes(existing.status)) {
           const isCard = method === 'CREDIT_CARD' || method === 'DEBIT_CARD';
           if (isCard && existing.status === 'PENDING') {
-            // show card form again
+            // fall through to show card form again
           } else {
             setPayment(existing);
             startPolling(existing);
@@ -103,12 +197,18 @@ export default function PaymentPage({ params }: PageProps) {
           }
         }
 
-        if (method === 'PIX' || method === 'BOLETO') {
+        if (method === 'PIX') {
           const created = await createPayment(orderId, { method }, token!);
           setPayment(created);
           startPolling(created);
         }
-        // For CREDIT_CARD: payment is created on first render of CardForm via handleCardInit
+
+        if (method === 'BOLETO' && taxId) {
+          const created = await createPayment(orderId, { method, taxId }, token!);
+          setPayment(created);
+          startPolling(created);
+        }
+        // CREDIT_CARD: PaymentIntent is created lazily in CardFormWrapper
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -118,7 +218,7 @@ export default function PaymentPage({ params }: PageProps) {
 
     init();
     return stopPolling;
-  }, [orderId, token, method, startPolling, stopPolling]);
+  }, [orderId, token, method, taxId, startPolling, stopPolling]);
 
   async function handleCardInit(): Promise<string> {
     const created = await createPayment(orderId, { method: 'CREDIT_CARD' }, token!);
@@ -126,8 +226,37 @@ export default function PaymentPage({ params }: PageProps) {
     return created.clientSecret ?? '';
   }
 
-  function handleCardSuccess() {
-    startPolling(payment!);
+  /**
+   * Called after stripe.confirmCardPayment() succeeds.
+   * Immediately queries the backend to get the authoritative status, then polls.
+   */
+  async function handleCardSuccess(paymentIntentId: string) {
+    setVerifying(true);
+    try {
+      // Prefer the dedicated status endpoint; fall back to getPayment if paymentId is absent
+      const currentPayment = payment;
+      let updated: Payment;
+
+      if (currentPayment?.id) {
+        updated = await getPaymentStatus(currentPayment.id, token!);
+      } else {
+        updated = await getPayment(orderId, token!);
+      }
+
+      setPayment(updated);
+
+      if (!TERMINAL_STATUSES.has(updated.status)) {
+        // Not yet confirmed by webhook — keep polling
+        startPolling(updated);
+      }
+    } catch {
+      // Status check failed — fall back to polling
+      if (payment) startPolling(payment);
+    } finally {
+      setVerifying(false);
+      // Suppress unused-variable warning for paymentIntentId
+      void paymentIntentId;
+    }
   }
 
   if (!user) {
@@ -173,8 +302,13 @@ export default function PaymentPage({ params }: PageProps) {
         </div>
 
         <div className="px-6 py-6">
+          {/* CPF step — shown before boleto is created */}
+          {method === 'BOLETO' && taxId === null && !payment && !error && (
+            <CpfForm onSubmit={(cpf) => setTaxId(cpf)} />
+          )}
+
           {/* Loading */}
-          {loading && !payment && (
+          {loading && !payment && taxId !== null && (
             <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
               <svg className="h-6 w-6 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle
@@ -199,20 +333,52 @@ export default function PaymentPage({ params }: PageProps) {
           {error && !payment && (
             <div className="space-y-4 py-8 text-center">
               <p className="text-sm text-destructive">{error}</p>
-              <button
-                onClick={() => {
-                  setError('');
-                  setLoading(false);
-                }}
-                className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted transition-colors"
-              >
-                Tentar novamente
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <button
+                  onClick={() => {
+                    setError('');
+                    setLoading(false);
+                    // For boleto, reset CPF step so user can retry
+                    if (method === 'BOLETO') setTaxId(null);
+                  }}
+                  className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted transition-colors"
+                >
+                  Tentar novamente
+                </button>
+                <Link
+                  href="/checkout"
+                  className="rounded-lg border px-4 py-2 text-sm text-center hover:bg-muted transition-colors"
+                >
+                  Alterar método
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Verifying card payment with backend */}
+          {verifying && (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                />
+              </svg>
+              Confirmando pagamento...
             </div>
           )}
 
           {/* APPROVED / AUTHORIZED */}
-          {(payment?.status === 'APPROVED' || payment?.status === 'AUTHORIZED') && (
+          {!verifying && (payment?.status === 'APPROVED' || payment?.status === 'AUTHORIZED') && (
             <div className="flex flex-col items-center gap-4 py-10 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
                 <svg
@@ -245,7 +411,7 @@ export default function PaymentPage({ params }: PageProps) {
           )}
 
           {/* REJECTED / CANCELLED */}
-          {payment && ['REJECTED', 'CANCELLED'].includes(payment.status) && (
+          {!verifying && payment && ['REJECTED', 'CANCELLED'].includes(payment.status) && (
             <div className="flex flex-col items-center gap-4 py-8 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
                 <svg
@@ -284,11 +450,12 @@ export default function PaymentPage({ params }: PageProps) {
 
           {/* Boleto */}
           {payment && !TERMINAL_STATUSES.has(payment.status) && method === 'BOLETO' && (
-            <BoletoDisplay payment={payment} />
+            <BoletoDisplay payment={payment} orderId={orderId} />
           )}
 
           {/* Card form */}
           {!loading &&
+            !verifying &&
             (method === 'CREDIT_CARD' || method === 'DEBIT_CARD') &&
             !['APPROVED', 'AUTHORIZED', 'REJECTED', 'CANCELLED', 'REFUNDED'].includes(
               payment?.status ?? '',
@@ -302,7 +469,7 @@ export default function PaymentPage({ params }: PageProps) {
               />
             )}
 
-          {/* Polling indicator */}
+          {/* Polling indicator — PIX and BOLETO */}
           {payment &&
             !TERMINAL_STATUSES.has(payment.status) &&
             (method === 'PIX' || method === 'BOLETO') && (
@@ -340,7 +507,8 @@ export default function PaymentPage({ params }: PageProps) {
   );
 }
 
-// Handles creating the PaymentIntent lazily (on mount) and then showing the Stripe form
+// ── CardFormWrapper ───────────────────────────────────────────────────────────
+
 function CardFormWrapper({
   publishableKey,
   existingClientSecret,
@@ -351,7 +519,7 @@ function CardFormWrapper({
   publishableKey: string;
   existingClientSecret: string | null;
   onInit: () => Promise<string>;
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId: string) => void;
   onError: (msg: string) => void;
 }) {
   const [clientSecret, setClientSecret] = useState<string | null>(existingClientSecret);

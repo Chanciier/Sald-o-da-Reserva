@@ -6,7 +6,8 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 
 interface CardFormInnerProps {
   clientSecret: string;
-  onSuccess: () => void;
+  /** Called with the payment intent ID after Stripe confirms — use it to verify status in the backend */
+  onSuccess: (paymentIntentId: string) => void;
   onError: (msg: string) => void;
 }
 
@@ -30,9 +31,11 @@ function CardFormInner({ clientSecret, onSuccess, onError }: CardFormInnerProps)
 
       if (result.error) {
         onError(result.error.message ?? 'Pagamento recusado.');
-      } else {
-        onSuccess();
+        return;
       }
+
+      // Pass the PaymentIntent ID back so the page can verify status via the backend
+      onSuccess(result.paymentIntent?.id ?? '');
     } catch (err) {
       onError((err as Error).message);
     } finally {
@@ -88,7 +91,7 @@ function CardFormInner({ clientSecret, onSuccess, onError }: CardFormInnerProps)
 interface CardFormProps {
   clientSecret: string;
   publishableKey: string;
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId: string) => void;
   onError: (msg: string) => void;
 }
 

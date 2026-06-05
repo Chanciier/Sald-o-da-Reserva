@@ -31,3 +31,10 @@ export async function getPayment(orderId: string, token: string): Promise<Paymen
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/** Used after confirmCardPayment() to verify the current payment status in the backend. */
+export async function getPaymentStatus(paymentId: string, token: string): Promise<Payment> {
+  return request<Payment>(`/payments/${paymentId}/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}

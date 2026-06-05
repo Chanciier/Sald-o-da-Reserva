@@ -5,6 +5,12 @@ import { Prisma, PaymentMethod, PaymentStatus, OrderStatus } from '@prisma/clien
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreatePaymentDto } from './dto/create-payment.dto';
 import { InvoiceService } from '../invoices/invoice.service';
+import type {
+  StripeBoletoDetails,
+  StripePixDetails,
+  ShippingAddressJson,
+  StripeBillingDetails,
+} from './interfaces/stripe.interfaces';
 
 @Injectable()
 export class PaymentsService {
@@ -49,6 +55,14 @@ export class PaymentsService {
       throw new BadRequestException('Gateway de pagamento não configurado. Contate o suporte.');
     }
 
+    // CPF is mandatory for boleto
+    if (dto.method === PaymentMethod.BOLETO) {
+      const taxId = (dto.taxId ?? '').replace(/\D/g, '');
+      if (!taxId) {
+        throw new BadRequestException('CPF é obrigatório para pagamento via boleto.');
+      }
+    }
+
     const amount = Math.round(order.total.toNumber() * 100); // Stripe uses cents
     const fullName = order.user.name ?? order.user.email;
     const returnUrl = `${this.frontendUrl}/pedidos/${orderId}`;
@@ -70,14 +84,19 @@ export class PaymentsService {
           break;
 
         case PaymentMethod.BOLETO: {
-          const taxId = (dto.taxId ?? '').replace(/\D/g, '') || '00000000000';
+          const taxId = (dto.taxId ?? '').replace(/\D/g, '');
+          const billing = this.buildBillingDetails(
+            order as { user: { name: string | null; email: string }; shippingAddress: unknown },
+            fullName,
+          );
+
           pi = await this.stripe.paymentIntents.create({
             amount,
             currency: 'brl',
             payment_method_types: ['boleto'],
             payment_method_data: {
               type: 'boleto',
-              billing_details: { name: fullName, email: order.user.email },
+              billing_details: billing,
               boleto: { tax_id: taxId },
             },
             confirm: true,
@@ -85,6 +104,16 @@ export class PaymentsService {
             payment_method_options: { boleto: { expires_after_days: 3 } },
             metadata: { orderId, userId },
           });
+
+          // Log a warning when Stripe doesn't return the boleto URL/code
+          const extras = this.extractExtras(PaymentMethod.BOLETO, pi);
+          if (!extras.boletoUrl || !extras.boletoCode) {
+            this.logger.warn(
+              `Boleto created without URL or code: orderId=${orderId} piId=${pi.id} ` +
+                `boletoUrl=${extras.boletoUrl ?? 'null'} boletoCode=${extras.boletoCode ? '[present]' : 'null'} ` +
+                `piStatus=${pi.status} nextAction=${JSON.stringify(pi.next_action)}`,
+            );
+          }
           break;
         }
 
@@ -103,6 +132,7 @@ export class PaymentsService {
       }
     } catch (err: unknown) {
       if (err instanceof BadRequestException) throw err;
+      if (err instanceof NotFoundException) throw err;
       const msg = (err as Stripe.errors.StripeError).message ?? 'Erro ao processar pagamento.';
       this.logger.error('Stripe create payment error', { orderId, method: dto.method, err });
       throw new BadRequestException(msg);
@@ -155,6 +185,19 @@ export class PaymentsService {
     this.logger.log(
       `Payment created: id=${payment.id} method=${dto.method} status=${status} order=${orderId}`,
     );
+    return this.serialize(payment);
+  }
+
+  // ── Get status (for frontend card verification) ───────────────────────────
+
+  async getStatus(paymentId: string, userId: string) {
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        order: { userId },
+      },
+    });
+    if (!payment) throw new NotFoundException('Pagamento não encontrado.');
     return this.serialize(payment);
   }
 
@@ -226,25 +269,47 @@ export class PaymentsService {
       event = JSON.parse(rawBody.toString()) as Stripe.Event;
     }
 
-    const pi = event.data.object as Stripe.PaymentIntent;
-
-    const handled = [
+    const piEvents = [
       'payment_intent.succeeded',
       'payment_intent.payment_failed',
       'payment_intent.canceled',
       'payment_intent.processing',
       'payment_intent.requires_action',
     ];
+    const chargeEvents = ['charge.succeeded', 'charge.failed'];
 
-    if (!handled.includes(event.type)) return { received: true };
-
-    try {
-      await this.processUpdate(pi, event.type);
-    } catch (err) {
-      this.logger.error(`Webhook: failed to process piId=${pi.id}`, err);
+    if (piEvents.includes(event.type)) {
+      const pi = event.data.object as Stripe.PaymentIntent;
+      try {
+        await this.processUpdate(pi, event.type);
+      } catch (err) {
+        this.logger.error(`Webhook: failed to process piId=${pi.id}`, err);
+      }
+    } else if (chargeEvents.includes(event.type)) {
+      await this.processChargeEvent(event);
     }
 
     return { received: true };
+  }
+
+  // ── Private: process charge.succeeded / charge.failed ────────────────────
+
+  private async processChargeEvent(event: Stripe.Event) {
+    const charge = event.data.object as Stripe.Charge;
+    const piId =
+      typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+
+    if (!piId) {
+      this.logger.warn(`Webhook: charge event ${event.type} has no payment_intent`);
+      return;
+    }
+
+    try {
+      const pi = await this.stripe.paymentIntents.retrieve(piId);
+      await this.processUpdate(pi, event.type);
+    } catch (err) {
+      this.logger.error(`Webhook: failed to process charge event for piId=${piId}`, err);
+    }
   }
 
   // ── Private: process webhook update ──────────────────────────────────────
@@ -260,7 +325,12 @@ export class PaymentsService {
     }
 
     const newStatus = this.mapStatus(pi.status);
-    if (payment.status === newStatus) return;
+
+    // Idempotency: skip if the status is already at the target state
+    if (payment.status === newStatus) {
+      this.logger.debug(`Webhook: idempotent skip — piId=${pi.id} status already ${newStatus}`);
+      return;
+    }
 
     const extras = this.extractExtras(payment.method, pi);
 
@@ -287,6 +357,10 @@ export class PaymentsService {
       }
     });
 
+    this.logger.log(
+      `Webhook: payment=${payment.id} ${payment.status} → ${newStatus} (${eventType})`,
+    );
+
     if (newStatus === 'APPROVED') {
       this.invoiceService
         .emitForOrder(payment.orderId)
@@ -294,22 +368,46 @@ export class PaymentsService {
     }
   }
 
+  // ── Private: build billing_details from order.shippingAddress ────────────
+
+  private buildBillingDetails(
+    order: { user: { name: string | null; email: string }; shippingAddress: unknown },
+    fullName: string,
+  ): StripeBillingDetails {
+    const addr = (order.shippingAddress ?? {}) as ShippingAddressJson;
+    const line1 = [addr.street, addr.number].filter(Boolean).join(', ') || fullName;
+    const line2Parts = [addr.complement, addr.neighborhood].filter(Boolean);
+
+    return {
+      name: fullName,
+      email: order.user.email,
+      address: {
+        line1,
+        line2: line2Parts.length > 0 ? line2Parts.join(' - ') : undefined,
+        city: addr.city ?? '',
+        state: addr.state ?? '',
+        postal_code: (addr.cep ?? '').replace(/\D/g, ''),
+        country: 'BR',
+      },
+    };
+  }
+
   // ── Private: map Stripe status ────────────────────────────────────────────
 
   private mapStatus(stripeStatus: Stripe.PaymentIntent.Status): PaymentStatus {
     switch (stripeStatus) {
       case 'succeeded':
-        return 'APPROVED';
+        return PaymentStatus.APPROVED;
       case 'canceled':
-        return 'CANCELLED';
+        return PaymentStatus.CANCELLED;
       case 'requires_capture':
-        return 'AUTHORIZED';
+        return PaymentStatus.AUTHORIZED;
       case 'processing':
       case 'requires_action':
       case 'requires_confirmation':
       case 'requires_payment_method':
       default:
-        return 'PENDING';
+        return PaymentStatus.PENDING;
     }
   }
 
@@ -319,9 +417,7 @@ export class PaymentsService {
     const nextAction = pi.next_action;
 
     if (method === PaymentMethod.PIX) {
-      const pix = nextAction?.pix_display_qr_code as
-        | { data?: string; image_url_png?: string; expiration_timestamp?: number }
-        | undefined;
+      const pix = nextAction?.pix_display_qr_code as StripePixDetails | undefined;
       return {
         pixQrCode: pix?.data ?? null,
         pixQrCodeBase64: pix?.image_url_png ?? null,
@@ -330,9 +426,7 @@ export class PaymentsService {
     }
 
     if (method === PaymentMethod.BOLETO) {
-      const boleto = nextAction?.boleto_display_details as
-        | { hosted_voucher_url?: string; number?: string; expires_at?: number }
-        | undefined;
+      const boleto = nextAction?.boleto_display_details as StripeBoletoDetails | undefined;
       return {
         boletoUrl: boleto?.hosted_voucher_url ?? null,
         boletoCode: boleto?.number ?? null,

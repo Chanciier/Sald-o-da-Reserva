@@ -7,5 +7,5 @@ export class CreatePaymentDto {
 
   @IsOptional()
   @IsString()
-  taxId?: string; // CPF/CNPJ for Boleto
+  taxId?: string; // CPF/CNPJ — required for BOLETO, validated in service
 }

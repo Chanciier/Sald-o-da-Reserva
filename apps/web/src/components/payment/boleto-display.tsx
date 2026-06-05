@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { Payment } from '@/types/payment';
 
 interface BoletoDisplayProps {
   payment: Payment;
+  orderId?: string;
 }
 
 function formatBoletoCode(code: string): string {
@@ -14,7 +16,7 @@ function formatBoletoCode(code: string): string {
   );
 }
 
-export function BoletoDisplay({ payment }: BoletoDisplayProps) {
+export function BoletoDisplay({ payment, orderId }: BoletoDisplayProps) {
   const [copied, setCopied] = useState(false);
 
   async function copyCode() {
@@ -27,6 +29,52 @@ export function BoletoDisplay({ payment }: BoletoDisplayProps) {
   const expiresDate = payment.boletoExpiresAt
     ? new Date(payment.boletoExpiresAt).toLocaleDateString('pt-BR')
     : null;
+
+  // Neither URL nor code — show a friendly error instead of a blank screen
+  if (!payment.boletoUrl && !payment.boletoCode) {
+    return (
+      <div className="flex flex-col items-center gap-5 py-6 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-yellow-100">
+          <svg
+            className="h-7 w-7 text-yellow-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+            />
+          </svg>
+        </div>
+        <div className="space-y-1.5">
+          <p className="font-semibold">Boleto não disponível</p>
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+            Não foi possível gerar o boleto neste momento. Tente novamente ou escolha outro método
+            de pagamento.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+          {orderId && (
+            <Link
+              href={`/pagamento/${orderId}?method=BOLETO`}
+              className="flex-1 rounded-lg border px-4 py-2 text-sm text-center hover:bg-muted transition-colors"
+            >
+              Tentar novamente
+            </Link>
+          )}
+          <Link
+            href="/checkout"
+            className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-center text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Outro método
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 py-4">
