@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { Role } from '@prisma/client';
 import { RbacService } from './rbac.service';
@@ -41,5 +51,37 @@ export class RbacController {
   async getUserPermissions(@Param('id') userId: string) {
     const permissions = await this.rbacService.getUserPermissions(userId);
     return { userId, permissions };
+  }
+
+  @Get('users')
+  @HttpCode(HttpStatus.OK)
+  listUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('role') role?: Role,
+    @Query('search') search?: string,
+  ) {
+    return this.rbacService.listUsers({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      role: role || undefined,
+      search: search || undefined,
+    });
+  }
+
+  @Get('audit-logs')
+  @HttpCode(HttpStatus.OK)
+  listAuditLogs(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('userId') userId?: string,
+    @Query('action') action?: string,
+  ) {
+    return this.rbacService.listAuditLogs({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 50,
+      userId: userId || undefined,
+      action: action || undefined,
+    });
   }
 }

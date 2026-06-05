@@ -117,6 +117,93 @@ export class AnalyticsService {
     };
   }
 
+  async getSellerOverview(sellerId: string) {
+    const now = new Date();
+    const today = startOfDay(now);
+    const monthStart = startOfMonth(now);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const sellerItemsWhere = {
+      product: { createdById: sellerId },
+      order: { status: { in: PAID } },
+    };
+
+    const [revenueToday, revenueMonth, topProducts, recentItems, chartItems] = await Promise.all([
+      this.prisma.orderItem.aggregate({
+        where: { ...sellerItemsWhere, order: { status: { in: PAID }, createdAt: { gte: today } } },
+        _sum: { subtotal: true },
+      }),
+      this.prisma.orderItem.aggregate({
+        where: {
+          ...sellerItemsWhere,
+          order: { status: { in: PAID }, createdAt: { gte: monthStart } },
+        },
+        _sum: { subtotal: true },
+      }),
+      this.prisma.orderItem.groupBy({
+        by: ['productId', 'name'],
+        where: sellerItemsWhere,
+        _sum: { quantity: true, subtotal: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 5,
+      }),
+      this.prisma.orderItem.findMany({
+        where: sellerItemsWhere,
+        include: {
+          order: {
+            select: {
+              id: true,
+              status: true,
+              createdAt: true,
+              user: { select: { name: true, email: true } },
+            },
+          },
+        },
+        orderBy: { order: { createdAt: 'desc' } },
+        take: 10,
+      }),
+      this.prisma.orderItem.findMany({
+        where: {
+          ...sellerItemsWhere,
+          order: { status: { in: PAID }, createdAt: { gte: thirtyDaysAgo } },
+        },
+        select: { subtotal: true, order: { select: { createdAt: true } } },
+      }),
+    ]);
+
+    const chartMap = new Map<string, number>();
+    for (const item of chartItems) {
+      const date = item.order.createdAt.toISOString().split('T')[0];
+      const prev = chartMap.get(date) ?? 0;
+      chartMap.set(date, prev + (item.subtotal as unknown as { toNumber(): number }).toNumber());
+    }
+
+    return {
+      revenueToday:
+        (revenueToday._sum.subtotal as unknown as { toNumber(): number } | null)?.toNumber() ?? 0,
+      revenueMonth:
+        (revenueMonth._sum.subtotal as unknown as { toNumber(): number } | null)?.toNumber() ?? 0,
+      topProducts: topProducts.map((p) => ({
+        productId: p.productId,
+        name: p.name,
+        sold: p._sum.quantity ?? 0,
+        revenue: (p._sum.subtotal as unknown as { toNumber(): number } | null)?.toNumber() ?? 0,
+      })),
+      recentOrders: recentItems.map((item) => ({
+        orderId: item.orderId,
+        orderStatus: item.order.status,
+        createdAt: item.order.createdAt,
+        customer: item.order.user,
+        product: item.name,
+        quantity: item.quantity,
+        subtotal: (item.subtotal as unknown as { toNumber(): number }).toNumber(),
+      })),
+      revenueChart: Array.from(chartMap.entries())
+        .map(([date, revenue]) => ({ date, revenue }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    };
+  }
+
   async getCustomerOverview(userId: string) {
     const [totalOrders, totalSpentAgg, avgTicketAgg, pendingOrders, ordersByStatus, recentOrders] =
       await Promise.all([

@@ -158,6 +158,46 @@ export class PaymentsService {
     return this.serialize(payment);
   }
 
+  // ── Admin: list all payments ──────────────────────────────────────────────
+
+  async findAll(params: { page: number; limit: number; method?: string; status?: string }) {
+    const where: Prisma.PaymentWhereInput = {
+      ...(params.method ? { method: params.method as PaymentMethod } : {}),
+      ...(params.status ? { status: params.status as PaymentStatus } : {}),
+    };
+
+    const [total, data] = await Promise.all([
+      this.prisma.payment.count({ where }),
+      this.prisma.payment.findMany({
+        where,
+        include: {
+          order: {
+            select: { id: true, total: true, user: { select: { email: true, name: true } } },
+          },
+        },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return {
+      data: data.map((p) => ({
+        ...this.serialize(p),
+        order: p.order
+          ? {
+              id: p.order.id,
+              total: (p.order.total as unknown as { toNumber(): number }).toNumber(),
+              user: p.order.user,
+            }
+          : null,
+      })),
+      total,
+      page: params.page,
+      pages: Math.ceil(total / params.limit),
+    };
+  }
+
   // ── Get by order ──────────────────────────────────────────────────────────
 
   async getByOrder(orderId: string, userId: string) {

@@ -4,12 +4,29 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { LayoutDashboard, ShoppingBag, Package, LogOut } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingBag,
+  Warehouse,
+  Truck,
+  Receipt,
+  BarChart2,
+  User,
+  LogOut,
+  Plus,
+} from 'lucide-react';
 
 const NAV = [
-  { href: '/vendedor', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/vendedor/pedidos', label: 'Pedidos', icon: ShoppingBag },
-  { href: '/vendedor/produtos', label: 'Produtos', icon: Package },
+  { href: '/vendedor', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/vendedor/produtos', label: 'Meus Produtos', icon: Package },
+  { href: '/vendedor/produtos/novo', label: 'Novo Produto', icon: Plus },
+  { href: '/vendedor/pedidos', label: 'Meus Pedidos', icon: ShoppingBag },
+  { href: '/vendedor/estoque', label: 'Estoque', icon: Warehouse },
+  { href: '/vendedor/fretes', label: 'Fretes', icon: Truck },
+  { href: '/vendedor/notas-fiscais', label: 'Notas Fiscais', icon: Receipt },
+  { href: '/vendedor/relatorios', label: 'Relatórios', icon: BarChart2 },
+  { href: '/vendedor/perfil', label: 'Meu Perfil', icon: User },
 ];
 
 export default function VendedorLayout({ children }: { children: React.ReactNode }) {
@@ -33,18 +50,15 @@ export default function VendedorLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="flex w-60 flex-col border-r bg-card">
-        <div className="flex h-14 items-center border-b px-5">
-          <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Vendedor
-          </span>
+      <aside className="flex w-60 shrink-0 flex-col border-r bg-card">
+        <div className="flex h-14 items-center border-b px-5 gap-2">
+          <span className="text-xs font-bold text-primary uppercase tracking-widest">Vendedor</span>
+          <span className="text-xs text-muted-foreground">· Saldão</span>
         </div>
 
-        <nav className="flex-1 space-y-0.5 p-3">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active =
-              href === '/vendedor' ? pathname === '/vendedor' : pathname.startsWith(href);
+        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {NAV.map(({ href, label, icon: Icon, exact }) => {
+            const active = exact ? pathname === href : pathname.startsWith(href);
             return (
               <Link
                 key={href}
@@ -62,8 +76,8 @@ export default function VendedorLayout({ children }: { children: React.ReactNode
           })}
         </nav>
 
-        <div className="border-t p-3">
-          <div className="mb-2 rounded-lg bg-muted px-3 py-2">
+        <div className="border-t p-3 space-y-1">
+          <div className="rounded-lg bg-muted px-3 py-2">
             <p className="text-xs font-medium truncate">{user.name ?? user.email}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           </div>
@@ -77,7 +91,6 @@ export default function VendedorLayout({ children }: { children: React.ReactNode
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-7xl p-6">{children}</div>
       </main>

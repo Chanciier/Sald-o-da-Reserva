@@ -4,11 +4,22 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { LayoutDashboard, ShoppingBag, User, LogOut } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  MapPin,
+  CreditCard,
+  Truck,
+  User,
+  LogOut,
+} from 'lucide-react';
 
 const NAV = [
-  { href: '/cliente', label: 'Início', icon: LayoutDashboard },
+  { href: '/cliente', label: 'Início', icon: LayoutDashboard, exact: true },
   { href: '/pedidos', label: 'Meus Pedidos', icon: ShoppingBag },
+  { href: '/cliente/rastreamento', label: 'Rastreamento', icon: Truck },
+  { href: '/cliente/enderecos', label: 'Meus Endereços', icon: MapPin },
+  { href: '/cliente/pagamentos', label: 'Pagamentos', icon: CreditCard },
   { href: '/cliente/perfil', label: 'Meu Perfil', icon: User },
 ];
 
@@ -33,18 +44,16 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="flex w-60 flex-col border-r bg-card">
-        <div className="flex h-14 items-center border-b px-5">
-          <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+      <aside className="flex w-60 shrink-0 flex-col border-r bg-card">
+        <div className="flex h-14 items-center border-b px-5 gap-2">
+          <span className="text-xs font-bold text-primary uppercase tracking-widest">
             Minha Conta
           </span>
         </div>
 
-        <nav className="flex-1 space-y-0.5 p-3">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active =
-              href === '/cliente' ? pathname === '/cliente' : pathname.startsWith(href);
+        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {NAV.map(({ href, label, icon: Icon, exact }) => {
+            const active = exact ? pathname === href : pathname.startsWith(href);
             return (
               <Link
                 key={href}
@@ -62,8 +71,8 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
           })}
         </nav>
 
-        <div className="border-t p-3">
-          <div className="mb-2 rounded-lg bg-muted px-3 py-2">
+        <div className="border-t p-3 space-y-1">
+          <div className="rounded-lg bg-muted px-3 py-2">
             <p className="text-xs font-medium truncate">{user.name ?? user.email}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           </div>
@@ -77,7 +86,6 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl p-6">{children}</div>
       </main>

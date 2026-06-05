@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { Permission, ROLE_PERMISSIONS } from './rbac.constants';
 
@@ -49,5 +49,59 @@ export class RbacService {
 
   getRolesMatrix(): Record<Role, Permission[]> {
     return ROLE_PERMISSIONS;
+  }
+
+  async listUsers(params: { page: number; limit: number; role?: Role; search?: string }) {
+    const where: Prisma.UserWhereInput = {
+      ...(params.role ? { role: params.role } : {}),
+      ...(params.search
+        ? {
+            OR: [
+              { email: { contains: params.search, mode: 'insensitive' } },
+              { name: { contains: params.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, data] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return { data, total, page: params.page, pages: Math.ceil(total / params.limit) };
+  }
+
+  async listAuditLogs(params: { page: number; limit: number; userId?: string; action?: string }) {
+    const where: Prisma.AuditLogWhereInput = {
+      ...(params.userId ? { userId: params.userId } : {}),
+      ...(params.action ? { action: { contains: params.action, mode: 'insensitive' } } : {}),
+    };
+
+    const [total, data] = await Promise.all([
+      this.prisma.auditLog.count({ where }),
+      this.prisma.auditLog.findMany({
+        where,
+        include: { user: { select: { email: true, name: true } } },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return { data, total, page: params.page, pages: Math.ceil(total / params.limit) };
   }
 }

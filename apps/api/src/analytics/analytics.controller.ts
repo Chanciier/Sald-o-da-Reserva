@@ -16,8 +16,8 @@ export class AnalyticsController {
 
   @Get('seller')
   @Roles(Role.ADMIN, Role.VENDEDOR)
-  getSellerOverview() {
-    return this.analyticsService.getAdminOverview();
+  getSellerOverview(@CurrentUser('id') userId: string) {
+    return this.analyticsService.getSellerOverview(userId);
   }
 
   @Get('customer')

@@ -2,39 +2,144 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import {
   LayoutDashboard,
-  ShoppingBag,
-  Package,
-  Tag,
-  Ticket,
   Users,
+  Package,
+  ShoppingBag,
+  Warehouse,
+  Truck,
+  DollarSign,
+  BarChart2,
+  Settings,
+  ChevronDown,
+  ChevronRight,
   LogOut,
-  Receipt,
+  ScrollText,
 } from 'lucide-react';
 
-const NAV = [
+type NavChild = { href: string; label: string };
+type NavItem =
+  | { href: string; label: string; icon: React.ElementType; children?: never }
+  | { href?: never; label: string; icon: React.ElementType; children: NavChild[] };
+
+const NAV: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
-  { href: '/admin/produtos', label: 'Produtos', icon: Package },
-  { href: '/admin/categorias', label: 'Categorias', icon: Tag },
-  { href: '/admin/cupons', label: 'Cupons', icon: Ticket },
-  { href: '/admin/usuarios', label: 'Usuários', icon: Users },
-  { href: '/admin/financeiro/notas-fiscais', label: 'Notas Fiscais', icon: Receipt },
+  {
+    label: 'Usuários',
+    icon: Users,
+    children: [
+      { href: '/admin/usuarios?role=CLIENTE', label: 'Clientes' },
+      { href: '/admin/usuarios?role=VENDEDOR', label: 'Vendedores' },
+      { href: '/admin/usuarios?role=ADMIN', label: 'Administradores' },
+    ],
+  },
+  {
+    label: 'Produtos',
+    icon: Package,
+    children: [
+      { href: '/admin/produtos', label: 'Listagem' },
+      { href: '/admin/produtos/novo', label: 'Novo Produto' },
+      { href: '/admin/categorias', label: 'Categorias' },
+      { href: '/admin/cupons', label: 'Cupons' },
+    ],
+  },
+  {
+    label: 'Pedidos',
+    icon: ShoppingBag,
+    children: [
+      { href: '/admin/pedidos', label: 'Todos os Pedidos' },
+      { href: '/admin/financeiro/pagamentos', label: 'Pagamentos' },
+      { href: '/admin/pedidos?status=CANCELLED', label: 'Cancelamentos' },
+    ],
+  },
+  {
+    label: 'Estoque',
+    icon: Warehouse,
+    children: [
+      { href: '/admin/estoque', label: 'Movimentações' },
+      { href: '/admin/estoque?filter=low', label: 'Alertas de Estoque' },
+    ],
+  },
+  {
+    label: 'Fretes',
+    icon: Truck,
+    children: [
+      { href: '/admin/fretes', label: 'Melhor Envio' },
+      { href: '/admin/fretes?tab=etiquetas', label: 'Etiquetas' },
+      { href: '/admin/fretes?tab=rastreamento', label: 'Rastreamentos' },
+    ],
+  },
+  {
+    label: 'Financeiro',
+    icon: DollarSign,
+    children: [
+      { href: '/admin/financeiro/pagamentos', label: 'Receitas & Pagamentos' },
+      { href: '/admin/financeiro/notas-fiscais', label: 'Notas Fiscais' },
+    ],
+  },
+  {
+    label: 'Relatórios',
+    icon: BarChart2,
+    children: [
+      { href: '/admin/relatorios/vendas', label: 'Vendas' },
+      { href: '/admin/relatorios/produtos', label: 'Produtos' },
+      { href: '/admin/relatorios/clientes', label: 'Clientes' },
+    ],
+  },
+  {
+    label: 'Configurações',
+    icon: Settings,
+    children: [
+      { href: '/admin/configuracoes?tab=integracoes', label: 'Integrações' },
+      { href: '/admin/configuracoes?tab=seguranca', label: 'Segurança' },
+      { href: '/admin/configuracoes?tab=sistema', label: 'Sistema' },
+    ],
+  },
+  {
+    label: 'Logs',
+    icon: ScrollText,
+    children: [
+      { href: '/admin/logs/auditoria', label: 'Auditoria' },
+      { href: '/admin/logs/auditoria?type=events', label: 'Eventos' },
+    ],
+  },
 ];
+
+function isActive(pathname: string, href: string) {
+  const base = href.split('?')[0];
+  if (base === '/admin') return pathname === '/admin';
+  return pathname.startsWith(base);
+}
+
+function groupActive(pathname: string, children: NavChild[]) {
+  return children.some((c) => isActive(pathname, c.href));
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [open, setOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'ADMIN')) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // Auto-open groups that contain the active route
+  useEffect(() => {
+    const autoOpen: Record<string, boolean> = {};
+    for (const item of NAV) {
+      if (item.children && groupActive(pathname, item.children)) {
+        autoOpen[item.label] = true;
+      }
+    }
+    setOpen((prev) => ({ ...prev, ...autoOpen }));
+  }, [pathname]);
 
   if (loading || !user || user.role !== 'ADMIN') {
     return (
@@ -44,38 +149,91 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  function toggle(label: string) {
+    setOpen((prev) => ({ ...prev, [label]: !prev[label] }));
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
-      <aside className="flex w-60 flex-col border-r bg-card">
-        <div className="flex h-14 items-center border-b px-5">
-          <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Admin
-          </span>
+      <aside className="flex w-60 shrink-0 flex-col border-r bg-card">
+        {/* Brand */}
+        <div className="flex h-14 items-center border-b px-5 gap-2">
+          <span className="text-xs font-bold text-primary uppercase tracking-widest">Admin</span>
+          <span className="text-xs text-muted-foreground">· Saldão</span>
         </div>
 
-        <nav className="flex-1 space-y-0.5 p-3">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {NAV.map((item) => {
+            if (!item.children) {
+              const active = isActive(pathname, item.href!);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href!}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </Link>
+              );
+            }
+
+            const anyActive = groupActive(pathname, item.children);
+            const isOpen = open[item.label] ?? false;
+
             return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {label}
-              </Link>
+              <div key={item.label}>
+                <button
+                  onClick={() => toggle(item.label)}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                    anyActive
+                      ? 'text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {isOpen ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                </button>
+
+                {isOpen && (
+                  <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-3">
+                    {item.children.map((child) => {
+                      const childActive = isActive(pathname, child.href);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={`flex items-center rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                            childActive
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
 
-        <div className="border-t p-3">
-          <div className="mb-2 rounded-lg bg-muted px-3 py-2">
+        {/* User footer */}
+        <div className="border-t p-3 space-y-1">
+          <div className="rounded-lg bg-muted px-3 py-2">
             <p className="text-xs font-medium truncate">{user.name ?? user.email}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           </div>
