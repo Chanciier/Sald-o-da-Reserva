@@ -1,33 +1,26 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MercadoPagoConfig, Payment as MpPayment } from 'mercadopago';
-import { createHmac } from 'crypto';
+import Stripe from 'stripe';
 import { Prisma, PaymentMethod, PaymentStatus, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreatePaymentDto } from './dto/create-payment.dto';
 import { InvoiceService } from '../invoices/invoice.service';
 
-type MpRaw = Record<string, unknown>;
-
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
-  private readonly mp: MpPayment;
+  private readonly stripe: Stripe;
   private readonly webhookSecret: string;
-  private readonly webhookUrl: string;
+  private readonly frontendUrl: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly invoiceService: InvoiceService,
   ) {
-    const client = new MercadoPagoConfig({
-      accessToken: this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN', ''),
-      options: { timeout: 10000 },
-    });
-    this.mp = new MpPayment(client);
-    this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
-    this.webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL', '');
+    this.stripe = new Stripe(this.config.get<string>('STRIPE_SECRET_KEY', ''));
+    this.webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET', '');
+    this.frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
   // ── Create ───────────────────────────────────────────────────────────────
@@ -42,53 +35,93 @@ export class PaymentsService {
 
     // Idempotency: return existing active payment
     if (order.payment) {
-      const terminal: string[] = ['REJECTED', 'CANCELLED'];
+      const isCard = dto.method === 'CREDIT_CARD' || dto.method === 'DEBIT_CARD';
+      const terminal: PaymentStatus[] = ['REJECTED', 'CANCELLED'];
+      if (isCard) terminal.push('PENDING');
       if (!terminal.includes(order.payment.status)) {
         return this.serialize(order.payment);
       }
-      // Delete rejected/cancelled to allow retry
       await this.prisma.payment.delete({ where: { id: order.payment.id } });
     }
 
-    const accessToken = this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN', '');
-    if (!accessToken) {
+    const secretKey = this.config.get<string>('STRIPE_SECRET_KEY', '');
+    if (!secretKey) {
       throw new BadRequestException('Gateway de pagamento não configurado. Contate o suporte.');
     }
 
-    const idempotencyKey = `order-${orderId}-${dto.method}`;
-    const body = this.buildBody(order as Parameters<typeof this.buildBody>[0], dto);
+    const amount = Math.round(order.total.toNumber() * 100); // Stripe uses cents
+    const fullName = order.user.name ?? order.user.email;
+    const returnUrl = `${this.frontendUrl}/pedidos/${orderId}`;
 
-    let mpRaw: MpRaw;
+    let pi: Stripe.PaymentIntent;
+
     try {
-      mpRaw = (await this.mp.create({
-        body: body as Parameters<typeof this.mp.create>[0]['body'],
-        requestOptions: { idempotencyKey },
-      })) as unknown as MpRaw;
+      switch (dto.method) {
+        case PaymentMethod.PIX:
+          pi = await this.stripe.paymentIntents.create({
+            amount,
+            currency: 'brl',
+            payment_method_types: ['pix'],
+            payment_method_data: { type: 'pix' },
+            confirm: true,
+            return_url: returnUrl,
+            metadata: { orderId, userId },
+          });
+          break;
+
+        case PaymentMethod.BOLETO: {
+          const taxId = (dto.taxId ?? '').replace(/\D/g, '') || '00000000000';
+          pi = await this.stripe.paymentIntents.create({
+            amount,
+            currency: 'brl',
+            payment_method_types: ['boleto'],
+            payment_method_data: {
+              type: 'boleto',
+              billing_details: { name: fullName, email: order.user.email },
+              boleto: { tax_id: taxId },
+            },
+            confirm: true,
+            return_url: returnUrl,
+            payment_method_options: { boleto: { expires_after_days: 3 } },
+            metadata: { orderId, userId },
+          });
+          break;
+        }
+
+        case PaymentMethod.CREDIT_CARD:
+        case PaymentMethod.DEBIT_CARD:
+          pi = await this.stripe.paymentIntents.create({
+            amount,
+            currency: 'brl',
+            payment_method_types: ['card'],
+            metadata: { orderId, userId },
+          });
+          break;
+
+        default:
+          throw new BadRequestException('Método de pagamento não suportado.');
+      }
     } catch (err: unknown) {
-      const cause = err as { cause?: { description?: string }; message?: string };
-      const msg =
-        cause?.cause?.description ??
-        cause?.message ??
-        'Erro ao processar pagamento. Tente novamente.';
-      this.logger.error('MP create payment error', { orderId, method: dto.method, err });
+      if (err instanceof BadRequestException) throw err;
+      const msg = (err as Stripe.errors.StripeError).message ?? 'Erro ao processar pagamento.';
+      this.logger.error('Stripe create payment error', { orderId, method: dto.method, err });
       throw new BadRequestException(msg);
     }
 
-    const mpStatus = mpRaw.status as string;
-    const status = this.mapStatus(mpStatus);
-    const extras = this.extractExtras(dto.method, mpRaw);
+    const status = this.mapStatus(pi.status);
+    const extras = this.extractExtras(dto.method, pi);
 
     const payment = await this.prisma.$transaction(async (tx) => {
       const p = await tx.payment.create({
         data: {
           orderId,
-          mpPaymentId: String(mpRaw.id),
+          gatewayPaymentId: pi.id,
+          clientSecret: pi.client_secret ?? null,
           method: dto.method,
           status,
           amount: order.total,
-          idempotencyKey,
-          rawStatus: mpStatus,
-          statusDetail: (mpRaw.status_detail as string) ?? null,
+          idempotencyKey: `${orderId}-${dto.method}-${Date.now()}`,
+          rawStatus: pi.status,
           ...extras,
         },
       });
@@ -97,8 +130,8 @@ export class PaymentsService {
         data: {
           paymentId: p.id,
           event: 'payment.created',
-          status: mpStatus,
-          rawData: mpRaw as unknown as Prisma.InputJsonValue,
+          status: pi.status,
+          rawData: pi as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -110,9 +143,9 @@ export class PaymentsService {
             paymentId: p.id,
             orderId,
             method: dto.method,
-            mpPaymentId: String(mpRaw.id),
+            stripePaymentIntentId: pi.id,
             amount: order.total.toNumber(),
-          },
+          } as Prisma.InputJsonValue,
         },
       });
 
@@ -137,29 +170,38 @@ export class PaymentsService {
     return this.serialize(payment);
   }
 
-  // ── Webhook ───────────────────────────────────────────────────────────────
+  // ── Stripe Webhook ────────────────────────────────────────────────────────
 
-  async handleWebhook(body: MpRaw, xSignature: string | undefined, xRequestId: string | undefined) {
-    // Validate HMAC-SHA256 signature if secret is configured
-    if (this.webhookSecret && xSignature) {
-      if (!this.validateSignature(body, xSignature, xRequestId)) {
-        this.logger.warn('Webhook: invalid signature rejected');
+  async handleWebhook(rawBody: Buffer, signature: string) {
+    let event: Stripe.Event;
+
+    if (this.webhookSecret && signature) {
+      try {
+        event = this.stripe.webhooks.constructEvent(rawBody, signature, this.webhookSecret);
+      } catch {
+        this.logger.warn('Webhook: invalid signature');
         throw new BadRequestException('Assinatura inválida.');
       }
+    } else {
+      event = JSON.parse(rawBody.toString()) as Stripe.Event;
     }
 
-    // Only handle payment events
-    if (body.type !== 'payment') return { received: true };
+    const pi = event.data.object as Stripe.PaymentIntent;
 
-    const dataId = String((body.data as MpRaw)?.id);
-    if (!dataId || dataId === 'undefined') return { received: true };
+    const handled = [
+      'payment_intent.succeeded',
+      'payment_intent.payment_failed',
+      'payment_intent.canceled',
+      'payment_intent.processing',
+      'payment_intent.requires_action',
+    ];
+
+    if (!handled.includes(event.type)) return { received: true };
 
     try {
-      const mpRaw = (await this.mp.get({ id: dataId })) as unknown as MpRaw;
-      await this.processUpdate(mpRaw);
+      await this.processUpdate(pi, event.type);
     } catch (err) {
-      this.logger.error(`Webhook: failed to process mpId=${dataId}`, err);
-      // Return 200 anyway so MP doesn't retry indefinitely
+      this.logger.error(`Webhook: failed to process piId=${pi.id}`, err);
     }
 
     return { received: true };
@@ -167,73 +209,44 @@ export class PaymentsService {
 
   // ── Private: process webhook update ──────────────────────────────────────
 
-  private async processUpdate(mpRaw: MpRaw) {
-    const mpPaymentId = String(mpRaw.id);
-    const mpStatus = mpRaw.status as string;
-    const statusDetail = (mpRaw.status_detail as string) ?? null;
-    const newStatus = this.mapStatus(mpStatus);
-
+  private async processUpdate(pi: Stripe.PaymentIntent, eventType: string) {
     const payment = await this.prisma.payment.findUnique({
-      where: { mpPaymentId },
-      include: { order: true },
+      where: { gatewayPaymentId: pi.id },
     });
 
     if (!payment) {
-      this.logger.warn(`Webhook: mpPaymentId=${mpPaymentId} not in DB – ignoring`);
+      this.logger.warn(`Webhook: no payment found for piId=${pi.id}`);
       return;
     }
 
-    // Idempotency: skip if status unchanged
-    if (payment.status === newStatus) {
-      this.logger.log(`Webhook: payment=${payment.id} already ${newStatus} – skip`);
-      return;
-    }
+    const newStatus = this.mapStatus(pi.status);
+    if (payment.status === newStatus) return;
 
-    const newOrderStatus = this.toOrderStatus(newStatus);
+    const extras = this.extractExtras(payment.method, pi);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
-        data: { status: newStatus, rawStatus: mpStatus, statusDetail },
+        data: { status: newStatus, rawStatus: pi.status, ...extras },
       });
 
       await tx.paymentLog.create({
         data: {
           paymentId: payment.id,
-          event: `webhook.${mpStatus}`,
-          status: mpStatus,
-          rawData: mpRaw as unknown as Prisma.InputJsonValue,
+          event: eventType,
+          status: pi.status,
+          rawData: pi as unknown as Prisma.InputJsonValue,
         },
       });
 
-      if (newOrderStatus && newOrderStatus !== payment.order.status) {
+      if (newStatus === 'APPROVED') {
         await tx.order.update({
           where: { id: payment.orderId },
-          data: { status: newOrderStatus },
+          data: { status: OrderStatus.PAID },
         });
       }
-
-      await tx.auditLog.create({
-        data: {
-          action: `payment.webhook.${mpStatus}`,
-          userId: payment.order.userId,
-          metadata: {
-            paymentId: payment.id,
-            mpPaymentId,
-            orderId: payment.orderId,
-            from: payment.status,
-            to: newStatus,
-            statusDetail,
-          },
-        },
-      });
     });
 
-    this.logger.log(
-      `Webhook: payment=${payment.id} ${payment.status}→${newStatus} order=${payment.orderId}`,
-    );
-
-    // Fire-and-forget: emit NF-e when payment is approved
     if (newStatus === 'APPROVED') {
       this.invoiceService
         .emitForOrder(payment.orderId)
@@ -241,174 +254,75 @@ export class PaymentsService {
     }
   }
 
-  // ── Private: build MP request body ───────────────────────────────────────
+  // ── Private: map Stripe status ────────────────────────────────────────────
 
-  private buildBody(
-    order: {
-      id: string;
-      total: { toNumber(): number };
-      user: { email: string; name: string | null };
-    },
-    dto: CreatePaymentDto,
-  ): MpRaw {
-    const amount = order.total.toNumber();
-    const fullName = order.user.name ?? order.user.email;
-    const [firstName, ...nameParts] = fullName.split(' ');
-    const lastName = nameParts.join(' ') || firstName;
-
-    const base: MpRaw = {
-      transaction_amount: amount,
-      description: `Saldão da Reversa #${order.id.slice(-8).toUpperCase()}`,
-      external_reference: order.id,
-      ...(this.webhookUrl ? { notification_url: this.webhookUrl } : {}),
-      payer: {
-        email: order.user.email,
-        first_name: firstName,
-        last_name: lastName,
-        ...(dto.payer?.identification
-          ? {
-              identification: {
-                type: dto.payer.identification.type,
-                number: dto.payer.identification.number,
-              },
-            }
-          : {}),
-      },
-    };
-
-    switch (dto.method) {
-      case PaymentMethod.PIX:
-        return {
-          ...base,
-          payment_method_id: 'pix',
-          date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        };
-
-      case PaymentMethod.BOLETO:
-        return {
-          ...base,
-          payment_method_id: dto.boletoMethod ?? 'bolbradesco',
-          date_of_expiration: (() => {
-            const d = new Date();
-            d.setDate(d.getDate() + 3);
-            d.setHours(23, 59, 59, 0);
-            return d.toISOString();
-          })(),
-        };
-
-      case PaymentMethod.CREDIT_CARD:
-      case PaymentMethod.DEBIT_CARD:
-        if (!dto.cardToken)
-          throw new BadRequestException('cardToken é obrigatório para pagamento com cartão.');
-        if (!dto.paymentMethodId)
-          throw new BadRequestException('paymentMethodId é obrigatório para pagamento com cartão.');
-        return {
-          ...base,
-          token: dto.cardToken,
-          payment_method_id: dto.paymentMethodId,
-          installments: dto.installments ?? 1,
-          statement_descriptor: 'SALDAO REVERSA',
-        };
-
+  private mapStatus(stripeStatus: Stripe.PaymentIntent.Status): PaymentStatus {
+    switch (stripeStatus) {
+      case 'succeeded':
+        return 'APPROVED';
+      case 'canceled':
+        return 'CANCELLED';
+      case 'requires_capture':
+        return 'AUTHORIZED';
+      case 'processing':
+      case 'requires_action':
+      case 'requires_confirmation':
+      case 'requires_payment_method':
       default:
-        throw new BadRequestException('Método de pagamento não suportado.');
+        return 'PENDING';
     }
   }
 
-  // ── Private: extract method-specific fields from MP response ─────────────
+  // ── Private: extract method-specific fields from Stripe PI ───────────────
 
-  private extractExtras(method: PaymentMethod, mp: MpRaw) {
+  private extractExtras(method: PaymentMethod, pi: Stripe.PaymentIntent) {
+    const nextAction = pi.next_action;
+
     if (method === PaymentMethod.PIX) {
-      const poi = mp.point_of_interaction as MpRaw | undefined;
-      const txData = poi?.transaction_data as MpRaw | undefined;
+      const pix = nextAction?.pix_display_qr_code as
+        | { data?: string; image_url_png?: string; expiration_timestamp?: number }
+        | undefined;
       return {
-        pixQrCode: (txData?.qr_code as string) ?? null,
-        pixQrCodeBase64: (txData?.qr_code_base64 as string) ?? null,
-        pixExpiresAt: mp.date_of_expiration ? new Date(mp.date_of_expiration as string) : null,
+        pixQrCode: pix?.data ?? null,
+        pixQrCodeBase64: pix?.image_url_png ?? null,
+        pixExpiresAt: pix?.expiration_timestamp ? new Date(pix.expiration_timestamp * 1000) : null,
       };
     }
 
     if (method === PaymentMethod.BOLETO) {
-      const txDetails = mp.transaction_details as MpRaw | undefined;
-      const barcode = mp.barcode as MpRaw | undefined;
+      const boleto = nextAction?.boleto_display_details as
+        | { hosted_voucher_url?: string; number?: string; expires_at?: number }
+        | undefined;
       return {
-        boletoUrl: (txDetails?.external_resource_url as string) ?? null,
-        boletoCode: (barcode?.content as string) ?? null,
-        boletoExpiresAt: mp.date_of_expiration ? new Date(mp.date_of_expiration as string) : null,
+        boletoUrl: boleto?.hosted_voucher_url ?? null,
+        boletoCode: boleto?.number ?? null,
+        boletoExpiresAt: boleto?.expires_at ? new Date(boleto.expires_at * 1000) : null,
       };
     }
 
-    // Card
-    const card = mp.card as MpRaw | undefined;
-    return {
-      cardBrand: (mp.payment_method_id as string) ?? null,
-      cardLast4: (card?.last_four_digits as string) ?? null,
-      installments: (mp.installments as number) ?? null,
-    };
-  }
-
-  // ── Private: status mapping ───────────────────────────────────────────────
-
-  private mapStatus(mpStatus: string): PaymentStatus {
-    const map: Record<string, PaymentStatus> = {
-      approved: 'APPROVED',
-      authorized: 'AUTHORIZED',
-      in_process: 'IN_PROCESS',
-      in_mediation: 'IN_MEDIATION',
-      pending: 'PENDING',
-      rejected: 'REJECTED',
-      cancelled: 'CANCELLED',
-      refunded: 'REFUNDED',
-      charged_back: 'CHARGED_BACK',
-    };
-    return map[mpStatus] ?? 'PENDING';
-  }
-
-  private toOrderStatus(ps: PaymentStatus): OrderStatus | null {
-    if (ps === 'APPROVED') return 'PAID';
-    if (ps === 'REFUNDED' || ps === 'CHARGED_BACK') return 'REFUNDED';
-    if (ps === 'CANCELLED') return 'CANCELLED';
-    return null;
-  }
-
-  // ── Private: webhook HMAC-SHA256 validation ───────────────────────────────
-
-  private validateSignature(body: MpRaw, xSignature: string, xRequestId?: string): boolean {
-    try {
-      const ts = xSignature
-        .split(',')
-        .find((p) => p.startsWith('ts='))
-        ?.slice(3);
-      const v1 = xSignature
-        .split(',')
-        .find((p) => p.startsWith('v1='))
-        ?.slice(3);
-      if (!ts || !v1) return false;
-
-      const dataId = (body.data as MpRaw)?.id;
-      const parts: string[] = [];
-      if (dataId) parts.push(`id:${dataId}`);
-      if (xRequestId) parts.push(`request-id:${xRequestId}`);
-      parts.push(`ts:${ts}`);
-      const manifest = parts.join(';') + ';';
-
-      const hash = createHmac('sha256', this.webhookSecret).update(manifest).digest('hex');
-      return hash === v1;
-    } catch {
-      return false;
+    if (method === PaymentMethod.CREDIT_CARD || method === PaymentMethod.DEBIT_CARD) {
+      const charge = (pi.latest_charge as Stripe.Charge | null)?.payment_method_details?.card;
+      const installmentsObj = charge?.installments as { count?: number } | null | undefined;
+      return {
+        cardBrand: charge?.brand ?? null,
+        cardLast4: charge?.last4 ?? null,
+        installments: installmentsObj?.count ?? null,
+      };
     }
+
+    return {};
   }
 
-  // ── Private: serialize Decimal fields ────────────────────────────────────
+  // ── Serialize ─────────────────────────────────────────────────────────────
 
   private serialize(p: {
     id: string;
     orderId: string;
-    mpPaymentId: string | null;
-    method: string;
-    status: string;
-    amount: { toNumber(): number };
-    idempotencyKey: string;
+    gatewayPaymentId: string | null;
+    clientSecret: string | null;
+    method: PaymentMethod;
+    status: PaymentStatus;
+    amount: Prisma.Decimal;
     pixQrCode: string | null;
     pixQrCodeBase64: string | null;
     pixExpiresAt: Date | null;
@@ -423,6 +337,27 @@ export class PaymentsService {
     createdAt: Date;
     updatedAt: Date;
   }) {
-    return { ...p, amount: p.amount.toNumber() };
+    return {
+      id: p.id,
+      orderId: p.orderId,
+      gatewayPaymentId: p.gatewayPaymentId,
+      clientSecret: p.clientSecret,
+      method: p.method,
+      status: p.status,
+      amount: p.amount.toNumber(),
+      pixQrCode: p.pixQrCode,
+      pixQrCodeBase64: p.pixQrCodeBase64,
+      pixExpiresAt: p.pixExpiresAt?.toISOString() ?? null,
+      boletoUrl: p.boletoUrl,
+      boletoCode: p.boletoCode,
+      boletoExpiresAt: p.boletoExpiresAt?.toISOString() ?? null,
+      cardBrand: p.cardBrand,
+      cardLast4: p.cardLast4,
+      installments: p.installments,
+      rawStatus: p.rawStatus,
+      statusDetail: p.statusDetail,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    };
   }
 }

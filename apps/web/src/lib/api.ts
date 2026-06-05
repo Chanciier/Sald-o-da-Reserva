@@ -27,7 +27,7 @@ export async function getProducts(query: ProductQuery = {}): Promise<PaginatedRe
 }
 
 export async function getProduct(slug: string): Promise<Product> {
-  return apiFetch<Product>(`/products/${slug}`, { next: { revalidate: 300 } });
+  return apiFetch<Product>(`/products/${slug}`, { cache: 'no-store' });
 }
 
 export async function getCategories(): Promise<PaginatedResult<Category>> {

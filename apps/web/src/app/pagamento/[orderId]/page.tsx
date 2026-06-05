@@ -21,53 +21,17 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
   DEBIT_CARD: 'Cartão de débito',
 };
 
-const TERMINAL_STATUSES = new Set([
-  'APPROVED',
-  'REJECTED',
-  'CANCELLED',
-  'REFUNDED',
-  'CHARGED_BACK',
-]);
+const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'REFUNDED']);
 const POLL_INTERVAL = 5000;
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    PENDING: {
-      label: 'Aguardando pagamento',
-      cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-    },
-    APPROVED: {
-      label: 'Pago',
-      cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-    },
-    AUTHORIZED: {
-      label: 'Autorizado',
-      cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-    },
-    IN_PROCESS: {
-      label: 'Em análise',
-      cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-    },
-    IN_MEDIATION: {
-      label: 'Em disputa',
-      cls: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-    },
-    REJECTED: {
-      label: 'Recusado',
-      cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-    },
-    CANCELLED: {
-      label: 'Cancelado',
-      cls: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-    },
-    REFUNDED: {
-      label: 'Estornado',
-      cls: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-    },
-    CHARGED_BACK: {
-      label: 'Chargeback',
-      cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-    },
+    PENDING: { label: 'Aguardando pagamento', cls: 'bg-yellow-100 text-yellow-800' },
+    APPROVED: { label: 'Pago', cls: 'bg-green-100 text-green-800' },
+    AUTHORIZED: { label: 'Autorizado', cls: 'bg-blue-100 text-blue-800' },
+    REJECTED: { label: 'Recusado', cls: 'bg-red-100 text-red-800' },
+    CANCELLED: { label: 'Cancelado', cls: 'bg-zinc-100 text-zinc-700' },
+    REFUNDED: { label: 'Estornado', cls: 'bg-zinc-100 text-zinc-700' },
   };
   const s = map[status] ?? { label: status, cls: 'bg-muted text-muted-foreground' };
   return (
@@ -94,6 +58,8 @@ export default function PaymentPage({ params }: PageProps) {
   const [error, setError] = useState('');
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -118,28 +84,31 @@ export default function PaymentPage({ params }: PageProps) {
     [orderId, token, stopPolling],
   );
 
-  // On mount: try to get existing payment, or auto-create for PIX/Boleto
   useEffect(() => {
     if (!token) return;
 
     async function init() {
       setLoading(true);
       try {
-        // Try fetching existing payment first
         const existing = await getPayment(orderId, token!).catch(() => null);
 
         if (existing && !['REJECTED', 'CANCELLED'].includes(existing.status)) {
-          setPayment(existing);
-          startPolling(existing);
-          return;
+          const isCard = method === 'CREDIT_CARD' || method === 'DEBIT_CARD';
+          if (isCard && existing.status === 'PENDING') {
+            // show card form again
+          } else {
+            setPayment(existing);
+            startPolling(existing);
+            return;
+          }
         }
 
-        // Auto-create for PIX and Boleto
         if (method === 'PIX' || method === 'BOLETO') {
           const created = await createPayment(orderId, { method }, token!);
           setPayment(created);
           startPolling(created);
         }
+        // For CREDIT_CARD: payment is created on first render of CardForm via handleCardInit
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -151,38 +120,14 @@ export default function PaymentPage({ params }: PageProps) {
     return stopPolling;
   }, [orderId, token, method, startPolling, stopPolling]);
 
-  async function handleCardSubmit(data: {
-    token: string;
-    paymentMethodId: string;
-    installments: number;
-  }) {
-    const created = await createPayment(
-      orderId,
-      {
-        method: 'CREDIT_CARD',
-        cardToken: data.token,
-        paymentMethodId: data.paymentMethodId,
-        installments: data.installments,
-      },
-      token!,
-    );
+  async function handleCardInit(): Promise<string> {
+    const created = await createPayment(orderId, { method: 'CREDIT_CARD' }, token!);
     setPayment(created);
-    startPolling(created);
+    return created.clientSecret ?? '';
   }
 
-  async function retryPayment() {
-    if (!token) return;
-    setError('');
-    setLoading(true);
-    try {
-      const created = await createPayment(orderId, { method }, token);
-      setPayment(created);
-      startPolling(created);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
+  function handleCardSuccess() {
+    startPolling(payment!);
   }
 
   if (!user) {
@@ -199,8 +144,6 @@ export default function PaymentPage({ params }: PageProps) {
     );
   }
 
-  const publicKey = process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY ?? '';
-
   return (
     <main className="mx-auto max-w-lg px-4 py-8">
       <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
@@ -216,7 +159,6 @@ export default function PaymentPage({ params }: PageProps) {
       </nav>
 
       <div className="rounded-2xl border border-border bg-card">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
             <h1 className="font-semibold">Pagamento</h1>
@@ -231,7 +173,7 @@ export default function PaymentPage({ params }: PageProps) {
         </div>
 
         <div className="px-6 py-6">
-          {/* Loading state */}
+          {/* Loading */}
           {loading && !payment && (
             <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
               <svg className="h-6 w-6 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -253,12 +195,15 @@ export default function PaymentPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* Error state */}
+          {/* Error */}
           {error && !payment && (
             <div className="space-y-4 py-8 text-center">
               <p className="text-sm text-destructive">{error}</p>
               <button
-                onClick={retryPayment}
+                onClick={() => {
+                  setError('');
+                  setLoading(false);
+                }}
                 className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted transition-colors"
               >
                 Tentar novamente
@@ -266,12 +211,12 @@ export default function PaymentPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* APPROVED */}
-          {payment?.status === 'APPROVED' && (
+          {/* APPROVED / AUTHORIZED */}
+          {(payment?.status === 'APPROVED' || payment?.status === 'AUTHORIZED') && (
             <div className="flex flex-col items-center gap-4 py-10 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
                 <svg
-                  className="h-8 w-8 text-green-600 dark:text-green-400"
+                  className="h-8 w-8 text-green-600"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -299,12 +244,12 @@ export default function PaymentPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* REJECTED */}
+          {/* REJECTED / CANCELLED */}
           {payment && ['REJECTED', 'CANCELLED'].includes(payment.status) && (
             <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
                 <svg
-                  className="h-8 w-8 text-red-600 dark:text-red-400"
+                  className="h-8 w-8 text-red-600"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -323,20 +268,12 @@ export default function PaymentPage({ params }: PageProps) {
                   <p className="text-sm text-muted-foreground mt-1">{payment.statusDetail}</p>
                 )}
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={retryPayment}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  Tentar novamente
-                </button>
-                <Link
-                  href="/checkout"
-                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
-                >
-                  Alterar método
-                </Link>
-              </div>
+              <Link
+                href="/checkout"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Alterar método
+              </Link>
             </div>
           )}
 
@@ -350,41 +287,22 @@ export default function PaymentPage({ params }: PageProps) {
             <BoletoDisplay payment={payment} />
           )}
 
-          {/* Card form (no payment yet) */}
-          {!payment && !loading && (method === 'CREDIT_CARD' || method === 'DEBIT_CARD') && (
-            <CardForm
-              amount={0}
-              publicKey={publicKey}
-              onSubmit={handleCardSubmit}
-              disabled={false}
-            />
-          )}
+          {/* Card form */}
+          {!loading &&
+            (method === 'CREDIT_CARD' || method === 'DEBIT_CARD') &&
+            !['APPROVED', 'AUTHORIZED', 'REJECTED', 'CANCELLED', 'REFUNDED'].includes(
+              payment?.status ?? '',
+            ) && (
+              <CardFormWrapper
+                publishableKey={publishableKey}
+                existingClientSecret={payment?.clientSecret ?? null}
+                onInit={handleCardInit}
+                onSuccess={handleCardSuccess}
+                onError={(msg) => setError(msg)}
+              />
+            )}
 
-          {/* Pending card (after submit) */}
-          {payment && payment.method === 'CREDIT_CARD' && payment.status === 'IN_PROCESS' && (
-            <div className="flex flex-col items-center gap-4 py-10 text-center">
-              <svg className="h-6 w-6 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                />
-              </svg>
-              <p className="text-sm text-muted-foreground">
-                Seu pagamento está em análise. Aguarde...
-              </p>
-            </div>
-          )}
-
-          {/* Polling indicator for PIX/Boleto */}
+          {/* Polling indicator */}
           {payment &&
             !TERMINAL_STATUSES.has(payment.status) &&
             (method === 'PIX' || method === 'BOLETO') && (
@@ -410,7 +328,6 @@ export default function PaymentPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Footer links */}
       <div className="mt-4 flex justify-center gap-6 text-sm text-muted-foreground">
         <Link href={`/pedidos/${orderId}`} className="hover:text-foreground transition-colors">
           Ver detalhes do pedido
@@ -420,5 +337,73 @@ export default function PaymentPage({ params }: PageProps) {
         </Link>
       </div>
     </main>
+  );
+}
+
+// Handles creating the PaymentIntent lazily (on mount) and then showing the Stripe form
+function CardFormWrapper({
+  publishableKey,
+  existingClientSecret,
+  onInit,
+  onSuccess,
+  onError,
+}: {
+  publishableKey: string;
+  existingClientSecret: string | null;
+  onInit: () => Promise<string>;
+  onSuccess: () => void;
+  onError: (msg: string) => void;
+}) {
+  const [clientSecret, setClientSecret] = useState<string | null>(existingClientSecret);
+  const [initializing, setInitializing] = useState(!existingClientSecret);
+
+  useEffect(() => {
+    if (clientSecret) return;
+    onInit()
+      .then((cs) => {
+        if (cs) setClientSecret(cs);
+      })
+      .catch((e) => onError((e as Error).message))
+      .finally(() => setInitializing(false));
+  }, []); // intentionally empty — runs once on mount
+
+  if (initializing) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+          />
+        </svg>
+        Preparando formulário...
+      </div>
+    );
+  }
+
+  if (!clientSecret || !publishableKey) {
+    return (
+      <p className="py-6 text-center text-sm text-destructive">
+        Não foi possível carregar o formulário de pagamento.
+      </p>
+    );
+  }
+
+  return (
+    <CardForm
+      clientSecret={clientSecret}
+      publishableKey={publishableKey}
+      onSuccess={onSuccess}
+      onError={onError}
+    />
   );
 }

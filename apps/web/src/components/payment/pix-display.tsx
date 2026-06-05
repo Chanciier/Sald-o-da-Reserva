@@ -44,7 +44,7 @@ export function PixDisplay({ payment }: PixDisplayProps) {
       {payment.pixQrCodeBase64 && (
         <div className="rounded-2xl border-4 border-border p-2 bg-white shadow-sm">
           <img
-            src={`data:image/png;base64,${payment.pixQrCodeBase64}`}
+            src={payment.pixQrCodeBase64}
             alt="QR Code PIX"
             width={200}
             height={200}

@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  RawBodyRequest,
+  Req,
+} from '@nestjs/common';
+import { Request } from 'express';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -26,11 +38,7 @@ export class PaymentsController {
   @Post('webhook')
   @Public()
   @HttpCode(HttpStatus.OK)
-  webhook(
-    @Body() body: Record<string, unknown>,
-    @Headers('x-signature') xSignature: string | undefined,
-    @Headers('x-request-id') xRequestId: string | undefined,
-  ) {
-    return this.payments.handleWebhook(body, xSignature, xRequestId);
+  webhook(@Req() req: RawBodyRequest<Request>, @Headers('stripe-signature') signature: string) {
+    return this.payments.handleWebhook(req.rawBody ?? Buffer.alloc(0), signature);
   }
 }

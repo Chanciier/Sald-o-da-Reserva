@@ -35,6 +35,7 @@
     "unrs-resolver@1.12.2": true,
     "@nestjs/core@10.4.22": true,
     "@prisma/client@5.22.0": true,
-    "@prisma/engines@5.22.0": true
+    "@prisma/engines@5.22.0": true,
+    "sharp@0.34.5": true
   }
 }

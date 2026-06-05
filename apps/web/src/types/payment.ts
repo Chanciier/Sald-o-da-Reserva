@@ -4,17 +4,15 @@ export type PaymentStatus =
   | 'PENDING'
   | 'APPROVED'
   | 'AUTHORIZED'
-  | 'IN_PROCESS'
-  | 'IN_MEDIATION'
   | 'REJECTED'
   | 'CANCELLED'
-  | 'REFUNDED'
-  | 'CHARGED_BACK';
+  | 'REFUNDED';
 
 export interface Payment {
   id: string;
   orderId: string;
-  mpPaymentId: string | null;
+  gatewayPaymentId: string | null;
+  clientSecret: string | null;
   method: PaymentMethod;
   status: PaymentStatus;
   amount: number;
@@ -35,11 +33,5 @@ export interface Payment {
 
 export interface CreatePaymentPayload {
   method: PaymentMethod;
-  cardToken?: string;
-  paymentMethodId?: string;
-  installments?: number;
-  boletoMethod?: string;
-  payer?: {
-    identification?: { type: 'CPF' | 'CNPJ'; number: string };
-  };
+  taxId?: string;
 }

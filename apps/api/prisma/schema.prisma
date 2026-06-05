@@ -277,31 +277,32 @@ model OrderItem {
 }
 
 model Payment {
-  id              String        @id @default(cuid())
-  orderId         String        @unique @map("order_id")
-  mpPaymentId     String?       @unique @map("mp_payment_id")
-  method          PaymentMethod
-  status          PaymentStatus @default(PENDING)
-  amount          Decimal       @db.Decimal(10, 2)
-  idempotencyKey  String        @unique @map("idempotency_key")
-  pixQrCode       String?       @map("pix_qr_code") @db.Text
-  pixQrCodeBase64 String?       @map("pix_qr_code_base64") @db.Text
-  pixExpiresAt    DateTime?     @map("pix_expires_at")
-  boletoUrl       String?       @map("boleto_url")
-  boletoCode      String?       @map("boleto_code") @db.Text
-  boletoExpiresAt DateTime?     @map("boleto_expires_at")
-  cardBrand       String?       @map("card_brand")
-  cardLast4       String?       @map("card_last_4")
-  installments    Int?
-  rawStatus       String?       @map("raw_status")
-  statusDetail    String?       @map("status_detail")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id               String        @id @default(cuid())
+  orderId          String        @unique @map("order_id")
+  gatewayPaymentId String?       @unique @map("gateway_payment_id")
+  clientSecret     String?       @map("client_secret") @db.Text
+  method           PaymentMethod
+  status           PaymentStatus @default(PENDING)
+  amount           Decimal       @db.Decimal(10, 2)
+  idempotencyKey   String        @unique @map("idempotency_key")
+  pixQrCode        String?       @map("pix_qr_code") @db.Text
+  pixQrCodeBase64  String?       @map("pix_qr_code_base64") @db.Text
+  pixExpiresAt     DateTime?     @map("pix_expires_at")
+  boletoUrl        String?       @map("boleto_url")
+  boletoCode       String?       @map("boleto_code") @db.Text
+  boletoExpiresAt  DateTime?     @map("boleto_expires_at")
+  cardBrand        String?       @map("card_brand")
+  cardLast4        String?       @map("card_last_4")
+  installments     Int?
+  rawStatus        String?       @map("raw_status")
+  statusDetail     String?       @map("status_detail")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
   order Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   logs  PaymentLog[]
 
-  @@index([mpPaymentId])
+  @@index([gatewayPaymentId])
   @@map("payments")
 }
 
