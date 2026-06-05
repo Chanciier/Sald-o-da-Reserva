@@ -1,7 +1,19 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { CheckoutService } from './checkout.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller()
 export class CheckoutController {
@@ -22,6 +34,26 @@ export class CheckoutController {
   @Get('orders')
   findMyOrders(@CurrentUser('id') userId: string) {
     return this.checkout.findUserOrders(userId);
+  }
+
+  @Get('orders/admin/all')
+  @Roles(Role.ADMIN)
+  findAllOrders(
+    @Query('page') page?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.checkout.findAllOrders({
+      page: page ? parseInt(page, 10) : 1,
+      status: status || undefined,
+      search: search || undefined,
+    });
+  }
+
+  @Patch('orders/admin/:id/status')
+  @Roles(Role.ADMIN)
+  updateOrderStatus(@Param('id') orderId: string, @Body('status') status: string) {
+    return this.checkout.updateOrderStatus(orderId, status);
   }
 
   @Get('orders/:id')

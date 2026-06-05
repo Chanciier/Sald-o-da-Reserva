@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/auth-context';
 import { CartProvider } from '@/contexts/cart-context';
+import { QueryProvider } from '@/providers/query-provider';
 import { Header } from '@/components/layout/header';
 import { CartDrawer } from '@/components/cart/cart-drawer';
 
@@ -21,13 +22,15 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
-        <AuthProvider>
-          <CartProvider>
-            <Header />
-            <CartDrawer />
-            {children}
-          </CartProvider>
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <CartProvider>
+              <Header />
+              <CartDrawer />
+              {children}
+            </CartProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

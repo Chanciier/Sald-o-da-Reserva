@@ -15,6 +15,7 @@ import { CouponsModule } from './coupons/coupons.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ShippingModule } from './shipping/shipping.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
 import { PermissionsGuard } from './rbac/guards/permissions.guard';
@@ -39,6 +40,7 @@ import { envValidation } from './config/env.validation';
     CheckoutModule,
     PaymentsModule,
     ShippingModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [

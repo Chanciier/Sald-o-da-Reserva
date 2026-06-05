@@ -197,6 +197,62 @@ export class CheckoutService {
     );
   }
 
+  async findAllOrders(opts: { page: number; status?: string; search?: string }) {
+    const take = 20;
+    const skip = (opts.page - 1) * take;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {};
+    if (opts.status) where.status = opts.status;
+    if (opts.search) {
+      where.OR = [
+        { id: { contains: opts.search, mode: 'insensitive' } },
+        { user: { email: { contains: opts.search, mode: 'insensitive' } } },
+        { user: { name: { contains: opts.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prismaAny = this.prisma as any;
+    const [orders, total] = await Promise.all([
+      prismaAny.order.findMany({
+        where,
+        take,
+        skip,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          items: { select: { name: true, quantity: true, subtotal: true } },
+          payment: { select: { method: true, status: true } },
+          shipment: { select: { status: true, carrier: true, trackingCode: true } },
+          coupon: { select: { code: true } },
+        },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return {
+      data: (orders as Record<string, unknown>[]).map((o) =>
+        serializeOrder(o as unknown as Record<string, unknown>),
+      ),
+      total,
+      page: opts.page,
+      pages: Math.ceil(total / take),
+    };
+  }
+
+  async updateOrderStatus(orderId: string, status: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error('Pedido não encontrado.');
+
+    return this.prisma.order.update({
+      where: { id: orderId },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: { status: status as any },
+      select: { id: true, status: true },
+    });
+  }
+
   async findOrderById(userId: string, orderId: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const prismaAny = this.prisma as any;
