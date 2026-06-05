@@ -97,6 +97,7 @@ export class ProductsService {
         dimensions: dto.dimensions as unknown as Prisma.InputJsonValue,
         stock: dto.stock ?? 0,
         minimumStock: dto.minimumStock ?? 0,
+        pickupAvailable: dto.pickupAvailable ?? false,
         status: dto.status,
         categoryId: dto.categoryId,
         metaTitle: dto.metaTitle,

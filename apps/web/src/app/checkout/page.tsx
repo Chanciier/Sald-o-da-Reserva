@@ -10,6 +10,8 @@ import { getShippingQuote } from '@/lib/shipping';
 import type { ShippingOption } from '@/types/cart';
 import type { PaymentMethod } from '@/types/payment';
 
+type DeliveryMethod = 'SHIPPING' | 'PICKUP';
+
 function formatBRL(n: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 }
@@ -86,6 +88,7 @@ export default function CheckoutPage() {
   const { cart, refresh } = useCart();
   const router = useRouter();
 
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('SHIPPING');
   const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
@@ -95,6 +98,8 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const lastQuotedCep = useRef('');
+
+  const isPickup = deliveryMethod === 'PICKUP';
 
   function set(field: keyof AddressForm, value: string) {
     setAddress((prev) => ({ ...prev, [field]: value }));
@@ -133,8 +138,6 @@ export default function CheckoutPage() {
     setSelectedShipping(null);
     try {
       const options = await getShippingQuote(cleaned, token);
-
-      // Prepend free shipping if eligible
       const FREE_THRESHOLD = 300;
       const subtotal = cart?.subtotal ?? 0;
       const allOptions: ShippingOption[] =
@@ -153,19 +156,17 @@ export default function CheckoutPage() {
               ...options,
             ]
           : options;
-
       setShippingOptions(allOptions);
       if (allOptions.length) setSelectedShipping(allOptions[0]);
     } catch {
-      // ignore — user can still proceed with empty options
+      // ignore
     } finally {
       setShippingLoading(false);
     }
   }
 
-  // Load initial options when cart loads (no CEP yet = fallback)
   useEffect(() => {
-    if (!token || !cart || shippingOptions.length) return;
+    if (!token || !cart || shippingOptions.length || isPickup) return;
     getShippingQuote('', token)
       .then((opts) => {
         const FREE_THRESHOLD = 300;
@@ -189,34 +190,41 @@ export default function CheckoutPage() {
         if (allOptions.length && !selectedShipping) setSelectedShipping(allOptions[0]);
       })
       .catch(() => {});
-  }, [token, cart?.subtotal]);
+  }, [token, cart?.subtotal, isPickup]);
 
-  const shippingCost = selectedShipping?.price ?? 0;
+  const shippingCost = isPickup ? 0 : (selectedShipping?.price ?? 0);
   const total = (cart?.total ?? 0) + shippingCost;
+
+  const canSubmit = isPickup ? true : !!selectedShipping;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token || !cart || !selectedShipping) return;
+    if (!token || !cart || !canSubmit) return;
     setError('');
     setSubmitting(true);
     try {
       const order = await createOrder(token, {
-        shippingAddress: {
-          name: address.name,
-          cep: address.cep.replace(/\D/g, ''),
-          street: address.street,
-          number: address.number,
-          complement: address.complement || undefined,
-          neighborhood: address.neighborhood,
-          city: address.city,
-          state: address.state,
-        },
-        shippingMethod: selectedShipping.name,
-        shippingPrice: selectedShipping.price,
-        meServiceId: selectedShipping.serviceId || undefined,
-        meCarrier: selectedShipping.carrier || undefined,
-        deliveryMin: selectedShipping.deliveryMin,
-        deliveryMax: selectedShipping.deliveryMax,
+        deliveryMethod,
+        ...(isPickup
+          ? {}
+          : {
+              shippingAddress: {
+                name: address.name,
+                cep: address.cep.replace(/\D/g, ''),
+                street: address.street,
+                number: address.number,
+                complement: address.complement || undefined,
+                neighborhood: address.neighborhood,
+                city: address.city,
+                state: address.state,
+              },
+              shippingMethod: selectedShipping!.name,
+              shippingPrice: selectedShipping!.price,
+              meServiceId: selectedShipping!.serviceId || undefined,
+              meCarrier: selectedShipping!.carrier || undefined,
+              deliveryMin: selectedShipping!.deliveryMin,
+              deliveryMax: selectedShipping!.deliveryMax,
+            }),
         couponCode: cart.couponCode ?? undefined,
       });
       await refresh();
@@ -268,162 +276,209 @@ export default function CheckoutPage() {
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            {/* Shipping address */}
-            <section className="rounded-xl border border-border p-5 space-y-4">
-              <h2 className="font-semibold">Endereço de entrega</h2>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium">Nome completo</label>
-                <input
-                  required
-                  value={address.name}
-                  onChange={(e) => set('name', e.target.value)}
-                  placeholder="Fulano da Silva"
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">CEP</label>
-                  <input
-                    required
-                    value={address.cep}
-                    onChange={(e) => set('cep', e.target.value)}
-                    onBlur={(e) => lookupCep(e.target.value)}
-                    placeholder="00000-000"
-                    maxLength={9}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  {cepLoading && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">Buscando...</p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Estado</label>
-                  <select
-                    required
-                    value={address.state}
-                    onChange={(e) => set('state', e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">UF</option>
-                    {STATES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium">Rua / Logradouro</label>
-                <input
-                  required
-                  value={address.street}
-                  onChange={(e) => set('street', e.target.value)}
-                  placeholder="Rua das Flores"
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Número</label>
-                  <input
-                    required
-                    value={address.number}
-                    onChange={(e) => set('number', e.target.value)}
-                    placeholder="123"
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Complemento</label>
-                  <input
-                    value={address.complement}
-                    onChange={(e) => set('complement', e.target.value)}
-                    placeholder="Apto 42 (opcional)"
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Bairro</label>
-                  <input
-                    required
-                    value={address.neighborhood}
-                    onChange={(e) => set('neighborhood', e.target.value)}
-                    placeholder="Centro"
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Cidade</label>
-                  <input
-                    required
-                    value={address.city}
-                    onChange={(e) => set('city', e.target.value)}
-                    placeholder="São Paulo"
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Shipping options */}
+            {/* Delivery method selector */}
             <section className="rounded-xl border border-border p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Frete</h2>
-                {shippingLoading && (
-                  <span className="text-xs text-muted-foreground animate-pulse">Calculando...</span>
-                )}
+              <h2 className="font-semibold">Forma de recebimento</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                  <input
+                    type="radio"
+                    name="deliveryMethod"
+                    value="SHIPPING"
+                    checked={deliveryMethod === 'SHIPPING'}
+                    onChange={() => setDeliveryMethod('SHIPPING')}
+                    className="accent-primary"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Entrega</p>
+                    <p className="text-xs text-muted-foreground">Receber em casa</p>
+                  </div>
+                </label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                  <input
+                    type="radio"
+                    name="deliveryMethod"
+                    value="PICKUP"
+                    checked={deliveryMethod === 'PICKUP'}
+                    onChange={() => setDeliveryMethod('PICKUP')}
+                    className="accent-primary"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Retirada na Loja</p>
+                    <p className="text-xs text-muted-foreground">Frete grátis</p>
+                  </div>
+                </label>
               </div>
 
-              {shippingOptions.length === 0 && !shippingLoading ? (
-                <p className="text-sm text-muted-foreground">
-                  Informe o CEP para ver as opções de frete.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {shippingOptions.map((opt) => (
-                    <label
-                      key={`${opt.method}-${opt.serviceId}`}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5"
-                    >
-                      <input
-                        type="radio"
-                        name="shipping"
-                        checked={
-                          selectedShipping?.method === opt.method &&
-                          selectedShipping?.serviceId === opt.serviceId
-                        }
-                        onChange={() => setSelectedShipping(opt)}
-                        className="accent-primary"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">
-                          {opt.name}
-                          {opt.carrier && opt.carrier !== opt.name ? (
-                            <span className="text-muted-foreground font-normal">
-                              {' '}
-                              · {opt.carrier}
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{opt.description}</p>
-                      </div>
-                      <span className="text-sm font-semibold">
-                        {opt.price === 0 ? 'Grátis' : formatBRL(opt.price)}
-                      </span>
-                    </label>
-                  ))}
+              {isPickup && (
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 text-sm text-muted-foreground">
+                  Você receberá uma notificação quando seu pedido estiver pronto para retirada.
                 </div>
               )}
             </section>
+
+            {/* Shipping address — hidden for PICKUP */}
+            {!isPickup && (
+              <section className="rounded-xl border border-border p-5 space-y-4">
+                <h2 className="font-semibold">Endereço de entrega</h2>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Nome completo</label>
+                  <input
+                    required
+                    value={address.name}
+                    onChange={(e) => set('name', e.target.value)}
+                    placeholder="Fulano da Silva"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">CEP</label>
+                    <input
+                      required
+                      value={address.cep}
+                      onChange={(e) => set('cep', e.target.value)}
+                      onBlur={(e) => lookupCep(e.target.value)}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    {cepLoading && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">Buscando...</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Estado</label>
+                    <select
+                      required
+                      value={address.state}
+                      onChange={(e) => set('state', e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">UF</option>
+                      {STATES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Rua / Logradouro</label>
+                  <input
+                    required
+                    value={address.street}
+                    onChange={(e) => set('street', e.target.value)}
+                    placeholder="Rua das Flores"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Número</label>
+                    <input
+                      required
+                      value={address.number}
+                      onChange={(e) => set('number', e.target.value)}
+                      placeholder="123"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Complemento</label>
+                    <input
+                      value={address.complement}
+                      onChange={(e) => set('complement', e.target.value)}
+                      placeholder="Apto 42 (opcional)"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Bairro</label>
+                    <input
+                      required
+                      value={address.neighborhood}
+                      onChange={(e) => set('neighborhood', e.target.value)}
+                      placeholder="Centro"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Cidade</label>
+                    <input
+                      required
+                      value={address.city}
+                      onChange={(e) => set('city', e.target.value)}
+                      placeholder="São Paulo"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Shipping options — hidden for PICKUP */}
+            {!isPickup && (
+              <section className="rounded-xl border border-border p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold">Frete</h2>
+                  {shippingLoading && (
+                    <span className="text-xs text-muted-foreground animate-pulse">
+                      Calculando...
+                    </span>
+                  )}
+                </div>
+
+                {shippingOptions.length === 0 && !shippingLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                    Informe o CEP para ver as opções de frete.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {shippingOptions.map((opt) => (
+                      <label
+                        key={`${opt.method}-${opt.serviceId}`}
+                        className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                      >
+                        <input
+                          type="radio"
+                          name="shipping"
+                          checked={
+                            selectedShipping?.method === opt.method &&
+                            selectedShipping?.serviceId === opt.serviceId
+                          }
+                          onChange={() => setSelectedShipping(opt)}
+                          className="accent-primary"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">
+                            {opt.name}
+                            {opt.carrier && opt.carrier !== opt.name ? (
+                              <span className="text-muted-foreground font-normal">
+                                {' '}
+                                · {opt.carrier}
+                              </span>
+                            ) : null}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{opt.description}</p>
+                        </div>
+                        <span className="text-sm font-semibold">
+                          {opt.price === 0 ? 'Grátis' : formatBRL(opt.price)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* Payment method */}
             <section className="rounded-xl border border-border p-5 space-y-3">
@@ -485,11 +540,17 @@ export default function CheckoutPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Frete</span>
                   <span>
-                    {selectedShipping
-                      ? selectedShipping.price === 0
-                        ? 'Grátis'
-                        : formatBRL(selectedShipping.price)
-                      : '—'}
+                    {isPickup ? (
+                      <span className="text-green-600 dark:text-green-400 font-medium">Grátis</span>
+                    ) : selectedShipping ? (
+                      selectedShipping.price === 0 ? (
+                        'Grátis'
+                      ) : (
+                        formatBRL(selectedShipping.price)
+                      )
+                    ) : (
+                      '—'
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
@@ -515,7 +576,7 @@ export default function CheckoutPage() {
 
               <button
                 type="submit"
-                disabled={submitting || !selectedShipping || !selectedPayment}
+                disabled={submitting || !canSubmit || !selectedPayment}
                 className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
               >
                 {submitting ? 'Processando...' : 'Confirmar e ir para pagamento'}

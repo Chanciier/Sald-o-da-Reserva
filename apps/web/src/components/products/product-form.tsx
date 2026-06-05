@@ -40,6 +40,7 @@ const schema = z.object({
   dimWidth: z.coerce.number().min(0).optional().nullable(),
   dimHeight: z.coerce.number().min(0).optional().nullable(),
   dimDepth: z.coerce.number().min(0).optional().nullable(),
+  pickupAvailable: z.boolean().default(false),
   status: z.enum(['ACTIVE', 'INACTIVE', 'DRAFT', 'ARCHIVED', 'OUT_OF_STOCK']),
   metaTitle: z.string().max(200).optional(),
   metaDescription: z.string().max(500).optional(),
@@ -108,6 +109,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           dimWidth: dims?.width ?? undefined,
           dimHeight: dims?.height ?? undefined,
           dimDepth: dims?.depth ?? undefined,
+          pickupAvailable: initialData.pickupAvailable ?? false,
           status: initialData.status as FormData['status'],
           metaTitle: initialData.metaTitle ?? '',
           metaDescription: initialData.metaDescription ?? '',
@@ -116,6 +118,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           status: 'ACTIVE',
           stock: 0,
           minimumStock: 0,
+          pickupAvailable: false,
         },
   });
 
@@ -208,6 +211,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
             unit: 'cm',
           }
         : undefined,
+      pickupAvailable: data.pickupAvailable,
       status: data.status,
       metaTitle: data.metaTitle || undefined,
       metaDescription: data.metaDescription || undefined,
@@ -522,6 +526,24 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               ))}
             </div>
             {errors.status && <p className={errorCls}>{errors.status.message}</p>}
+          </div>
+
+          {/* Retirada na loja */}
+          <div className={cardCls}>
+            <h2 className="text-sm font-semibold">Retirada na Loja</h2>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                {...register('pickupAvailable')}
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div>
+                <p className="text-sm font-medium leading-tight">Disponível para retirada</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Clientes poderão retirar este produto na loja sem custo de frete.
+                </p>
+              </div>
+            </label>
           </div>
 
           {/* Categoria */}

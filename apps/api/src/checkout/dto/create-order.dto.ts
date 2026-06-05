@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -8,9 +9,11 @@ import {
   Matches,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { DeliveryMethod } from '@prisma/client';
 
 export class ShippingAddressDto {
   @IsString()
@@ -53,18 +56,26 @@ export class ShippingAddressDto {
 }
 
 export class CreateOrderDto {
+  @IsOptional()
+  @IsEnum(DeliveryMethod)
+  deliveryMethod?: DeliveryMethod;
+
+  // Required only for SHIPPING
+  @ValidateIf((o: CreateOrderDto) => o.deliveryMethod !== DeliveryMethod.PICKUP)
   @ValidateNested()
   @Type(() => ShippingAddressDto)
-  shippingAddress: ShippingAddressDto;
+  shippingAddress?: ShippingAddressDto;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  shippingMethod: string;
+  shippingMethod?: string;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  shippingPrice: number;
+  shippingPrice?: number;
 
   @IsOptional()
   @IsInt()

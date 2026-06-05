@@ -43,6 +43,7 @@ interface Order {
   subtotal: number;
   discount: number;
   shipping: number;
+  deliveryMethod?: string;
   createdAt: string;
   user: { id: string; name: string | null; email: string } | null;
   payment: { method: string; status: string } | null;
@@ -259,7 +260,11 @@ export default function AdminPedidos() {
                     </td>
 
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {o.shipment ? (
+                      {o.deliveryMethod === 'PICKUP' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                          🏪 Retirada na Loja
+                        </span>
+                      ) : o.shipment ? (
                         <>
                           <p>{o.shipment.carrier || o.shipment.status}</p>
                           {o.shipment.trackingCode && (

@@ -38,6 +38,7 @@ export interface Product {
   dimensions: { width: number; height: number; depth: number; unit: string } | null;
   stock: number;
   minimumStock: number;
+  pickupAvailable: boolean;
   status: string;
   metaTitle: string | null;
   metaDescription: string | null;

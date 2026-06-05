@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { DeliveryMethod, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
@@ -59,6 +59,12 @@ export class CheckoutService {
   }
 
   async createOrder(userId: string, dto: CreateOrderDto) {
+    const isPickup = dto.deliveryMethod === DeliveryMethod.PICKUP;
+
+    if (!isPickup && !dto.shippingAddress) {
+      throw new BadRequestException('Endereço de entrega obrigatório para envio.');
+    }
+
     const cart = await this.cartService.getCart(userId);
     if (!cart.items.length) throw new BadRequestException('Carrinho está vazio.');
 
@@ -80,7 +86,7 @@ export class CheckoutService {
       }
     }
 
-    const shippingCost = round2(Math.max(0, dto.shippingPrice));
+    const shippingCost = isPickup ? 0 : round2(Math.max(0, dto.shippingPrice ?? 0));
 
     // Coupon
     const couponCode = dto.couponCode?.toUpperCase() ?? cart.couponCode ?? null;
@@ -116,12 +122,15 @@ export class CheckoutService {
         data: {
           userId,
           couponId,
+          deliveryMethod: dto.deliveryMethod ?? DeliveryMethod.SHIPPING,
           subtotal: cart.subtotal,
           discount: round2(discount),
           shipping: shippingCost,
           total,
-          shippingAddress: dto.shippingAddress as unknown as Prisma.InputJsonValue,
-          shippingMethod: dto.shippingMethod,
+          shippingAddress: isPickup
+            ? Prisma.JsonNull
+            : (dto.shippingAddress as unknown as Prisma.InputJsonValue),
+          shippingMethod: isPickup ? 'PICKUP' : (dto.shippingMethod ?? 'N/A'),
           notes: dto.notes,
           items: {
             create: cart.items.map((item) => {
@@ -159,18 +168,20 @@ export class CheckoutService {
         });
       }
 
-      // Create shipment record
-      await tx.shipment.create({
-        data: {
-          orderId: newOrder.id,
-          serviceId: dto.meServiceId ?? 0,
-          carrier: dto.meCarrier ?? 'N/A',
-          service: dto.shippingMethod,
-          price: shippingCost,
-          deliveryMin: dto.deliveryMin ?? null,
-          deliveryMax: dto.deliveryMax ?? null,
-        },
-      });
+      // Create shipment record (PICKUP orders have no shipment)
+      if (!isPickup) {
+        await tx.shipment.create({
+          data: {
+            orderId: newOrder.id,
+            serviceId: dto.meServiceId ?? 0,
+            carrier: dto.meCarrier ?? 'N/A',
+            service: dto.shippingMethod ?? 'N/A',
+            price: shippingCost,
+            deliveryMin: dto.deliveryMin ?? null,
+            deliveryMax: dto.deliveryMax ?? null,
+          },
+        });
+      }
 
       return newOrder;
     });

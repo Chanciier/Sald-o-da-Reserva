@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNumber,
@@ -87,6 +88,10 @@ export class UpdateProductDto {
   @Min(0)
   @Type(() => Number)
   minimumStock?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  pickupAvailable?: boolean;
 
   @IsOptional()
   @IsEnum(ProductStatus)

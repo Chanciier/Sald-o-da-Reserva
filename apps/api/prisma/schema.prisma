@@ -26,6 +26,11 @@ enum CouponType {
   FIXED
 }
 
+enum DeliveryMethod {
+  SHIPPING
+  PICKUP
+}
+
 enum OrderStatus {
   PENDING
   CONFIRMED
@@ -151,6 +156,7 @@ model Product {
   dimensions       Json?
   stock            Int           @default(0)
   minimumStock     Int           @default(0) @map("minimum_stock")
+  pickupAvailable  Boolean       @default(false) @map("pickup_available")
   status           ProductStatus @default(ACTIVE)
   metaTitle        String?       @map("meta_title") @db.VarChar(200)
   metaDescription  String?       @map("meta_description") @db.VarChar(500)
@@ -159,10 +165,10 @@ model Product {
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdBy   User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  images      Image[]
-  orderItems  OrderItem[]
+  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy  User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  images     Image[]
+  orderItems OrderItem[]
 
   @@index([categoryId])
   @@index([status])
@@ -236,13 +242,14 @@ model Order {
   id              String      @id @default(cuid())
   userId          String      @map("user_id")
   couponId        String?     @map("coupon_id")
-  status          OrderStatus @default(PENDING)
-  subtotal        Decimal     @db.Decimal(10, 2)
-  discount        Decimal     @default(0) @db.Decimal(10, 2)
-  shipping        Decimal     @default(0) @db.Decimal(10, 2)
-  total           Decimal     @db.Decimal(10, 2)
-  shippingAddress Json        @map("shipping_address")
-  shippingMethod  String      @map("shipping_method")
+  status          OrderStatus    @default(PENDING)
+  deliveryMethod  DeliveryMethod @default(SHIPPING) @map("delivery_method")
+  subtotal        Decimal        @db.Decimal(10, 2)
+  discount        Decimal        @default(0) @db.Decimal(10, 2)
+  shipping        Decimal        @default(0) @db.Decimal(10, 2)
+  total           Decimal        @db.Decimal(10, 2)
+  shippingAddress Json?          @map("shipping_address")
+  shippingMethod  String         @map("shipping_method")
   notes           String?
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
