@@ -65,7 +65,7 @@ export interface Shipment {
   deliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
-  events: ShipmentEvent[];
+  events?: ShipmentEvent[];
 }
 
 export interface Order {

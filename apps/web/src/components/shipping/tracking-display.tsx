@@ -123,11 +123,11 @@ export function TrackingDisplay({ shipment }: TrackingDisplayProps) {
       )}
 
       {/* Timeline */}
-      {shipment.events.length > 0 && (
+      {(shipment.events?.length ?? 0) > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium">Histórico</p>
           <ol className="relative border-l border-border ml-3 space-y-3">
-            {shipment.events.map((ev) => (
+            {(shipment.events ?? []).map((ev) => (
               <li key={ev.id} className="pl-4">
                 <div className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border border-border bg-background" />
                 <p className="text-sm font-medium leading-tight">{ev.description ?? ev.event}</p>
