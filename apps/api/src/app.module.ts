@@ -16,6 +16,8 @@ import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { InvoiceModule } from './invoices/invoice.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
 import { PermissionsGuard } from './rbac/guards/permissions.guard';
@@ -28,6 +30,7 @@ import { envValidation } from './config/env.validation';
       isGlobal: true,
       validate: envValidation,
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     RedisModule,
     AuthModule,
@@ -41,6 +44,7 @@ import { envValidation } from './config/env.validation';
     PaymentsModule,
     ShippingModule,
     AnalyticsModule,
+    InvoiceModule,
   ],
   controllers: [AppController],
   providers: [

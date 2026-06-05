@@ -5,6 +5,7 @@ import { createHmac } from 'crypto';
 import { Prisma, PaymentMethod, PaymentStatus, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreatePaymentDto } from './dto/create-payment.dto';
+import { InvoiceService } from '../invoices/invoice.service';
 
 type MpRaw = Record<string, unknown>;
 
@@ -18,6 +19,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly invoiceService: InvoiceService,
   ) {
     const client = new MercadoPagoConfig({
       accessToken: this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN', ''),
@@ -230,6 +232,13 @@ export class PaymentsService {
     this.logger.log(
       `Webhook: payment=${payment.id} ${payment.status}→${newStatus} order=${payment.orderId}`,
     );
+
+    // Fire-and-forget: emit NF-e when payment is approved
+    if (newStatus === 'APPROVED') {
+      this.invoiceService
+        .emitForOrder(payment.orderId)
+        .catch((e) => this.logger.error('Invoice emission failed', e));
+    }
   }
 
   // ── Private: build MP request body ───────────────────────────────────────

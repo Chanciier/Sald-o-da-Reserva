@@ -64,6 +64,14 @@ enum PaymentStatus {
   CHARGED_BACK
 }
 
+enum InvoiceStatus {
+  PENDING
+  PROCESSING
+  AUTHORIZED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -244,6 +252,7 @@ model Order {
   items    OrderItem[]
   payment  Payment?
   shipment Shipment?
+  invoices Invoice[]
 
   @@index([userId])
   @@map("orders")
@@ -350,4 +359,27 @@ model PaymentLog {
 
   @@index([paymentId])
   @@map("payment_logs")
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  orderId          String        @map("order_id")
+  enotasId         String?       @unique @map("enotas_id")
+  invoiceNumber    String?       @map("invoice_number")
+  accessKey        String?       @map("access_key") @db.VarChar(60)
+  status           InvoiceStatus @default(PENDING)
+  xmlUrl           String?       @map("xml_url") @db.Text
+  pdfUrl           String?       @map("pdf_url") @db.Text
+  issueDate        DateTime?     @map("issue_date")
+  cancellationDate DateTime?     @map("cancellation_date")
+  errorMessage     String?       @map("error_message") @db.Text
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([enotasId])
+  @@index([status])
+  @@map("invoices")
 }

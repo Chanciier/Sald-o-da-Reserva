@@ -116,6 +116,30 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   MELHOR_ENVIO_FROM_STATE: string = '';
+
+  @IsString()
+  @IsOptional()
+  ENOTAS_API_KEY: string = '';
+
+  @IsString()
+  @IsOptional()
+  ENOTAS_COMPANY_ID: string = '';
+
+  @IsString()
+  @IsOptional()
+  ENOTAS_ENVIRONMENT: string = 'sandbox';
+
+  @IsString()
+  @IsOptional()
+  ENOTAS_WEBHOOK_SECRET: string = '';
+
+  @IsString()
+  @IsOptional()
+  RESEND_API_KEY: string = '';
+
+  @IsString()
+  @IsOptional()
+  RESEND_FROM_EMAIL: string = 'noreply@saldaodareserva.com.br';
 }
 
 export function envValidation(config: Record<string, unknown>) {

@@ -4,7 +4,16 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { LayoutDashboard, ShoppingBag, Package, Tag, Ticket, Users, LogOut } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  Package,
+  Tag,
+  Ticket,
+  Users,
+  LogOut,
+  Receipt,
+} from 'lucide-react';
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -13,6 +22,7 @@ const NAV = [
   { href: '/admin/categorias', label: 'Categorias', icon: Tag },
   { href: '/admin/cupons', label: 'Cupons', icon: Ticket },
   { href: '/admin/usuarios', label: 'Usuários', icon: Users },
+  { href: '/admin/financeiro/notas-fiscais', label: 'Notas Fiscais', icon: Receipt },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
