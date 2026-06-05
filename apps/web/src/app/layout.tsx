@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { AuthProvider } from '@/contexts/auth-context';
 import { CartProvider } from '@/contexts/cart-context';
@@ -31,6 +32,7 @@ export default function RootLayout({
             </CartProvider>
           </AuthProvider>
         </QueryProvider>
+        <Analytics />
       </body>
     </html>
   );
