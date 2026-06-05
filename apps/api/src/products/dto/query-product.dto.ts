@@ -72,4 +72,8 @@ export class QueryProductDto {
   @IsOptional()
   @IsString()
   sortOrder?: SortOrder = 'desc';
+
+  @IsOptional()
+  @IsString()
+  createdById?: string;
 }

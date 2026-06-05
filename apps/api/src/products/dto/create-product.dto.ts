@@ -40,11 +40,21 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
+  internalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
   brand?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(5000)
+  @MaxLength(500)
+  shortDescription?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10000)
   description?: string;
 
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -76,12 +86,28 @@ export class CreateProductDto {
   stock?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  minimumStock?: number;
+
+  @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus;
 
   @IsOptional()
   @IsString()
   categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  metaTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  metaDescription?: string;
 
   @IsOptional()
   @IsArray()

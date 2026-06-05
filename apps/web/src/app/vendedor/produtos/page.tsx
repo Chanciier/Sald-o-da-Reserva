@@ -13,7 +13,6 @@ const STATUS_OPTIONS = [
   { value: 'INACTIVE', label: 'Inativo' },
   { value: 'DRAFT', label: 'Rascunho' },
   { value: 'ARCHIVED', label: 'Arquivado' },
-  { value: 'OUT_OF_STOCK', label: 'Sem estoque' },
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -36,8 +35,8 @@ function fmt(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function AdminProdutos() {
-  const { token } = useAuth();
+export default function VendedorProdutos() {
+  const { token, user } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
@@ -46,22 +45,23 @@ export default function AdminProdutos() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['admin-products', page, statusFilter, search],
+    queryKey: ['vendor-products', page, statusFilter, search, user?.id],
     queryFn: () =>
       fetchProducts(token, {
         page: String(page),
         ...(statusFilter && { status: statusFilter }),
         ...(search && { search }),
+        ...(user?.id && { createdById: user.id }),
         limit: '20',
       }),
-    enabled: !!token,
+    enabled: !!token && !!user,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteProduct(token!, id),
     onSuccess: () => {
       setDeletingId(null);
-      qc.invalidateQueries({ queryKey: ['admin-products'] });
+      qc.invalidateQueries({ queryKey: ['vendor-products'] });
     },
   });
 
@@ -85,7 +85,10 @@ export default function AdminProdutos() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Produtos</h1>
+        <div>
+          <h1 className="text-xl font-bold">Meus Produtos</h1>
+          <p className="text-sm text-muted-foreground">Produtos criados por você</p>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => refetch()}
@@ -96,7 +99,7 @@ export default function AdminProdutos() {
             Atualizar
           </button>
           <Link
-            href="/admin/produtos/novo"
+            href="/vendedor/produtos/novo"
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -162,9 +165,11 @@ export default function AdminProdutos() {
           </div>
         ) : !data?.data.length ? (
           <div className="py-16 text-center">
-            <p className="text-sm text-muted-foreground">Nenhum produto encontrado.</p>
+            <p className="text-sm text-muted-foreground">
+              Você ainda não tem produtos cadastrados.
+            </p>
             <Link
-              href="/admin/produtos/novo"
+              href="/vendedor/produtos/novo"
               className="mt-3 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <Plus className="h-3.5 w-3.5" /> Criar primeiro produto
@@ -181,7 +186,6 @@ export default function AdminProdutos() {
                   <th className="px-4 py-3 font-medium">Preço</th>
                   <th className="px-4 py-3 font-medium">Estoque</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Criado por</th>
                   <th className="px-4 py-3 font-medium">Ações</th>
                 </tr>
               </thead>
@@ -204,9 +208,6 @@ export default function AdminProdutos() {
                     <td className="px-4 py-3">
                       <p className="font-medium leading-tight truncate max-w-[200px]">{p.name}</p>
                       <p className="text-xs text-muted-foreground font-mono">{p.sku}</p>
-                      {p.internalCode && (
-                        <p className="text-xs text-muted-foreground">{p.internalCode}</p>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {p.category?.name ?? '—'}
@@ -236,13 +237,10 @@ export default function AdminProdutos() {
                         {STATUS_LABEL[p.status] ?? p.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {p.createdBy?.name ?? p.createdBy?.email ?? '—'}
-                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <Link
-                          href={`/admin/produtos/${p.id}`}
+                          href={`/vendedor/produtos/${p.id}`}
                           className="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
                         >
                           <Pencil className="h-3 w-3" /> Editar

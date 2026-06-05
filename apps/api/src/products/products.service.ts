@@ -1,15 +1,27 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { StorageService } from '../storage/storage.service';
 import { slugify } from '../utils/slugify';
+import { AuthenticatedUser } from '../auth/types/auth.types';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
 
-const CACHE_TTL = 300; // 5 minutes
+const CACHE_TTL = 300;
 const keyItem = (slug: string) => `products:item:${slug}`;
+
+const INCLUDE_FULL = {
+  category: true,
+  images: { orderBy: { position: 'asc' as const } },
+  createdBy: { select: { id: true, name: true, email: true } },
+};
 
 function serializeProduct<
   T extends {
@@ -34,7 +46,33 @@ export class ProductsService {
     private readonly storage: StorageService,
   ) {}
 
-  async create(dto: CreateProductDto) {
+  private async auditLog(action: string, userId?: string, metadata?: object) {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          action,
+          userId,
+          metadata: metadata as Prisma.InputJsonValue | undefined,
+        },
+      });
+    } catch (_) {
+      // fire-and-forget: audit failures must not break business operations
+    }
+  }
+
+  private async connectImagesWithPosition(imageIds: string[], productId: string) {
+    if (!imageIds.length) return;
+    await Promise.all(
+      imageIds.map((id, index) =>
+        this.prisma.image.update({
+          where: { id },
+          data: { productId, position: index },
+        }),
+      ),
+    );
+  }
+
+  async create(dto: CreateProductDto, userId?: string) {
     const slug = dto.slug ?? slugify(dto.name);
 
     const [slugConflict, skuConflict] = await Promise.all([
@@ -49,24 +87,31 @@ export class ProductsService {
         name: dto.name,
         slug,
         sku: dto.sku,
+        internalCode: dto.internalCode,
         brand: dto.brand,
+        shortDescription: dto.shortDescription,
         description: dto.description,
         price: dto.price,
         salePrice: dto.salePrice,
         weight: dto.weight,
         dimensions: dto.dimensions as unknown as Prisma.InputJsonValue,
         stock: dto.stock ?? 0,
+        minimumStock: dto.minimumStock ?? 0,
         status: dto.status,
         categoryId: dto.categoryId,
+        metaTitle: dto.metaTitle,
+        metaDescription: dto.metaDescription,
+        createdById: userId,
       },
-      include: { category: true, images: true },
+      include: INCLUDE_FULL,
     });
 
     if (dto.imageIds?.length) {
-      await this.storage.connectImages(dto.imageIds, 'productId', product.id);
+      await this.connectImagesWithPosition(dto.imageIds, product.id);
     }
 
     await this.redis.delPattern('products:*');
+    await this.auditLog('PRODUCT_CREATED', userId, { productId: product.id, name: product.name });
     return serializeProduct(product);
   }
 
@@ -88,6 +133,7 @@ export class ProductsService {
       inStock,
       sortBy = 'createdAt',
       sortOrder = 'desc',
+      createdById,
     } = query;
 
     const where: Prisma.ProductWhereInput = {
@@ -97,6 +143,7 @@ export class ProductsService {
           { description: { contains: search, mode: 'insensitive' } },
           { sku: { contains: search, mode: 'insensitive' } },
           { brand: { contains: search, mode: 'insensitive' } },
+          { internalCode: { contains: search, mode: 'insensitive' } },
         ],
       }),
       ...(categoryId && { categoryId }),
@@ -110,12 +157,13 @@ export class ProductsService {
       }),
       ...(brand && { brand: { contains: brand, mode: 'insensitive' } }),
       ...(inStock === true && { stock: { gt: 0 } }),
+      ...(createdById && { createdById }),
     };
 
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        include: { category: true, images: true },
+        include: INCLUDE_FULL,
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
@@ -141,7 +189,7 @@ export class ProductsService {
 
     const product = await this.prisma.product.findUnique({
       where: { slug },
-      include: { category: true, images: true },
+      include: { category: true, images: { orderBy: { position: 'asc' } } },
     });
     if (!product) throw new NotFoundException('Produto não encontrado.');
 
@@ -150,9 +198,22 @@ export class ProductsService {
     return serialized;
   }
 
-  async update(id: string, dto: UpdateProductDto) {
+  async findById(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: INCLUDE_FULL,
+    });
+    if (!product) throw new NotFoundException('Produto não encontrado.');
+    return serializeProduct(product);
+  }
+
+  async update(id: string, dto: UpdateProductDto, user: AuthenticatedUser) {
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Produto não encontrado.');
+
+    if (user.role === Role.VENDEDOR && existing.createdById !== user.id) {
+      throw new ForbiddenException('Você só pode editar seus próprios produtos.');
+    }
 
     if (dto.slug && dto.slug !== existing.slug) {
       const conflict = await this.prisma.product.findUnique({ where: { slug: dto.slug } });
@@ -167,41 +228,72 @@ export class ProductsService {
     const { imageIds, dimensions, ...rest } = dto;
     const slug = rest.name && !rest.slug ? slugify(rest.name) : (rest.slug ?? existing.slug);
 
-    const updated = await this.prisma.product.update({
+    await this.prisma.product.update({
       where: { id },
       data: {
         ...rest,
         slug,
         dimensions: dimensions as unknown as Prisma.InputJsonValue | undefined,
       },
-      include: { category: true, images: true },
     });
 
-    if (imageIds?.length) {
-      await this.storage.connectImages(imageIds, 'productId', id);
-      const withImages = await this.prisma.product.findUnique({
-        where: { id },
-        include: { category: true, images: true },
+    if (imageIds !== undefined) {
+      await this.prisma.image.updateMany({
+        where: { productId: id, id: { notIn: imageIds } },
+        data: { productId: null },
       });
-      await this.redis.delPattern('products:*');
-      return serializeProduct(withImages!);
+      if (imageIds.length) {
+        await this.connectImagesWithPosition(imageIds, id);
+      }
     }
 
     await this.redis.delPattern('products:*');
+    await this.auditLog('PRODUCT_UPDATED', user.id, { productId: id, changes: Object.keys(rest) });
+
+    const updated = await this.prisma.product.findUnique({ where: { id }, include: INCLUDE_FULL });
+    return serializeProduct(updated!);
+  }
+
+  async updateStock(id: string, stock: number, user: AuthenticatedUser) {
+    const existing = await this.prisma.product.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Produto não encontrado.');
+
+    if (user.role === Role.VENDEDOR && existing.createdById !== user.id) {
+      throw new ForbiddenException('Você só pode alterar o estoque dos seus próprios produtos.');
+    }
+
+    const updated = await this.prisma.product.update({
+      where: { id },
+      data: { stock },
+      include: { category: true, images: { orderBy: { position: 'asc' } } },
+    });
+
+    await this.redis.delPattern('products:*');
+    await this.auditLog('PRODUCT_STOCK_UPDATED', user.id, {
+      productId: id,
+      previousStock: existing.stock,
+      newStock: stock,
+    });
+
     return serializeProduct(updated);
   }
 
-  async remove(id: string) {
+  async remove(id: string, user: AuthenticatedUser) {
     const existing = await this.prisma.product.findUnique({
       where: { id },
       include: { images: { select: { key: true } } },
     });
     if (!existing) throw new NotFoundException('Produto não encontrado.');
 
+    if (user.role === Role.VENDEDOR && existing.createdById !== user.id) {
+      throw new ForbiddenException('Você não pode excluir produtos de outros usuários.');
+    }
+
     const keys = existing.images.map((i) => i.key);
     if (keys.length) await this.storage.deleteManyByKeys(keys);
 
     await this.prisma.product.delete({ where: { id } });
     await this.redis.delPattern('products:*');
+    await this.auditLog('PRODUCT_DELETED', user.id, { productId: id, name: existing.name });
   }
 }
