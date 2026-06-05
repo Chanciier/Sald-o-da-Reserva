@@ -1,35 +1,305 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+import type { InstallmentOption } from '@/types/payment';
+
 interface CardFormProps {
-  clientSecret: string;
-  onSuccess: (paymentIntentId: string) => void;
+  amount: number;
+  publicKey: string;
+  onSubmit: (data: {
+    token: string;
+    installments: number;
+    paymentMethodId: string;
+    issuerId?: string;
+    identificationNumber: string;
+  }) => Promise<void>;
   onError: (msg: string) => void;
 }
 
-export function CardForm({ onError: _onError, onSuccess: _onSuccess }: CardFormProps) {
+function formatCardNumber(v: string) {
+  return v
+    .replace(/\D/g, '')
+    .slice(0, 16)
+    .replace(/(\d{4})(?=\d)/g, '$1 ')
+    .trim();
+}
+
+function formatCpf(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+function formatExpiry(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 4);
+  if (d.length <= 2) return d;
+  return `${d.slice(0, 2)}/${d.slice(2)}`;
+}
+
+export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps) {
+  const [mp, setMp] = useState<MercadoPagoInstance | null>(null);
+  const [sdkLoading, setSdkLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardholderName, setCardholderName] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [installments, setInstallments] = useState(1);
+  const [installmentOptions, setInstallmentOptions] = useState<InstallmentOption[]>([]);
+  const [loadingInstallments, setLoadingInstallments] = useState(false);
+  const [detectedPaymentMethodId, setDetectedPaymentMethodId] = useState<string>('');
+
+  useEffect(() => {
+    if (window.MercadoPago) {
+      setMp(new window.MercadoPago(publicKey, { locale: 'pt-BR' }));
+      setSdkLoading(false);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://sdk.mercadopago.com/js/v2';
+    script.async = true;
+    script.onload = () => {
+      if (window.MercadoPago) {
+        setMp(new window.MercadoPago(publicKey, { locale: 'pt-BR' }));
+      }
+      setSdkLoading(false);
+    };
+    script.onerror = () => {
+      onError('Não foi possível carregar o SDK do Mercado Pago.');
+      setSdkLoading(false);
+    };
+    document.body.appendChild(script);
+  }, [publicKey, onError]);
+
+  const loadInstallments = useCallback(
+    async (bin: string) => {
+      if (!mp || bin.length < 6) {
+        setInstallmentOptions([]);
+        return;
+      }
+      setLoadingInstallments(true);
+      try {
+        const result = await mp.getInstallments({ amount: amount.toFixed(2), bin });
+        const first = result[0];
+        const costs = first?.payer_costs ?? [];
+        if (first?.payment_method_id) setDetectedPaymentMethodId(first.payment_method_id);
+        setInstallmentOptions(
+          costs.map((c) => ({
+            installments: c.installments,
+            recommended_message: c.recommended_message,
+            total_amount: c.total_amount,
+          })),
+        );
+        if (costs.length && !costs.find((c) => c.installments === installments)) {
+          setInstallments(costs[0].installments);
+        }
+      } catch {
+        setInstallmentOptions([
+          { installments: 1, recommended_message: '1x', total_amount: amount },
+        ]);
+      } finally {
+        setLoadingInstallments(false);
+      }
+    },
+    [mp, amount, installments],
+  );
+
+  useEffect(() => {
+    const bin = cardNumber.replace(/\D/g, '').slice(0, 6);
+    if (bin.length === 6) loadInstallments(bin);
+  }, [cardNumber, loadInstallments]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mp) {
+      onError('SDK do Mercado Pago não carregado.');
+      return;
+    }
+
+    const cleanCpf = cpf.replace(/\D/g, '');
+    if (cleanCpf.length !== 11) {
+      onError('Informe um CPF válido.');
+      return;
+    }
+
+    const [month, yearShort] = expiry.split('/');
+    if (!month || !yearShort || month.length !== 2 || yearShort.length !== 2) {
+      onError('Data de validade inválida.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const tokenResult = await mp.createCardToken({
+        cardNumber: cardNumber.replace(/\D/g, ''),
+        cardholderName: cardholderName.trim(),
+        cardExpirationMonth: month,
+        cardExpirationYear: `20${yearShort}`,
+        securityCode: cvv.replace(/\D/g, ''),
+        identificationType: 'CPF',
+        identificationNumber: cleanCpf,
+      });
+
+      if (!tokenResult.id) throw new Error('Falha ao tokenizar o cartão.');
+
+      await onSubmit({
+        token: tokenResult.id,
+        installments,
+        paymentMethodId: detectedPaymentMethodId || tokenResult.payment_method_id || 'master',
+        issuerId: tokenResult.issuer_id,
+        identificationNumber: cleanCpf,
+      });
+    } catch (err) {
+      onError((err as Error).message ?? 'Erro ao processar cartão.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (sdkLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+        <Spinner /> Carregando formulário...
+      </div>
+    );
+  }
+
+  if (!publicKey) {
+    return (
+      <p className="py-6 text-center text-sm text-destructive">
+        Chave pública do Mercado Pago não configurada (NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY).
+      </p>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center gap-3 py-10 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-        <svg
-          className="h-6 w-6 text-muted-foreground"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium">Número do cartão</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="0000 0000 0000 0000"
+          value={cardNumber}
+          onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+          required
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">Nome no cartão</label>
+        <input
+          type="text"
+          placeholder="Como impresso no cartão"
+          value={cardholderName}
+          onChange={(e) => setCardholderName(e.target.value)}
+          required
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Validade</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="MM/AA"
+            value={expiry}
+            onChange={(e) => setExpiry(formatExpiry(e.target.value))}
+            required
+            maxLength={5}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">CVV</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="123"
+            value={cvv}
+            onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            required
+            maxLength={4}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">CPF do titular</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="000.000.000-00"
+          value={cpf}
+          onChange={(e) => setCpf(formatCpf(e.target.value))}
+          required
+          maxLength={14}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">Parcelas</label>
+        <select
+          value={installments}
+          onChange={(e) => setInstallments(parseInt(e.target.value, 10))}
+          disabled={loadingInstallments}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
         >
+          {(installmentOptions.length
+            ? installmentOptions
+            : [
+                {
+                  installments: 1,
+                  recommended_message: `1x de R$ ${amount.toFixed(2)}`,
+                  total_amount: amount,
+                },
+              ]
+          ).map((opt) => (
+            <option key={opt.installments} value={opt.installments}>
+              {opt.recommended_message}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+      >
+        {submitting ? 'Processando...' : 'Pagar com cartão'}
+      </button>
+
+      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+            strokeWidth={2}
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
           />
         </svg>
+        Pagamento seguro via Mercado Pago
       </div>
-      <div>
-        <p className="font-medium">Pagamento com cartão em breve</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Utilize PIX ou Boleto enquanto finalizamos a integração.
-        </p>
-      </div>
-    </div>
+    </form>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+    </svg>
   );
 }

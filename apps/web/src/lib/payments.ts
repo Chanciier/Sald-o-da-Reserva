@@ -1,4 +1,4 @@
-import type { Payment, CreatePaymentPayload } from '@/types/payment';
+import type { CreateCardPayload, CreatePixPayload, Payment } from '@/types/payment';
 
 const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
@@ -11,30 +11,54 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function createPayment(
-  orderId: string,
-  payload: CreatePaymentPayload,
-  token: string,
-): Promise<Payment> {
-  return request<Payment>(`/payments/order/${orderId}`, {
+function authHeaders(token: string) {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+/** POST /payments/pix */
+export async function createPixPayment(payload: CreatePixPayload, token: string): Promise<Payment> {
+  return request<Payment>('/payments/pix', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(token),
     body: JSON.stringify(payload),
   });
 }
 
-export async function getPayment(orderId: string, token: string): Promise<Payment> {
+/** POST /payments/card */
+export async function createCardPayment(
+  payload: CreateCardPayload,
+  token: string,
+): Promise<Payment> {
+  return request<Payment>('/payments/card', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+}
+
+/** GET /payments/:id — consulta status (sincroniza com Mercado Pago) */
+export async function getPaymentById(paymentId: string, token: string): Promise<Payment> {
+  return request<Payment>(`/payments/${paymentId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/** GET /payments/order/:orderId */
+export async function getPaymentByOrder(orderId: string, token: string): Promise<Payment> {
   return request<Payment>(`/payments/order/${orderId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
-/** Used after confirmCardPayment() to verify the current payment status in the backend. */
+/** @deprecated use getPaymentById */
 export async function getPaymentStatus(paymentId: string, token: string): Promise<Payment> {
-  return request<Payment>(`/payments/${paymentId}/status`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  return getPaymentById(paymentId, token);
+}
+
+/** @deprecated use createPixPayment or createCardPayment */
+export async function getPayment(orderId: string, token: string): Promise<Payment> {
+  return getPaymentByOrder(orderId, token);
 }

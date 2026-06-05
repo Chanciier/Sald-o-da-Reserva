@@ -4,9 +4,12 @@ export type PaymentStatus =
   | 'PENDING'
   | 'APPROVED'
   | 'AUTHORIZED'
+  | 'IN_PROCESS'
+  | 'IN_MEDIATION'
   | 'REJECTED'
   | 'CANCELLED'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  | 'CHARGED_BACK';
 
 export interface Payment {
   id: string;
@@ -31,36 +34,21 @@ export interface Payment {
   updatedAt: string;
 }
 
-export interface CreatePaymentPayload {
-  method: PaymentMethod;
-  /** CPF/CNPJ — obrigatório para BOLETO */
-  taxId?: string;
+export interface CreatePixPayload {
+  orderId: string;
 }
 
-export interface BillingAddress {
-  line1: string;
-  line2?: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
+export interface CreateCardPayload {
+  orderId: string;
+  token: string;
+  installments: number;
+  paymentMethodId: string;
+  issuerId?: string;
+  identificationNumber?: string;
 }
 
-export interface BoletoPaymentResult {
-  boletoUrl: string | null;
-  boletoCode: string | null;
-  boletoExpiresAt: string | null;
-}
-
-export interface PixPaymentResult {
-  pixQrCode: string | null;
-  pixQrCodeBase64: string | null;
-  pixExpiresAt: string | null;
-}
-
-export interface CardPaymentResult {
-  clientSecret: string;
-  cardBrand: string | null;
-  cardLast4: string | null;
-  installments: number | null;
+export interface InstallmentOption {
+  installments: number;
+  recommended_message: string;
+  total_amount: number;
 }

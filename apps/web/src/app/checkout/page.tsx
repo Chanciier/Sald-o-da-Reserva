@@ -72,13 +72,13 @@ const PAYMENT_METHODS: {
   description: string;
   icon: string;
 }[] = [
+  { method: 'PIX', label: 'PIX', description: 'Aprovação imediata', icon: '⚡' },
   {
     method: 'CREDIT_CARD',
     label: 'Cartão de crédito',
     description: 'Visa, Mastercard, Elo e outros',
     icon: '💳',
   },
-  { method: 'BOLETO', label: 'Boleto bancário', description: 'Vence em 3 dias úteis', icon: '🏦' },
 ];
 
 export default function CheckoutPage() {
@@ -89,7 +89,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('CREDIT_CARD');
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('PIX');
   const [cepLoading, setCepLoading] = useState(false);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);

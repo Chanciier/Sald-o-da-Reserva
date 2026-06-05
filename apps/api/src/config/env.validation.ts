@@ -57,6 +57,10 @@ class EnvironmentVariables {
   @IsOptional()
   MERCADO_PAGO_WEBHOOK_SECRET: string = '';
 
+  @IsUrl({ require_tld: false })
+  @IsOptional()
+  API_PUBLIC_URL: string = 'http://localhost:3001';
+
   @IsString()
   @IsOptional()
   MELHOR_ENVIO_TOKEN: string = '';

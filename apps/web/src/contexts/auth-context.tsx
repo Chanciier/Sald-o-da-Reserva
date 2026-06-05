@@ -49,6 +49,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const scheduleRefresh = useCallback(
+    (accessToken: string) => {
+      try {
+        const payload = JSON.parse(
+          atob(accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')),
+        );
+        const msUntilExpiry = payload.exp * 1000 - Date.now();
+        // Refresh 60 seconds before expiry
+        const delay = Math.max(0, msUntilExpiry - 60_000);
+        const timer = setTimeout(() => {
+          const storedRefresh = localStorage.getItem(REFRESH_KEY);
+          if (!storedRefresh) return;
+          refreshApi(storedRefresh)
+            .then((data) => persist({ ...data }))
+            .catch(() => logout());
+        }, delay);
+        return timer;
+      } catch {
+        return undefined;
+      }
+    },
+    [persist, logout],
+  );
+
   useEffect(() => {
     const stored = localStorage.getItem(ACCESS_KEY);
     const storedUser = localStorage.getItem(USER_KEY);
@@ -84,6 +108,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setLoading(false);
   }, [logout, persist]);
+
+  // Schedule silent refresh whenever the access token changes
+  useEffect(() => {
+    if (!token) return;
+    const timer = scheduleRefresh(token);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [token, scheduleRefresh]);
 
   const login = useCallback(
     async (email: string, password: string) => {
