@@ -18,6 +18,7 @@ import { MercadoPagoModule } from './mercadopago/mercadopago.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { InvoiceModule } from './invoices/invoice.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -47,6 +48,7 @@ import { envValidation } from './config/env.validation';
     ShippingModule,
     AnalyticsModule,
     InvoiceModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [

@@ -44,7 +44,7 @@ export class MercadoPagoService {
     // MP rejects localhost URLs — only set webhook URL in production/ngrok
     this.webhookUrl = /localhost|127\.0\.0\.1/.test(cleanUrl)
       ? ''
-      : `${cleanUrl}/api/v1/payments/webhook`;
+      : `${cleanUrl}/api/v1/webhooks/mercadopago`;
 
     if (!this.accessToken) {
       this.logger.warn('MERCADO_PAGO_ACCESS_TOKEN não configurado.');
