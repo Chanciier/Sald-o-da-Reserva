@@ -14,6 +14,7 @@ import { CartModule } from './cart/cart.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentsModule } from './payments/payments.module';
+import { MercadoPagoModule } from './mercadopago/mercadopago.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { InvoiceModule } from './invoices/invoice.module';
@@ -42,6 +43,7 @@ import { envValidation } from './config/env.validation';
     CouponsModule,
     CheckoutModule,
     PaymentsModule,
+    MercadoPagoModule,
     ShippingModule,
     AnalyticsModule,
     InvoiceModule,

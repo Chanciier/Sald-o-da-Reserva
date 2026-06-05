@@ -1,106 +1,35 @@
 'use client';
 
-import { useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-
-interface CardFormInnerProps {
+interface CardFormProps {
   clientSecret: string;
-  /** Called with the payment intent ID after Stripe confirms — use it to verify status in the backend */
   onSuccess: (paymentIntentId: string) => void;
   onError: (msg: string) => void;
 }
 
-function CardFormInner({ clientSecret, onSuccess, onError }: CardFormInnerProps) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-
-    setSubmitting(true);
-    try {
-      const card = elements.getElement(CardElement);
-      if (!card) throw new Error('Formulário de cartão não encontrado.');
-
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: { card },
-      });
-
-      if (result.error) {
-        onError(result.error.message ?? 'Pagamento recusado.');
-        return;
-      }
-
-      // Pass the PaymentIntent ID back so the page can verify status via the backend
-      onSuccess(result.paymentIntent?.id ?? '');
-    } catch (err) {
-      onError((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
+export function CardForm({ onError: _onError, onSuccess: _onSuccess }: CardFormProps) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="mb-1.5 block text-sm font-medium">Dados do cartão</label>
-        <div className="rounded-lg border border-input bg-background px-3 py-3">
-          <CardElement
-            options={{
-              style: {
-                base: {
-                  fontSize: '14px',
-                  color: '#09090b',
-                  fontFamily: 'inherit',
-                  '::placeholder': { color: '#a1a1aa' },
-                },
-                invalid: { color: '#ef4444' },
-              },
-              hidePostalCode: true,
-            }}
-          />
-        </div>
-      </div>
-
-      <button
-        type="submit"
-        disabled={!stripe || submitting}
-        className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
-      >
-        {submitting ? 'Processando...' : 'Pagar com cartão'}
-      </button>
-
-      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div className="flex flex-col items-center gap-3 py-10 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <svg
+          className="h-6 w-6 text-muted-foreground"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            strokeWidth={1.5}
+            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
           />
         </svg>
-        Pagamento seguro via Stripe
       </div>
-    </form>
-  );
-}
-
-interface CardFormProps {
-  clientSecret: string;
-  publishableKey: string;
-  onSuccess: (paymentIntentId: string) => void;
-  onError: (msg: string) => void;
-}
-
-export function CardForm({ clientSecret, publishableKey, onSuccess, onError }: CardFormProps) {
-  const stripePromise = loadStripe(publishableKey);
-
-  return (
-    <Elements stripe={stripePromise} options={{ clientSecret, locale: 'pt-BR' }}>
-      <CardFormInner clientSecret={clientSecret} onSuccess={onSuccess} onError={onError} />
-    </Elements>
+      <div>
+        <p className="font-medium">Pagamento com cartão em breve</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Utilize PIX ou Boleto enquanto finalizamos a integração.
+        </p>
+      </div>
+    </div>
   );
 }

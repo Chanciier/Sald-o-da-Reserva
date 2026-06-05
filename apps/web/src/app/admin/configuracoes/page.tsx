@@ -12,10 +12,10 @@ const TABS = [
 
 const INTEGRATIONS = [
   {
-    name: 'Stripe',
+    name: 'Mercado Pago',
     desc: 'Gateway de pagamento (PIX, Cartão, Boleto)',
     status: true,
-    envKey: 'STRIPE_SECRET_KEY',
+    envKey: 'MERCADO_PAGO_ACCESS_TOKEN',
   },
   {
     name: 'Melhor Envio',
@@ -51,10 +51,10 @@ const SECURITY_ITEMS = [
   { label: 'Audit Log', desc: 'Registro de ações administrativas sensíveis', ok: true },
   { label: 'CORS configurado', desc: 'Apenas o frontend autorizado acessa a API', ok: true },
   {
-    label: 'Webhook Stripe',
+    label: 'Webhook Mercado Pago',
     desc: 'Assinatura de webhook configurada',
     ok: false,
-    warn: 'STRIPE_WEBHOOK_SECRET não configurado',
+    warn: 'MERCADO_PAGO_WEBHOOK_SECRET não configurado',
   },
 ];
 
@@ -65,7 +65,7 @@ const SYSTEM_ITEMS = [
   { label: 'Scheduler', desc: 'Cron para retry automático de notas fiscais', ok: true },
   {
     label: 'Logs de pagamento',
-    desc: 'Tabela PaymentLog registra todos os eventos Stripe',
+    desc: 'Tabela PaymentLog registra todos os eventos de pagamento',
     ok: true,
   },
 ];

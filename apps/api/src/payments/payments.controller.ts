@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -38,7 +37,6 @@ export class PaymentsController {
     return this.payments.getByOrder(orderId, userId);
   }
 
-  /** Dedicated status endpoint for post-card-payment verification */
   @Get(':paymentId/status')
   getStatus(@Param('paymentId') paymentId: string, @CurrentUser('id') userId: string) {
     return this.payments.getStatus(paymentId, userId);
@@ -63,7 +61,7 @@ export class PaymentsController {
   @Post('webhook')
   @Public()
   @HttpCode(HttpStatus.OK)
-  webhook(@Req() req: RawBodyRequest<Request>, @Headers('stripe-signature') signature: string) {
-    return this.payments.handleWebhook(req.rawBody ?? Buffer.alloc(0), signature);
+  webhook(@Req() req: RawBodyRequest<Request>) {
+    return this.payments.handleWebhook(req.rawBody ?? Buffer.alloc(0));
   }
 }

@@ -70,7 +70,7 @@ function CpfForm({ onSubmit }: { onSubmit: (cpf: string) => void }) {
         </div>
         <p className="font-semibold">Informe seu CPF</p>
         <p className="text-sm text-muted-foreground">
-          O Stripe exige o CPF do pagador para emitir o boleto.
+          O CPF do pagador é necessário para emitir o boleto.
         </p>
       </div>
 
@@ -145,8 +145,6 @@ export default function PaymentPage({ params }: PageProps) {
   /** CPF collected before boleto creation; null = not yet collected */
   const [taxId, setTaxId] = useState<string | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -227,8 +225,8 @@ export default function PaymentPage({ params }: PageProps) {
   }
 
   /**
-   * Called after stripe.confirmCardPayment() succeeds.
-   * Immediately queries the backend to get the authoritative status, then polls.
+   * Chamado após confirmação do pagamento com cartão.
+   * Consulta o backend para obter o status atualizado, depois inicia polling.
    */
   async function handleCardSuccess(paymentIntentId: string) {
     setVerifying(true);
@@ -461,7 +459,6 @@ export default function PaymentPage({ params }: PageProps) {
               payment?.status ?? '',
             ) && (
               <CardFormWrapper
-                publishableKey={publishableKey}
                 existingClientSecret={payment?.clientSecret ?? null}
                 onInit={handleCardInit}
                 onSuccess={handleCardSuccess}
@@ -510,13 +507,11 @@ export default function PaymentPage({ params }: PageProps) {
 // ── CardFormWrapper ───────────────────────────────────────────────────────────
 
 function CardFormWrapper({
-  publishableKey,
   existingClientSecret,
   onInit,
   onSuccess,
   onError,
 }: {
-  publishableKey: string;
   existingClientSecret: string | null;
   onInit: () => Promise<string>;
   onSuccess: (paymentIntentId: string) => void;
@@ -558,7 +553,7 @@ function CardFormWrapper({
     );
   }
 
-  if (!clientSecret || !publishableKey) {
+  if (!clientSecret) {
     return (
       <p className="py-6 text-center text-sm text-destructive">
         Não foi possível carregar o formulário de pagamento.
@@ -566,12 +561,5 @@ function CardFormWrapper({
     );
   }
 
-  return (
-    <CardForm
-      clientSecret={clientSecret}
-      publishableKey={publishableKey}
-      onSuccess={onSuccess}
-      onError={onError}
-    />
-  );
+  return <CardForm clientSecret={clientSecret} onSuccess={onSuccess} onError={onError} />;
 }

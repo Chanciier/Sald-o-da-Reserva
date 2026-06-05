@@ -75,7 +75,7 @@ export default function HomePage() {
               {
                 icon: '🔒',
                 title: 'Pagamento seguro',
-                desc: 'PIX, cartão e boleto com total segurança via Stripe',
+                desc: 'PIX, cartão e boleto com total segurança via Mercado Pago',
               },
               {
                 icon: '📦',

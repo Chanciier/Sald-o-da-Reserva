@@ -51,15 +51,11 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  STRIPE_SECRET_KEY: string = '';
+  MERCADO_PAGO_ACCESS_TOKEN: string = '';
 
   @IsString()
   @IsOptional()
-  STRIPE_WEBHOOK_SECRET: string = '';
-
-  @IsString()
-  @IsOptional()
-  STRIPE_PUBLISHABLE_KEY: string = '';
+  MERCADO_PAGO_WEBHOOK_SECRET: string = '';
 
   @IsString()
   @IsOptional()

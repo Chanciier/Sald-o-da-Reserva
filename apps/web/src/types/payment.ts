@@ -64,13 +64,3 @@ export interface CardPaymentResult {
   cardLast4: string | null;
   installments: number | null;
 }
-
-/** Stripe status values mapped in the backend */
-export type StripePaymentIntentStatus =
-  | 'requires_payment_method'
-  | 'requires_confirmation'
-  | 'requires_action'
-  | 'processing'
-  | 'requires_capture'
-  | 'canceled'
-  | 'succeeded';
