@@ -56,10 +56,10 @@ export function Header() {
           {user ? (
             <div className="flex items-center gap-2">
               <Link
-                href="/pedidos"
+                href="/cliente"
                 className="hidden text-sm text-muted-foreground hover:text-foreground transition-colors sm:block"
               >
-                Pedidos
+                Minha Conta
               </Link>
               <button
                 onClick={logout}

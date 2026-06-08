@@ -33,10 +33,10 @@ export class CreateProductDto {
   @MaxLength(200)
   slug?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(100)
-  sku: string;
+  sku?: string;
 
   @IsOptional()
   @IsString()

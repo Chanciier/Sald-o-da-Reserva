@@ -11,7 +11,7 @@ import { Role } from '@prisma/client';
 import { Resend } from 'resend';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/types/auth.types';
-import { EnotasService } from './enotas.service';
+import { FocusNfeProvider } from './focusnfe.provider';
 import { InvoiceRepository } from './invoice.repository';
 import { QueryInvoiceDto } from './dto/query-invoice.dto';
 
@@ -23,12 +23,12 @@ export class InvoiceService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly enotas: EnotasService,
+    private readonly focus: FocusNfeProvider,
     private readonly repo: InvoiceRepository,
     private readonly config: ConfigService,
   ) {
     const resendKey = this.config.get<string>('RESEND_API_KEY', '');
-    this.resend = resendKey ? new Resend(resendKey) : null;
+    this.resend = resendKey && !resendKey.startsWith('re_REPLACE') ? new Resend(resendKey) : null;
     this.fromEmail = this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@saldaodareserva.com.br');
   }
 
@@ -36,8 +36,21 @@ export class InvoiceService {
 
   async emitForOrder(orderId: string): Promise<void> {
     const existing = await this.repo.findByOrderId(orderId);
-    if (existing && ['PENDING', 'PROCESSING', 'AUTHORIZED'].includes(existing.status)) {
-      this.logger.log(`Invoice already exists for order ${orderId} (${existing.status}) – skip`);
+
+    // Skip only if already authorized or currently being processed by Focus NFe
+    if (existing?.status === 'AUTHORIZED') {
+      this.logger.log(`Invoice for order ${orderId} is AUTHORIZED – skip`);
+      return;
+    }
+    if (existing?.status === 'PROCESSING') {
+      this.logger.log(`Invoice for order ${orderId} is PROCESSING – skip`);
+      return;
+    }
+    // PENDING with a focusReference means it was submitted but not yet confirmed — skip
+    if (existing?.status === 'PENDING' && existing.focusReference) {
+      this.logger.log(
+        `Invoice for order ${orderId} is PENDING with ref=${existing.focusReference} – skip`,
+      );
       return;
     }
 
@@ -49,6 +62,7 @@ export class InvoiceService {
         payment: true,
       },
     });
+
     if (!order) {
       this.logger.warn(`emitForOrder: order ${orderId} not found`);
       return;
@@ -58,78 +72,79 @@ export class InvoiceService {
       return;
     }
 
-    const invoice = await this.repo.create({ order: { connect: { id: orderId } } });
+    // Reuse existing PENDING/REJECTED invoice or create a new one
+    const invoice = existing ?? (await this.repo.create({ order: { connect: { id: orderId } } }));
 
-    if (!this.enotas.isConfigured()) {
-      this.logger.warn('eNotas not configured – invoice created as PENDING');
+    if (!this.focus.isConfigured()) {
+      this.logger.warn('Focus NFe not configured – invoice created as PENDING');
       return;
     }
 
     try {
-      const address = order.shippingAddress as Record<string, string>;
-      const payload = {
-        consumidor: {
-          nome: order.user.name ?? order.user.email,
+      const address = order.shippingAddress as Record<string, string> | null;
+      const reference = invoice.id; // Use invoice ID as Focus NFe reference (unique per attempt)
+
+      const result = await this.focus.issueInvoice({
+        reference,
+        customer: {
+          name: order.user.name ?? order.user.email,
           email: order.user.email,
-          ...(address?.cep
+          address: address?.cep
             ? {
-                endereco: {
-                  pais: 'Brasil',
-                  cep: address.cep,
-                  logradouro: address.street ?? address.logradouro ?? '',
-                  numero: address.number ?? address.numero ?? 'S/N',
-                  complemento: address.complement ?? address.complemento,
-                  bairro: address.neighborhood ?? address.bairro ?? '',
-                  cidade: address.city ?? address.cidade ?? '',
-                  estado: address.state ?? address.estado ?? '',
-                },
+                cep: address.cep,
+                street: address.street ?? address.logradouro ?? '',
+                number: address.number ?? address.numero ?? 'S/N',
+                complement: address.complement ?? address.complemento,
+                neighborhood: address.neighborhood ?? address.bairro ?? '',
+                city: address.city ?? address.cidade ?? '',
+                state: address.state ?? address.estado ?? '',
               }
-            : {}),
+            : undefined,
         },
-        itens: order.items.map((item) => ({
-          nome: item.name,
-          cfop: '5102',
-          quantidade: item.quantity,
-          quantidadeUnidade: 'UN',
-          valorUnitario: Number(item.price),
-          totalItem: Number(item.subtotal),
+        items: order.items.map((item) => ({
+          sku: item.sku,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: Number(item.price),
+          total: Number(item.subtotal),
         })),
-        formaPagamento: this.mapPaymentMethod(order.payment?.method ?? 'PIX'),
-        totalVenda: Number(order.total),
-        totalFrete: Number(order.shipping),
-        totalDesconto: Number(order.discount),
-        informacoesAdicionais: `Pedido #${order.id.slice(-8).toUpperCase()}`,
-        enviarEmailDestinatario: false,
-      };
-
-      await this.repo.update(invoice.id, { status: 'PROCESSING' });
-      const result = await this.enotas.emitInvoice(payload);
-
-      await this.repo.update(invoice.id, {
-        enotasId: result.id,
-        status: this.enotas.mapStatus(result.status),
-        invoiceNumber: result.numero ?? null,
-        accessKey: result.chaveAcesso ?? null,
-        xmlUrl: result.xmlUrl ?? null,
-        pdfUrl: result.pdfUrl ?? null,
-        issueDate: result.dataEmissao ? new Date(result.dataEmissao) : null,
-        errorMessage: result.mensagemErro ?? null,
+        paymentMethod: order.payment?.method ?? 'PIX',
+        total: Number(order.total),
+        freight: Number(order.shipping),
+        discount: Number(order.discount),
+        additionalInfo: `Pedido #${order.id.slice(-8).toUpperCase()}`,
       });
 
-      await this.audit('INVOICE_EMITTED', order.userId, { invoiceId: invoice.id, orderId });
+      await this.repo.update(invoice.id, {
+        focusReference: reference,
+        status: result.status,
+        invoiceNumber: result.invoiceNumber ?? null,
+        accessKey: result.accessKey ?? null,
+        protocol: result.protocol ?? null,
+        xmlUrl: result.xmlUrl ?? null,
+        danfeUrl: result.danfeUrl ?? null,
+        issueDate: result.issueDate ?? null,
+        errorMessage: result.errorMessage ?? null,
+      });
 
-      if (result.pdfUrl) {
+      await this.audit('INVOICE_EMITTED', order.userId, {
+        invoiceId: invoice.id,
+        orderId,
+        reference,
+      });
+
+      if (result.status === 'AUTHORIZED' && result.danfeUrl) {
         this.sendInvoiceEmail(
           order.user.email,
           order.user.name,
-          result.pdfUrl,
+          result.danfeUrl,
           result.xmlUrl,
+          result.invoiceNumber,
+          result.accessKey,
         ).catch((e) => this.logger.warn('Email send failed', e));
       }
 
-      this.logger.log(
-        `Invoice ${invoice.id} emitted → eNotasId=${result.id} status=${result.status}`,
-      );
+      this.logger.log(`Invoice ${invoice.id} emitted → ref=${reference} status=${result.status}`);
     } catch (err) {
       this.logger.error(`emitForOrder failed for order ${orderId}`, err);
       await this.repo.update(invoice.id, {
@@ -157,15 +172,18 @@ export class InvoiceService {
     if (invoice.status === 'AUTHORIZED') {
       throw new ConflictException('Nota já autorizada. Cancele antes de reemitir.');
     }
+
     await this.repo.update(invoiceId, {
       status: 'PENDING',
-      enotasId: null,
+      focusReference: null,
       invoiceNumber: null,
       accessKey: null,
+      protocol: null,
       xmlUrl: null,
-      pdfUrl: null,
+      danfeUrl: null,
       errorMessage: null,
     });
+
     await this.emitForOrder(invoice.orderId);
     await this.audit('INVOICE_REEMITTED', user.id, { invoiceId, orderId: invoice.orderId });
     return this.repo.findById(invoiceId);
@@ -181,8 +199,8 @@ export class InvoiceService {
       throw new BadRequestException('Somente notas autorizadas podem ser canceladas.');
     }
 
-    if (invoice.enotasId && this.enotas.isConfigured()) {
-      await this.enotas.cancelInvoice(invoice.enotasId, reason);
+    if (invoice.focusReference && this.focus.isConfigured()) {
+      await this.focus.cancelInvoice(invoice.focusReference, reason);
     }
 
     const updated = await this.repo.update(invoiceId, {
@@ -199,35 +217,41 @@ export class InvoiceService {
   async syncStatus(invoiceId: string, requestUser?: AuthenticatedUser) {
     const invoice = await this.repo.findById(invoiceId);
     if (!invoice) throw new NotFoundException('Nota não encontrada.');
-    if (!invoice.enotasId) return invoice;
-    if (!this.enotas.isConfigured()) return invoice;
+    if (!invoice.focusReference) return invoice;
+    if (!this.focus.isConfigured()) return invoice;
 
-    const result = await this.enotas.getInvoice(invoice.enotasId);
-    const newStatus = this.enotas.mapStatus(result.status);
+    const result = await this.focus.getInvoice(invoice.focusReference);
 
     const updated = await this.repo.update(invoiceId, {
-      status: newStatus,
-      invoiceNumber: result.numero ?? invoice.invoiceNumber,
-      accessKey: result.chaveAcesso ?? invoice.accessKey,
-      xmlUrl: result.xmlUrl ?? invoice.xmlUrl,
-      pdfUrl: result.pdfUrl ?? invoice.pdfUrl,
-      issueDate: result.dataEmissao ? new Date(result.dataEmissao) : invoice.issueDate,
-      errorMessage: result.mensagemErro ?? null,
+      status: result.status,
+      invoiceNumber: result.invoiceNumber ?? invoice.invoiceNumber ?? null,
+      accessKey: result.accessKey ?? invoice.accessKey ?? null,
+      protocol: result.protocol ?? invoice.protocol ?? null,
+      xmlUrl: result.xmlUrl ?? invoice.xmlUrl ?? null,
+      danfeUrl: result.danfeUrl ?? invoice.danfeUrl ?? null,
+      issueDate: result.issueDate ?? invoice.issueDate ?? null,
+      cancellationDate: result.cancellationDate ?? invoice.cancellationDate ?? null,
+      errorMessage: result.errorMessage ?? null,
     });
 
     if (requestUser) {
       await this.audit('INVOICE_SYNCED', requestUser.id, {
         invoiceId,
         from: invoice.status,
-        to: newStatus,
+        to: result.status,
       });
     }
 
-    if (newStatus === 'AUTHORIZED' && invoice.status !== 'AUTHORIZED' && result.pdfUrl) {
+    if (result.status === 'AUTHORIZED' && invoice.status !== 'AUTHORIZED' && result.danfeUrl) {
       const { user } = invoice.order;
-      this.sendInvoiceEmail(user.email, user.name, result.pdfUrl, result.xmlUrl ?? undefined).catch(
-        (e) => this.logger.warn('Email send failed', e),
-      );
+      this.sendInvoiceEmail(
+        user.email,
+        user.name,
+        result.danfeUrl,
+        result.xmlUrl ?? undefined,
+        result.invoiceNumber,
+        result.accessKey,
+      ).catch((e) => this.logger.warn('Email send failed', e));
     }
 
     return updated;
@@ -241,10 +265,10 @@ export class InvoiceService {
     return { url: invoice.xmlUrl };
   }
 
-  async getPdfUrl(invoiceId: string, user: AuthenticatedUser) {
+  async getDanfeUrl(invoiceId: string, user: AuthenticatedUser) {
     const invoice = await this.getWithAccess(invoiceId, user);
-    await this.audit('INVOICE_DOWNLOAD_PDF', user.id, { invoiceId });
-    return { url: invoice.pdfUrl };
+    await this.audit('INVOICE_DOWNLOAD_DANFE', user.id, { invoiceId });
+    return { url: invoice.danfeUrl };
   }
 
   // ── Queries ───────────────────────────────────────────────────────────────
@@ -262,51 +286,37 @@ export class InvoiceService {
     return this.repo.countByStatus();
   }
 
-  // ── eNotas webhook handler ────────────────────────────────────────────────
+  // ── Focus NFe status webhook ──────────────────────────────────────────────
 
   async handleWebhook(body: Record<string, unknown>) {
-    const event = body.event as string;
-    const enotasId = (body.notaId ?? body.id) as string;
+    const ref = (body.ref ?? body.reference) as string;
+    const focusStatus = body.status as string;
 
-    if (!enotasId) return { received: true };
+    if (!ref || !focusStatus) return { received: true };
 
-    const invoice = await this.prisma.invoice.findUnique({ where: { enotasId } });
+    const invoice = await this.prisma.invoice.findUnique({ where: { focusReference: ref } });
     if (!invoice) {
-      this.logger.warn(`eNotas webhook: enotasId=${enotasId} not found`);
+      this.logger.warn(`Focus NFe webhook: ref=${ref} not found`);
       return { received: true };
     }
 
-    const statusMap: Record<
-      string,
-      'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'REJECTED' | 'CANCELLED'
-    > = {
-      'invoice.created': 'PROCESSING',
-      'invoice.processing': 'PROCESSING',
-      'invoice.authorized': 'AUTHORIZED',
-      notaEmitida: 'AUTHORIZED',
-      notaAutorizada: 'AUTHORIZED',
-      'invoice.rejected': 'REJECTED',
-      notaRejeitada: 'REJECTED',
-      'invoice.cancelled': 'CANCELLED',
-      notaCancelada: 'CANCELLED',
-    };
-
-    const newStatus = statusMap[event];
-    if (!newStatus || invoice.status === newStatus) return { received: true };
+    const newStatus = this.focus.mapStatus(focusStatus);
+    if (invoice.status === newStatus) return { received: true };
 
     await this.repo.update(invoice.id, {
       status: newStatus,
-      invoiceNumber: (body.numeroNota as string) ?? invoice.invoiceNumber ?? undefined,
-      accessKey: (body.chaveAcesso as string) ?? invoice.accessKey ?? undefined,
-      xmlUrl: (body.xmlUrl as string) ?? invoice.xmlUrl ?? undefined,
-      pdfUrl: (body.pdfUrl as string) ?? invoice.pdfUrl ?? undefined,
-      issueDate: body.dataEmissao
-        ? new Date(body.dataEmissao as string)
-        : (invoice.issueDate ?? undefined),
-      errorMessage: (body.mensagemErro as string) ?? null,
+      invoiceNumber: (body.numero as string) ?? invoice.invoiceNumber ?? null,
+      accessKey: (body.chave_nfe as string) ?? invoice.accessKey ?? null,
+      protocol: (body.protocolo as string) ?? invoice.protocol ?? null,
+      xmlUrl: (body.url as string) ?? invoice.xmlUrl ?? null,
+      danfeUrl: (body.danfe_url as string) ?? invoice.danfeUrl ?? null,
+      issueDate: body.data_emissao
+        ? new Date(body.data_emissao as string)
+        : (invoice.issueDate ?? null),
+      errorMessage: newStatus === 'REJECTED' ? ((body.mensagem_sefaz as string) ?? null) : null,
     });
 
-    this.logger.log(`eNotas webhook: invoice=${invoice.id} ${invoice.status}→${newStatus}`);
+    this.logger.log(`Focus NFe webhook: invoice=${invoice.id} ${invoice.status}→${newStatus}`);
     return { received: true };
   }
 
@@ -322,21 +332,13 @@ export class InvoiceService {
     return invoice;
   }
 
-  private mapPaymentMethod(method: string): string {
-    const map: Record<string, string> = {
-      PIX: 'Pix',
-      CREDIT_CARD: 'Cartão de Crédito',
-      DEBIT_CARD: 'Cartão de Débito',
-      BOLETO: 'Boleto Bancário',
-    };
-    return map[method] ?? method;
-  }
-
   private async sendInvoiceEmail(
     to: string,
     name: string | null,
-    pdfUrl: string,
+    danfeUrl: string,
     xmlUrl?: string | null,
+    invoiceNumber?: string | null,
+    accessKey?: string | null,
   ) {
     if (!this.resend) return;
 
@@ -345,16 +347,18 @@ export class InvoiceService {
       to,
       subject: 'Sua Nota Fiscal está disponível – Saldão da Reversa',
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Olá${name ? `, ${name}` : ''}!</h2>
-          <p>Sua Nota Fiscal Eletrônica foi emitida com sucesso. Você pode baixá-la pelos links abaixo:</p>
-          <p>
-            <a href="${pdfUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;margin-right:8px;">
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#111;">
+          <h2 style="margin-bottom:8px;">Olá${name ? `, ${name.split(' ')[0]}` : ''}!</h2>
+          <p>Sua Nota Fiscal Eletrônica foi emitida e autorizada pela SEFAZ.</p>
+          ${invoiceNumber ? `<p style="margin:4px 0;"><strong>Número NF-e:</strong> ${invoiceNumber}</p>` : ''}
+          ${accessKey ? `<p style="margin:4px 0;font-size:12px;color:#555;word-break:break-all;"><strong>Chave de acesso:</strong> ${accessKey}</p>` : ''}
+          <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="${danfeUrl}" style="display:inline-block;background:#111;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:14px;">
               Baixar DANFE (PDF)
             </a>
-            ${xmlUrl ? `<a href="${xmlUrl}" style="display:inline-block;background:#555;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Baixar XML</a>` : ''}
-          </p>
-          <p style="color:#888;font-size:12px;">Saldão da Reversa</p>
+            ${xmlUrl ? `<a href="${xmlUrl}" style="display:inline-block;background:#444;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:14px;">Baixar XML</a>` : ''}
+          </div>
+          <p style="margin-top:24px;color:#888;font-size:12px;">Saldão da Reversa</p>
         </div>
       `,
     });

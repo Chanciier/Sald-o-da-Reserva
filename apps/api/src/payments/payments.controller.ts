@@ -1,24 +1,10 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Post,
-  Query,
-  RawBodyRequest,
-  Req,
-} from '@nestjs/common';
-import { Request } from 'express';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePixPaymentDto } from './dto/create-pix-payment.dto';
 import { CreateCardPaymentDto } from './dto/create-card-payment.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('payments')
@@ -76,23 +62,5 @@ export class PaymentsController {
   @Get(':id')
   getById(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.payments.getById(id, userId);
-  }
-
-  @Post('webhook')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  webhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('x-signature') xSignature: string | undefined,
-    @Headers('x-request-id') xRequestId: string | undefined,
-    @Query('data.id') dataId?: string,
-    @Query('id') queryId?: string,
-  ) {
-    return this.payments.handleWebhook(
-      req.rawBody ?? Buffer.alloc(0),
-      xSignature,
-      xRequestId,
-      dataId ?? queryId,
-    );
   }
 }

@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@media print {
+  .no-print { display: none !important; }
+  nav, header, aside, footer { display: none !important; }
+  body { background: white !important; color: black !important; }
+  * { box-shadow: none !important; }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

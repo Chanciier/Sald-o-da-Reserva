@@ -18,6 +18,9 @@ import {
   ChevronRight,
   LogOut,
   ScrollText,
+  Store,
+  ExternalLink,
+  ClipboardList,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -44,6 +47,19 @@ const NAV: NavItem[] = [
       { href: '/admin/produtos/novo', label: 'Novo Produto' },
       { href: '/admin/categorias', label: 'Categorias' },
       { href: '/admin/cupons', label: 'Cupons' },
+    ],
+  },
+  {
+    label: 'Expedição',
+    icon: ClipboardList,
+    children: [
+      { href: '/admin/expedicao', label: 'Dashboard' },
+      { href: '/admin/expedicao/fila', label: 'Fila de Pedidos' },
+      { href: '/admin/expedicao/separacao', label: 'Separação' },
+      { href: '/admin/expedicao/prontos', label: 'Prontos p/ Envio' },
+      { href: '/admin/expedicao/enviados', label: 'Enviados' },
+      { href: '/admin/expedicao/retirada', label: 'Retirada na Loja' },
+      { href: '/admin/expedicao/concluidos', label: 'Concluídos' },
     ],
   },
   {
@@ -125,7 +141,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== 'ADMIN')) {
+    if (!loading && (!user || (user.role !== 'ADMIN' && user.role !== 'VENDEDOR'))) {
       router.push('/login');
     }
   }, [user, loading, router]);
@@ -141,13 +157,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setOpen((prev) => ({ ...prev, ...autoOpen }));
   }, [pathname]);
 
-  if (loading || !user || user.role !== 'ADMIN') {
+  if (loading || !user || (user.role !== 'ADMIN' && user.role !== 'VENDEDOR')) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
+
+  const visibleNav =
+    user.role === 'VENDEDOR'
+      ? NAV.filter((i) => i.label === 'Expedição' || i.label === 'Produtos').map((i) => {
+          if (i.label === 'Produtos' && i.children) {
+            return {
+              ...i,
+              children: i.children.filter(
+                (c) => c.href === '/admin/produtos' || c.href === '/admin/produtos/novo',
+              ),
+            };
+          }
+          return i;
+        })
+      : NAV;
 
   function toggle(label: string) {
     setOpen((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -156,7 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
-      <aside className="flex w-60 shrink-0 flex-col border-r bg-card">
+      <aside className="no-print flex w-60 shrink-0 flex-col border-r bg-card">
         {/* Brand */}
         <div className="flex h-14 items-center border-b px-5 gap-2">
           <span className="text-xs font-bold text-primary uppercase tracking-widest">Admin</span>
@@ -165,7 +196,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             if (!item.children) {
               const active = isActive(pathname, item.href!);
               return (
@@ -237,6 +268,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <p className="text-xs font-medium truncate">{user.name ?? user.email}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           </div>
+          <Link
+            href="/"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <Store className="h-4 w-4" />
+            Ver Loja
+          </Link>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Abrir Loja em Nova Aba
+          </a>
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"

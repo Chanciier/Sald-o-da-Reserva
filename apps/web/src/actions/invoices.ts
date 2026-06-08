@@ -1,6 +1,6 @@
 'use server';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+const API = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
 export interface InvoiceOrder {
   id: string;
@@ -14,12 +14,13 @@ export interface InvoiceOrder {
 export interface Invoice {
   id: string;
   orderId: string;
-  enotasId: string | null;
+  focusReference: string | null;
   invoiceNumber: string | null;
   accessKey: string | null;
+  protocol: string | null;
   status: 'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'REJECTED' | 'CANCELLED';
   xmlUrl: string | null;
-  pdfUrl: string | null;
+  danfeUrl: string | null;
   issueDate: string | null;
   cancellationDate: string | null;
   errorMessage: string | null;
@@ -55,9 +56,14 @@ async function apiFetch<T>(token: string, path: string, init?: RequestInit): Pro
 
 export async function fetchInvoices(
   token: string,
-  params?: Record<string, string>,
+  params?: Record<string, string | number>,
 ): Promise<InvoicesResponse> {
-  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  const qs = params
+    ? '?' +
+      new URLSearchParams(
+        Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+      ).toString()
+    : '';
   return apiFetch<InvoicesResponse>(token, `/invoices${qs}`);
 }
 
@@ -88,6 +94,12 @@ export async function fetchInvoiceXml(token: string, id: string): Promise<{ url:
   return apiFetch<{ url: string | null }>(token, `/invoices/${id}/xml`);
 }
 
-export async function fetchInvoicePdf(token: string, id: string): Promise<{ url: string | null }> {
-  return apiFetch<{ url: string | null }>(token, `/invoices/${id}/pdf`);
+export async function fetchInvoiceDanfe(
+  token: string,
+  id: string,
+): Promise<{ url: string | null }> {
+  return apiFetch<{ url: string | null }>(token, `/invoices/${id}/danfe`);
 }
+
+/** @deprecated use fetchInvoiceDanfe */
+export const fetchInvoicePdf = fetchInvoiceDanfe;

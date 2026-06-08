@@ -46,6 +46,16 @@ export class ProductsService {
     private readonly storage: StorageService,
   ) {}
 
+  private generateSku(name: string): string {
+    const prefix = name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 3)
+      .padEnd(3, 'X');
+    const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+    return `${prefix}-${rand}`;
+  }
+
   private async auditLog(action: string, userId?: string, metadata?: object) {
     try {
       await this.prisma.auditLog.create({
@@ -74,10 +84,11 @@ export class ProductsService {
 
   async create(dto: CreateProductDto, userId?: string) {
     const slug = dto.slug ?? slugify(dto.name);
+    const sku = dto.sku || this.generateSku(dto.name);
 
     const [slugConflict, skuConflict] = await Promise.all([
       this.prisma.product.findUnique({ where: { slug } }),
-      this.prisma.product.findUnique({ where: { sku: dto.sku } }),
+      this.prisma.product.findUnique({ where: { sku } }),
     ]);
     if (slugConflict) throw new ConflictException('Já existe um produto com esse slug.');
     if (skuConflict) throw new ConflictException('Já existe um produto com esse SKU.');
@@ -86,7 +97,7 @@ export class ProductsService {
       data: {
         name: dto.name,
         slug,
-        sku: dto.sku,
+        sku,
         internalCode: dto.internalCode,
         brand: dto.brand,
         shortDescription: dto.shortDescription,

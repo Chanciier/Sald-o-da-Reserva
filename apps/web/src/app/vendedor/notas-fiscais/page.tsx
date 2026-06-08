@@ -35,7 +35,7 @@ export default function VendedorNotasFiscais() {
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['vendedor-invoices', page],
-    queryFn: () => fetchInvoices(token!, { page }),
+    queryFn: () => fetchInvoices(token!, { page: String(page) }),
     enabled: !!token,
   });
 
@@ -89,7 +89,7 @@ export default function VendedorNotasFiscais() {
                     status: string;
                     issueDate: string | null;
                     xmlUrl: string | null;
-                    pdfUrl: string | null;
+                    danfeUrl: string | null;
                     errorMessage: string | null;
                   }) => (
                     <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
@@ -125,14 +125,14 @@ export default function VendedorNotasFiscais() {
                             <Download className="h-3 w-3" /> XML
                           </a>
                         )}
-                        {inv.pdfUrl && (
+                        {inv.danfeUrl && (
                           <a
-                            href={inv.pdfUrl}
+                            href={inv.danfeUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted"
                           >
-                            <ExternalLink className="h-3 w-3" /> PDF
+                            <ExternalLink className="h-3 w-3" /> DANFE
                           </a>
                         )}
                       </td>
@@ -144,10 +144,10 @@ export default function VendedorNotasFiscais() {
           </div>
         )}
 
-        {data && (data.pages ?? 1) > 1 && (
+        {data && data.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-4 py-3">
             <p className="text-xs text-muted-foreground">
-              {data.total} notas · página {data.page} de {data.pages}
+              {data.total} notas · página {data.page} de {data.totalPages}
             </p>
             <div className="flex gap-2">
               <button
@@ -158,8 +158,8 @@ export default function VendedorNotasFiscais() {
                 <ChevronLeft className="h-3.5 w-3.5" /> Anterior
               </button>
               <button
-                onClick={() => setPage((p) => Math.min(data.pages, p + 1))}
-                disabled={page === data.pages}
+                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={page === data.totalPages}
                 className="flex items-center gap-1 rounded border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
               >
                 Próxima <ChevronRight className="h-3.5 w-3.5" />

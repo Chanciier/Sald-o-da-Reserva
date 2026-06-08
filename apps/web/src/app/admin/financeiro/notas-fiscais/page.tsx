@@ -200,9 +200,9 @@ export default function NotasFiscaisPage() {
                   <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
                       <p className="font-mono text-xs font-medium">{inv.invoiceNumber ?? '—'}</p>
-                      {inv.enotasId && (
+                      {inv.focusReference && (
                         <p className="text-[10px] text-muted-foreground">
-                          {inv.enotasId.slice(0, 8)}…
+                          ref: {inv.focusReference.slice(0, 8)}…
                         </p>
                       )}
                     </td>
@@ -234,14 +234,14 @@ export default function NotasFiscaisPage() {
                         >
                           <ExternalLink className="h-3 w-3" /> Ver
                         </Link>
-                        {inv.pdfUrl && (
+                        {inv.danfeUrl && (
                           <a
-                            href={inv.pdfUrl}
+                            href={inv.danfeUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
                           >
-                            PDF
+                            DANFE
                           </a>
                         )}
                       </div>

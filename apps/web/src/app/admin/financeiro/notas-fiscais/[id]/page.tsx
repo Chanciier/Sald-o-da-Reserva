@@ -3,7 +3,17 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, RefreshCw, Download, FileText, XCircle, RotateCcw, Send } from 'lucide-react';
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  RefreshCw,
+  Download,
+  FileText,
+  XCircle,
+  RotateCcw,
+  Send,
+  Printer,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import {
   fetchInvoice,
@@ -12,7 +22,7 @@ import {
   cancelInvoice,
   syncInvoice,
   fetchInvoiceXml,
-  fetchInvoicePdf,
+  fetchInvoiceDanfe,
 } from '@/actions/invoices';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -108,11 +118,11 @@ export default function InvoiceDetailPage() {
     onError: (e: Error) => setError(e.message),
   });
 
-  const pdfMut = useMutation({
-    mutationFn: () => fetchInvoicePdf(token!, id),
+  const danfeMut = useMutation({
+    mutationFn: () => fetchInvoiceDanfe(token!, id),
     onSuccess: (r) => {
       if (r.url) window.open(r.url, '_blank');
-      else setError('URL do PDF não disponível.');
+      else setError('URL do DANFE não disponível.');
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -128,7 +138,11 @@ export default function InvoiceDetailPage() {
   if (!invoice) return <p className="text-sm text-muted-foreground">Nota não encontrada.</p>;
 
   const isProcessing =
-    emitMut.isPending || reemitMut.isPending || cancelMut.isPending || syncMut.isPending;
+    emitMut.isPending ||
+    reemitMut.isPending ||
+    cancelMut.isPending ||
+    syncMut.isPending ||
+    danfeMut.isPending;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -212,6 +226,14 @@ export default function InvoiceDetailPage() {
           Sincronizar Status
         </button>
 
+        <Link
+          href={`/admin/financeiro/notas-fiscais/${id}/imprimir`}
+          target="_blank"
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted transition-colors"
+        >
+          <Printer className="h-3.5 w-3.5" /> Imprimir DANFE
+        </Link>
+
         {invoice.xmlUrl && (
           <button
             onClick={() => xmlMut.mutate()}
@@ -222,10 +244,10 @@ export default function InvoiceDetailPage() {
           </button>
         )}
 
-        {invoice.pdfUrl && (
+        {invoice.danfeUrl && (
           <button
-            onClick={() => pdfMut.mutate()}
-            disabled={pdfMut.isPending}
+            onClick={() => danfeMut.mutate()}
+            disabled={danfeMut.isPending}
             className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted disabled:opacity-50"
           >
             <FileText className="h-3.5 w-3.5" /> Baixar DANFE
@@ -242,10 +264,10 @@ export default function InvoiceDetailPage() {
             value={<span className="font-mono text-[10px]">{invoice.id}</span>}
           />
           <Row
-            label="ID eNotas"
+            label="Focus NFe Ref"
             value={
-              invoice.enotasId ? (
-                <span className="font-mono text-[10px]">{invoice.enotasId}</span>
+              invoice.focusReference ? (
+                <span className="font-mono text-[10px]">{invoice.focusReference}</span>
               ) : null
             }
           />
@@ -258,6 +280,7 @@ export default function InvoiceDetailPage() {
               ) : null
             }
           />
+          <Row label="Protocolo" value={invoice.protocol} />
           <Row label="Data de Emissão" value={fmtDate(invoice.issueDate)} />
           <Row label="Data Cancelamento" value={fmtDate(invoice.cancellationDate)} />
           {invoice.errorMessage && (

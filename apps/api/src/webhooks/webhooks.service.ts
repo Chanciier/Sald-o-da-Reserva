@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { RedisService } from '../redis/redis.service';
 import { InvoiceService } from '../invoices/invoice.service';
+import { ShippingService } from '../shipping/shipping.service';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 
 // Payment statuses that trigger stock restoration and order cancellation
@@ -28,6 +29,7 @@ export class WebhooksService {
     private readonly mp: MercadoPagoService,
     private readonly redis: RedisService,
     private readonly invoiceService: InvoiceService,
+    private readonly shippingService: ShippingService,
     private readonly config: ConfigService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
@@ -194,6 +196,14 @@ export class WebhooksService {
       this.invoiceService
         .emitForOrder(payment.orderId)
         .catch((e) => this.logger.error('Webhook MP: invoice emission failed', e));
+
+      this.shippingService
+        .purchaseLabel(payment.orderId)
+        .catch((e) =>
+          this.logger.warn(
+            `Webhook MP: auto-shipping skipped for order=${payment.orderId} — ${(e as Error).message}`,
+          ),
+        );
     }
 
     this.logger.log(

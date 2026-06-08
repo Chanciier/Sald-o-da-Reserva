@@ -214,7 +214,11 @@ export class CheckoutService {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};
-    if (opts.status) where.status = opts.status;
+    if (opts.status) {
+      where.status = opts.status;
+    } else {
+      where.NOT = { status: 'PENDING' };
+    }
     if (opts.search) {
       where.OR = [
         { id: { contains: opts.search, mode: 'insensitive' } },
@@ -233,7 +237,7 @@ export class CheckoutService {
         orderBy: { createdAt: 'desc' },
         include: {
           user: { select: { id: true, name: true, email: true } },
-          items: { select: { name: true, quantity: true, subtotal: true } },
+          items: { select: { name: true, quantity: true, price: true, subtotal: true } },
           payment: { select: { method: true, status: true } },
           shipment: { select: { status: true, carrier: true, trackingCode: true } },
           coupon: { select: { code: true } },
@@ -264,11 +268,12 @@ export class CheckoutService {
     });
   }
 
-  async findOrderById(userId: string, orderId: string) {
+  async findOrderById(userId: string | null, orderId: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const prismaAny = this.prisma as any;
+    const where = userId ? { id: orderId, userId } : { id: orderId };
     const order = await prismaAny.order.findFirst({
-      where: { id: orderId, userId },
+      where,
       include: {
         items: { include: { product: { include: { images: { take: 1 } } } } },
         coupon: { select: { code: true, type: true, value: true } },

@@ -35,6 +35,9 @@ enum OrderStatus {
   PENDING
   CONFIRMED
   PAID
+  SEPARATING
+  SEPARATED
+  READY_TO_SHIP
   SHIPPED
   DELIVERED
   CANCELLED
@@ -251,6 +254,8 @@ model Order {
   shippingAddress Json?          @map("shipping_address")
   shippingMethod  String         @map("shipping_method")
   notes           String?
+  pickupCode      String?  @unique @map("pickup_code")
+  separatedItems  Json?    @map("separated_items")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
@@ -372,12 +377,13 @@ model PaymentLog {
 model Invoice {
   id               String        @id @default(cuid())
   orderId          String        @map("order_id")
-  enotasId         String?       @unique @map("enotas_id")
+  focusReference   String?       @unique @map("focus_reference")
   invoiceNumber    String?       @map("invoice_number")
   accessKey        String?       @map("access_key") @db.VarChar(60)
+  protocol         String?       @map("protocol") @db.VarChar(30)
   status           InvoiceStatus @default(PENDING)
   xmlUrl           String?       @map("xml_url") @db.Text
-  pdfUrl           String?       @map("pdf_url") @db.Text
+  danfeUrl         String?       @map("danfe_url") @db.Text
   issueDate        DateTime?     @map("issue_date")
   cancellationDate DateTime?     @map("cancellation_date")
   errorMessage     String?       @map("error_message") @db.Text
@@ -387,7 +393,7 @@ model Invoice {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
-  @@index([enotasId])
+  @@index([focusReference])
   @@index([status])
   @@map("invoices")
 }

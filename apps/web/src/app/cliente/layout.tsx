@@ -12,6 +12,7 @@ import {
   Truck,
   User,
   LogOut,
+  LayoutGrid,
 } from 'lucide-react';
 
 const NAV = [
@@ -76,6 +77,15 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
             <p className="text-xs font-medium truncate">{user.name ?? user.email}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           </div>
+          {(user.role === 'ADMIN' || user.role === 'VENDEDOR') && (
+            <Link
+              href="/admin"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Painel Administrativo
+            </Link>
+          )}
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"

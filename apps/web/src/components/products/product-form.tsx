@@ -6,12 +6,22 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { X, ChevronUp, ChevronDown, Loader2, ImageIcon } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, Loader2, ImageIcon, RefreshCw, Camera } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchCategories } from '@/actions/products';
 import type { Product, ProductImage } from '@/actions/products';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+function generateSku(name = ''): string {
+  const prefix = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 3)
+    .padEnd(3, 'X');
+  const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${prefix}-${rand}`;
+}
 
 function slugify(str: string) {
   return str
@@ -26,7 +36,7 @@ function slugify(str: string) {
 const schema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres').max(200),
   slug: z.string().max(200).optional(),
-  sku: z.string().min(2, 'SKU obrigatório').max(100),
+  sku: z.string().max(100).optional(),
   internalCode: z.string().max(100).optional(),
   brand: z.string().max(100).optional(),
   shortDescription: z.string().max(500).optional(),
@@ -66,10 +76,12 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
   const router = useRouter();
   const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [slugManual, setSlugManual] = useState(!!initialData);
+  const [skuManual, setSkuManual] = useState(!!initialData);
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories-list'],
@@ -119,6 +131,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           stock: 0,
           minimumStock: 0,
           pickupAvailable: false,
+          sku: generateSku(),
         },
   });
 
@@ -129,6 +142,12 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       setValue('slug', slugify(nameValue));
     }
   }, [nameValue, slugManual, setValue]);
+
+  useEffect(() => {
+    if (!skuManual && nameValue) {
+      setValue('sku', generateSku(nameValue));
+    }
+  }, [nameValue, skuManual, setValue]);
 
   useEffect(() => {
     if (initialData?.images) {
@@ -283,9 +302,33 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className={labelCls}>SKU *</label>
-                <input {...register('sku')} className={inputCls} placeholder="SKU-001" />
+                <label className={labelCls}>SKU</label>
+                <div className="flex gap-1.5">
+                  <input
+                    {...register('sku')}
+                    className={inputCls}
+                    placeholder="Gerado automaticamente"
+                    onChange={(e) => {
+                      setSkuManual(true);
+                      register('sku').onChange(e);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    title="Gerar novo SKU"
+                    onClick={() => {
+                      setSkuManual(false);
+                      setValue('sku', generateSku(watch('name') ?? ''));
+                    }}
+                    className="flex items-center rounded-lg border px-2.5 hover:bg-muted"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </button>
+                </div>
                 {errors.sku && <p className={errorCls}>{errors.sku.message}</p>}
+                {!skuManual && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">Gerado a partir do nome</p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>Código interno</label>
@@ -371,7 +414,22 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                 ) : (
                   <>
                     <ImageIcon className="h-6 w-6" />
-                    <span className="text-xs text-center leading-tight">Adicionar imagens</span>
+                    <span className="text-xs text-center leading-tight">Galeria</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={uploading}
+                className="flex aspect-square flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+              >
+                {uploading ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <>
+                    <Camera className="h-6 w-6" />
+                    <span className="text-xs text-center leading-tight">Tirar foto</span>
                   </>
                 )}
               </button>
@@ -381,6 +439,14 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               type="file"
               accept="image/jpeg,image/png,image/webp"
               multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              capture="environment"
               className="hidden"
               onChange={handleFileChange}
             />

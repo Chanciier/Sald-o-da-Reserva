@@ -224,7 +224,13 @@ export default function PaymentPage({ params }: PageProps) {
 
           {!loading && showSuccess && <SuccessBlock orderId={orderId} />}
 
-          {!loading && showRejected && <RejectedBlock payment={payment!} />}
+          {!loading && showRejected && (
+            <RejectedBlock
+              payment={payment!}
+              orderId={orderId}
+              onRetryCard={isCard ? () => setPayment(null) : undefined}
+            />
+          )}
 
           {!loading && showPix && <PixDisplay payment={payment!} />}
 
@@ -280,7 +286,15 @@ function SuccessBlock({ orderId }: { orderId: string }) {
   );
 }
 
-function RejectedBlock({ payment }: { payment: Payment }) {
+function RejectedBlock({
+  payment,
+  orderId,
+  onRetryCard,
+}: {
+  payment: Payment;
+  orderId: string;
+  onRetryCard?: () => void;
+}) {
   return (
     <div className="flex flex-col items-center gap-4 py-8 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
@@ -299,12 +313,29 @@ function RejectedBlock({ payment }: { payment: Payment }) {
           <p className="text-sm text-muted-foreground mt-1">{payment.statusDetail}</p>
         )}
       </div>
-      <Link
-        href="/checkout"
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-      >
-        Alterar método
-      </Link>
+      <div className="flex gap-2 flex-wrap justify-center">
+        {onRetryCard ? (
+          <button
+            onClick={onRetryCard}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Tentar com cartão
+          </button>
+        ) : (
+          <Link
+            href={`/pagamento/${orderId}?method=CREDIT_CARD`}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Tentar com cartão
+          </Link>
+        )}
+        <Link
+          href={`/pagamento/${orderId}?method=PIX`}
+          className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+        >
+          Pagar com PIX
+        </Link>
+      </div>
     </div>
   );
 }

@@ -35,7 +35,10 @@ export class InvoiceRepository {
 
   async findPending() {
     return this.prisma.invoice.findMany({
-      where: { status: { in: ['PENDING', 'PROCESSING'] }, enotasId: { not: null } },
+      where: {
+        status: { in: ['PENDING', 'PROCESSING'] },
+        focusReference: { not: null },
+      },
       include: INVOICE_INCLUDE,
     });
   }
@@ -71,6 +74,7 @@ export class InvoiceRepository {
       ...(search && {
         OR: [
           { invoiceNumber: { contains: search, mode: 'insensitive' } },
+          { focusReference: { contains: search, mode: 'insensitive' } },
           { orderId: { contains: search, mode: 'insensitive' } },
           { order: { user: { name: { contains: search, mode: 'insensitive' } } } },
           { order: { user: { email: { contains: search, mode: 'insensitive' } } } },

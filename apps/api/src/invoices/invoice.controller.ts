@@ -20,7 +20,7 @@ import { AuthenticatedUser } from '../auth/types/auth.types';
 export class InvoiceController {
   constructor(private readonly invoiceService: InvoiceService) {}
 
-  // ── Admin list ────────────────────────────────────────────────────────────
+  // ── Admin / Vendedor list ─────────────────────────────────────────────────
 
   @Get()
   @Roles('ADMIN', 'VENDEDOR')
@@ -80,7 +80,13 @@ export class InvoiceController {
   @Get(':id/pdf')
   @Roles('ADMIN', 'VENDEDOR')
   getPdf(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.invoiceService.getPdfUrl(id, user);
+    return this.invoiceService.getDanfeUrl(id, user);
+  }
+
+  @Get(':id/danfe')
+  @Roles('ADMIN', 'VENDEDOR')
+  getDanfe(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.invoiceService.getDanfeUrl(id, user);
   }
 
   // ── Sync ──────────────────────────────────────────────────────────────────
@@ -92,12 +98,12 @@ export class InvoiceController {
     return this.invoiceService.syncStatus(id, user);
   }
 
-  // ── eNotas webhook (public) ───────────────────────────────────────────────
+  // ── Focus NFe webhook (public) ────────────────────────────────────────────
 
-  @Post('webhook/enotas')
+  @Post('webhook/focusnfe')
   @Public()
   @HttpCode(HttpStatus.OK)
-  enotasWebhook(@Body() body: Record<string, unknown>) {
+  focusWebhook(@Body() body: Record<string, unknown>) {
     return this.invoiceService.handleWebhook(body);
   }
 }

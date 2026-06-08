@@ -12,7 +12,7 @@ export class InvoiceScheduler {
     private readonly service: InvoiceService,
   ) {}
 
-  // Every 15 minutes: sync PENDING/PROCESSING invoices
+  // Every 10 minutes: sync PENDING/PROCESSING invoices with Focus NFe
   @Cron(CronExpression.EVERY_10_MINUTES)
   async syncPending() {
     const pending = await this.repo.findPending();

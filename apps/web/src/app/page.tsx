@@ -1,36 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading || !user) return;
-    if (user.role === 'ADMIN') router.replace('/admin');
-    else if (user.role === 'VENDEDOR') router.replace('/vendedor');
-    else router.replace('/cliente');
-  }, [user, loading, router]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
+  const { user } = useAuth();
 
   return (
     <main className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -52,12 +26,14 @@ export default function HomePage() {
           >
             Ver produtos
           </Link>
-          <Link
-            href="/login"
-            className="rounded-lg border border-border px-6 py-3 text-sm font-semibold hover:bg-muted transition-colors"
-          >
-            Entrar
-          </Link>
+          {!user && (
+            <Link
+              href="/login"
+              className="rounded-lg border border-border px-6 py-3 text-sm font-semibold hover:bg-muted transition-colors"
+            >
+              Entrar
+            </Link>
+          )}
         </div>
       </section>
 
@@ -97,18 +73,20 @@ export default function HomePage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-border px-4 py-12 text-center">
-        <p className="text-muted-foreground text-sm">
-          Já tem uma conta?{' '}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            Faça login
-          </Link>{' '}
-          ou{' '}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            crie a sua gratuitamente
-          </Link>
-        </p>
-      </section>
+      {!user && (
+        <section className="border-t border-border px-4 py-12 text-center">
+          <p className="text-muted-foreground text-sm">
+            Já tem uma conta?{' '}
+            <Link href="/login" className="font-medium text-primary hover:underline">
+              Faça login
+            </Link>{' '}
+            ou{' '}
+            <Link href="/login" className="font-medium text-primary hover:underline">
+              crie a sua gratuitamente
+            </Link>
+          </p>
+        </section>
+      )}
     </main>
   );
 }

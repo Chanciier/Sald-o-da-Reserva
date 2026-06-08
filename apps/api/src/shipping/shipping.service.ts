@@ -82,7 +82,7 @@ export class ShippingService {
     this.from = {
       name: this.config.get<string>('MELHOR_ENVIO_FROM_NAME', ''),
       email: this.config.get<string>('MELHOR_ENVIO_FROM_EMAIL', ''),
-      document: this.config.get<string>('MELHOR_ENVIO_FROM_DOCUMENT', ''),
+      document: this.config.get<string>('MELHOR_ENVIO_FROM_DOCUMENT', '').replace(/\D/g, ''),
       phone: this.config.get<string>('MELHOR_ENVIO_FROM_PHONE', ''),
       address: this.config.get<string>('MELHOR_ENVIO_FROM_ADDRESS', ''),
       number: this.config.get<string>('MELHOR_ENVIO_FROM_NUMBER', ''),

@@ -15,6 +15,8 @@ import {
   User,
   LogOut,
   Plus,
+  Store,
+  ExternalLink,
 } from 'lucide-react';
 
 const NAV = [
@@ -81,6 +83,22 @@ export default function VendedorLayout({ children }: { children: React.ReactNode
             <p className="text-xs font-medium truncate">{user.name ?? user.email}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           </div>
+          <Link
+            href="/"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <Store className="h-4 w-4" />
+            Ver Loja
+          </Link>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Abrir Loja em Nova Aba
+          </a>
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"

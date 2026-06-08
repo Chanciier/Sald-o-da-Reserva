@@ -14,6 +14,7 @@ import { CheckoutService } from './checkout.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { AuthenticatedUser } from '../auth/types/auth.types';
 
 @Controller()
 export class CheckoutController {
@@ -57,7 +58,8 @@ export class CheckoutController {
   }
 
   @Get('orders/:id')
-  findOrder(@CurrentUser('id') userId: string, @Param('id') orderId: string) {
-    return this.checkout.findOrderById(userId, orderId);
+  findOrder(@CurrentUser() user: AuthenticatedUser, @Param('id') orderId: string) {
+    const isStaff = user.role === Role.ADMIN || user.role === Role.VENDEDOR;
+    return this.checkout.findOrderById(isStaff ? null : user.id, orderId);
   }
 }

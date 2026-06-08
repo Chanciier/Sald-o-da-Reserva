@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
 import { purchaseLabel } from '@/lib/shipping';
+import { fetchInvoices, type Invoice } from '@/actions/invoices';
 import { TrackingDisplay } from '@/components/shipping/tracking-display';
 import type { Order, Shipment } from '@/types/order';
 
@@ -52,8 +53,10 @@ export default function OrderDetailPage() {
   const [error, setError] = useState('');
   const [labelLoading, setLabelLoading] = useState(false);
   const [labelError, setLabelError] = useState('');
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
 
   const isAdmin = user?.role === 'ADMIN';
+  const isStaff = user?.role === 'ADMIN' || user?.role === 'VENDEDOR';
 
   useEffect(() => {
     if (!token || !params.id) return;
@@ -62,6 +65,13 @@ export default function OrderDetailPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [token, params.id]);
+
+  useEffect(() => {
+    if (!token || !isStaff || !params.id) return;
+    fetchInvoices(token, { orderId: params.id as string, limit: '1' })
+      .then((res) => setInvoice(res.data[0] ?? null))
+      .catch(() => null);
+  }, [token, isStaff, params.id]);
 
   async function handlePurchaseLabel() {
     if (!token || !order) return;
@@ -124,7 +134,7 @@ export default function OrderDetailPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
+      <nav className="no-print mb-6 flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/pedidos" className="hover:text-foreground">
           Pedidos
         </Link>
@@ -139,10 +149,42 @@ export default function OrderDetailPage() {
             {new Date(order.createdAt).toLocaleDateString('pt-BR', { dateStyle: 'long' })}
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.color}`}>
-          {status.label}
-        </span>
+        <div className="flex items-center gap-2">
+          {isStaff && (
+            <button
+              onClick={() => window.print()}
+              className="no-print rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+            >
+              Imprimir pedido
+            </button>
+          )}
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.color}`}>
+            {status.label}
+          </span>
+        </div>
       </div>
+
+      {order.status === 'PENDING' && (
+        <div className="mb-4 rounded-xl border border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950/30 p-4">
+          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-3">
+            Seu pedido aguarda pagamento. Escolha como deseja pagar:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/pagamento/${order.id}?method=PIX`}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Pagar com PIX
+            </Link>
+            <Link
+              href={`/pagamento/${order.id}?method=CREDIT_CARD`}
+              className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            >
+              Pagar com Cartão
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* Items */}
@@ -203,6 +245,67 @@ export default function OrderDetailPage() {
           </section>
         )}
 
+        {/* NF-e — staff only */}
+        {isStaff && (
+          <section className="rounded-xl border border-border p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">Nota Fiscal</h2>
+              <Link
+                href={`/admin/financeiro/notas-fiscais${invoice ? `/${invoice.id}` : `?search=${order.id}`}`}
+                className="text-xs text-primary hover:underline"
+              >
+                {invoice ? 'Ver detalhes' : 'Gerenciar NF-e'}
+              </Link>
+            </div>
+            {invoice ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    invoice.status === 'AUTHORIZED'
+                      ? 'bg-green-100 text-green-800'
+                      : invoice.status === 'REJECTED'
+                        ? 'bg-red-100 text-red-800'
+                        : invoice.status === 'CANCELLED'
+                          ? 'bg-gray-100 text-gray-700'
+                          : 'bg-blue-100 text-blue-800'
+                  }`}
+                >
+                  {invoice.status === 'AUTHORIZED'
+                    ? 'Autorizada'
+                    : invoice.status === 'REJECTED'
+                      ? 'Rejeitada'
+                      : invoice.status === 'CANCELLED'
+                        ? 'Cancelada'
+                        : invoice.status === 'PROCESSING'
+                          ? 'Processando'
+                          : 'Pendente'}
+                </span>
+                {invoice.invoiceNumber && (
+                  <span className="text-sm text-muted-foreground">
+                    NF-e #{invoice.invoiceNumber}
+                  </span>
+                )}
+                {invoice.status === 'AUTHORIZED' && (
+                  <a
+                    href={
+                      invoice.danfeUrl ?? `/admin/financeiro/notas-fiscais/${invoice.id}/imprimir`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    Imprimir DANFE
+                  </a>
+                )}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nenhuma nota emitida para este pedido.
+              </p>
+            )}
+          </section>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Address */}
           <section className="rounded-xl border border-border p-5">
@@ -247,7 +350,7 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="no-print mt-6">
         <Link href="/pedidos" className="text-sm text-muted-foreground hover:text-foreground">
           ← Voltar aos pedidos
         </Link>

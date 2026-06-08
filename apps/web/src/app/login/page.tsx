@@ -26,7 +26,7 @@ export default function LoginPage() {
       } else {
         await register(name, email, password);
       }
-      router.back();
+      router.push('/');
     } catch (err) {
       setError((err as Error).message);
     } finally {
