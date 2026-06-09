@@ -9,10 +9,12 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { WebhooksService } from './webhooks.service';
 
 @Controller('webhooks')
+@SkipThrottle()
 export class WebhooksController {
   constructor(private readonly webhooks: WebhooksService) {}
 
