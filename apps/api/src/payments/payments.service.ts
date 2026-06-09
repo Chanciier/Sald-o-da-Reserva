@@ -83,7 +83,10 @@ export class PaymentsService {
         idempotencyKey,
       });
     } catch (err) {
-      this.logger.error('MP createCard error', err);
+      this.logger.error(
+        `MP createCard error | orderId=${orderId} paymentMethodId=${dto.paymentMethodId} installments=${dto.installments}`,
+        JSON.stringify(err, Object.getOwnPropertyNames(err as object)),
+      );
       throw new BadRequestException(extractMpError(err));
     }
 
