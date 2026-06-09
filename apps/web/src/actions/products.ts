@@ -1,6 +1,6 @@
 'use server';
 
-const BASE = process.env.API_URL ?? 'http://localhost:3001';
+const BASE = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export interface ProductImage {
   id: string;
@@ -139,7 +139,11 @@ export async function deleteProduct(token: string, id: string): Promise<void> {
 }
 
 export async function fetchCategories(): Promise<{ data: CategoryItem[] }> {
-  const res = await fetch(`${BASE}/api/v1/categories`, { cache: 'no-store' });
-  if (!res.ok) return { data: [] };
-  return res.json();
+  try {
+    const res = await fetch(`${BASE}/api/v1/categories`, { cache: 'no-store' });
+    if (!res.ok) return { data: [] };
+    return res.json();
+  } catch {
+    return { data: [] };
+  }
 }
