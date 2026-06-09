@@ -147,10 +147,16 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
 
       if (!tokenResult.id) throw new Error('Falha ao tokenizar o cartão.');
 
+      const pmId = tokenResult.payment_method_id || detectedPaymentMethodId;
+      if (!pmId)
+        throw new Error(
+          'Não foi possível identificar a bandeira do cartão. Verifique o número e tente novamente.',
+        );
+
       await onSubmit({
         token: tokenResult.id,
         installments,
-        paymentMethodId: detectedPaymentMethodId || tokenResult.payment_method_id || 'master',
+        paymentMethodId: pmId,
         issuerId: tokenResult.issuer_id,
         identificationNumber: cleanCpf,
       });
