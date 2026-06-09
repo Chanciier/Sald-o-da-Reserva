@@ -68,6 +68,7 @@ export default function AdminUsuarios() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['admin-users', page, roleFilter, search],
@@ -81,6 +82,15 @@ export default function AdminUsuarios() {
     onSuccess: () => {
       setEditingId(null);
       qc.invalidateQueries({ queryKey: ['admin-users'] });
+      setNotice({
+        type: 'success',
+        msg: 'Perfil atualizado. O usuário será desconectado automaticamente e precisará fazer login novamente para as alterações entrarem em vigor.',
+      });
+      setTimeout(() => setNotice(null), 8000);
+    },
+    onError: (err: Error) => {
+      setNotice({ type: 'error', msg: err.message ?? 'Erro ao atualizar perfil.' });
+      setTimeout(() => setNotice(null), 5000);
     },
   });
 
@@ -92,6 +102,18 @@ export default function AdminUsuarios() {
 
   return (
     <div className="space-y-5">
+      {notice && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            notice.type === 'success'
+              ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-300'
+              : 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300'
+          }`}
+        >
+          {notice.msg}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Usuários</h1>
         <button
