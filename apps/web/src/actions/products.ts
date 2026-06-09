@@ -39,6 +39,7 @@ export interface Product {
   stock: number;
   minimumStock: number;
   pickupAvailable: boolean;
+  featuredOffer: boolean;
   status: string;
   metaTitle: string | null;
   metaDescription: string | null;

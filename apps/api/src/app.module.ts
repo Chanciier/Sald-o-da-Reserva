@@ -20,6 +20,8 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { InvoiceModule } from './invoices/invoice.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ExpedicaoModule } from './expedicao/expedicao.module';
+import { ReturnsModule } from './returns/returns.module';
+import { MailModule } from './mail/mail.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -51,6 +53,8 @@ import { envValidation } from './config/env.validation';
     InvoiceModule,
     WebhooksModule,
     ExpedicaoModule,
+    ReturnsModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [

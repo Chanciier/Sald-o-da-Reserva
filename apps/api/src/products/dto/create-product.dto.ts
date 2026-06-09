@@ -97,6 +97,10 @@ export class CreateProductDto {
   pickupAvailable?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  featuredOffer?: boolean;
+
+  @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus;
 

@@ -128,7 +128,7 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
         } else {
           next.add(itemId);
         }
-        saveMutation.mutate([...next]);
+        saveMutation.mutate(Array.from(next));
         return next;
       });
     },

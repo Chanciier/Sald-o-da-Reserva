@@ -155,7 +155,7 @@ export default function AdminCategorias() {
     const body = {
       name: form.name.trim(),
       slug: form.slug || slugify(form.name),
-      description: form.description || undefined,
+      description: form.description || '',
     };
     if (modal === 'create') createMutation.mutate(body);
     else updateMutation.mutate(body);

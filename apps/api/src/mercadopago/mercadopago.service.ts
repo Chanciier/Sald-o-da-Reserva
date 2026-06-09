@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MercadoPagoConfig, Payment } from 'mercadopago';
+import { MercadoPagoConfig, Payment, PaymentRefund } from 'mercadopago';
 import { PaymentStatus } from '@prisma/client';
 import type { MpPaymentResponse } from './mercadopago.types';
 
@@ -34,6 +34,7 @@ export class MercadoPagoService {
   private readonly webhookUrl: string;
   private readonly client: MercadoPagoConfig | null;
   private readonly paymentApi: Payment | null;
+  private readonly refundApi: PaymentRefund | null;
 
   constructor(private readonly config: ConfigService) {
     this.accessToken = this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN', '');
@@ -50,9 +51,11 @@ export class MercadoPagoService {
       this.logger.warn('MERCADO_PAGO_ACCESS_TOKEN não configurado.');
       this.client = null;
       this.paymentApi = null;
+      this.refundApi = null;
     } else {
       this.client = new MercadoPagoConfig({ accessToken: this.accessToken });
       this.paymentApi = new Payment(this.client);
+      this.refundApi = new PaymentRefund(this.client);
     }
   }
 
@@ -117,6 +120,23 @@ export class MercadoPagoService {
     });
 
     return result as MpPaymentResponse;
+  }
+
+  async createRefund(
+    mpPaymentId: string,
+    amount?: number,
+  ): Promise<{ id: number; status: string; amount: number }> {
+    this.ensureConfigured();
+    const result = await this.refundApi!.create({
+      payment_id: mpPaymentId,
+      body: amount ? { amount } : undefined,
+      requestOptions: { idempotencyKey: `refund-${mpPaymentId}-${Date.now()}` },
+    });
+    return {
+      id: result.id ?? 0,
+      status: result.status ?? 'approved',
+      amount: result.amount ?? amount ?? 0,
+    };
   }
 
   async getPayment(mpPaymentId: string): Promise<MpPaymentResponse> {

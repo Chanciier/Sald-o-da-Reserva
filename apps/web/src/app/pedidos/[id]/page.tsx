@@ -8,6 +8,13 @@ import { getOrder } from '@/lib/cart-api';
 import { purchaseLabel } from '@/lib/shipping';
 import { fetchInvoices, type Invoice } from '@/actions/invoices';
 import { TrackingDisplay } from '@/components/shipping/tracking-display';
+import { ReturnModal } from '@/components/orders/return-modal';
+import {
+  getReturnsByOrder,
+  RETURN_STATUS_LABEL,
+  RETURN_REASON_LABEL,
+  type ReturnRequest,
+} from '@/actions/returns';
 import type { Order, Shipment } from '@/types/order';
 
 function formatBRL(n: number) {
@@ -54,6 +61,8 @@ export default function OrderDetailPage() {
   const [labelLoading, setLabelLoading] = useState(false);
   const [labelError, setLabelError] = useState('');
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
+  const [showReturnModal, setShowReturnModal] = useState(false);
 
   const isAdmin = user?.role === 'ADMIN';
   const isStaff = user?.role === 'ADMIN' || user?.role === 'VENDEDOR';
@@ -64,6 +73,13 @@ export default function OrderDetailPage() {
       .then(setOrder)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+  }, [token, params.id]);
+
+  useEffect(() => {
+    if (!token || !params.id) return;
+    getReturnsByOrder(token, params.id as string)
+      .then(setReturnRequests)
+      .catch(() => {});
   }, [token, params.id]);
 
   useEffect(() => {
@@ -185,6 +201,107 @@ export default function OrderDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Devolução */}
+      {(() => {
+        const activeReturn = returnRequests.find((r) => r.status !== 'REJECTED');
+        const deliveredAt =
+          (order.shipment as Shipment | null | undefined)?.deliveredAt ?? order.updatedAt;
+        const withinWindow =
+          order.status === 'DELIVERED' && deliveredAt
+            ? (Date.now() - new Date(deliveredAt).getTime()) / (1000 * 60 * 60 * 24) <= 7
+            : false;
+        const canRequest = order.status === 'DELIVERED' && withinWindow && !activeReturn;
+
+        return (
+          <>
+            {canRequest && (
+              <div className="mb-4 rounded-xl border border-border p-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Precisa devolver algum item?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Você tem até 7 dias após a entrega para solicitar a devolução.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowReturnModal(true)}
+                  className="shrink-0 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
+                >
+                  Solicitar devolução
+                </button>
+              </div>
+            )}
+
+            {activeReturn && (
+              <div
+                className={`mb-4 rounded-xl border p-4 ${
+                  activeReturn.status === 'APPROVED'
+                    ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20'
+                    : activeReturn.status === 'COMPLETED'
+                      ? 'border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/20'
+                      : 'border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <p className="text-sm font-semibold">Solicitação de devolução</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Motivo: {RETURN_REASON_LABEL[activeReturn.reason]} ·{' '}
+                      {new Date(activeReturn.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      activeReturn.status === 'APPROVED'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                        : activeReturn.status === 'COMPLETED'
+                          ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                    }`}
+                  >
+                    {RETURN_STATUS_LABEL[activeReturn.status]}
+                  </span>
+                </div>
+                {activeReturn.adminNotes && (
+                  <p className="mt-2 text-sm text-muted-foreground border-t border-border pt-2">
+                    {activeReturn.adminNotes}
+                  </p>
+                )}
+                {activeReturn.status === 'APPROVED' && activeReturn.labelUrl && (
+                  <div className="mt-3 border-t border-border pt-3 space-y-2">
+                    <p className="text-xs font-medium">Envio de devolução</p>
+                    {activeReturn.trackingCode ? (
+                      <div className="rounded-lg bg-background/70 border px-3 py-2">
+                        <p className="text-xs text-muted-foreground">Código de rastreio</p>
+                        <p className="font-mono text-sm font-semibold mt-0.5">
+                          {activeReturn.trackingCode}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Imprima a etiqueta e leve o pacote à agência dos Correios.
+                      </p>
+                    )}
+                    <a
+                      href={activeReturn.labelUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted/60 transition-colors"
+                    >
+                      Imprimir etiqueta de devolução →
+                    </a>
+                    {activeReturn.postedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Postado em {new Date(activeReturn.postedAt).toLocaleDateString('pt-BR')}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <div className="space-y-4">
         {/* Items */}
@@ -355,6 +472,20 @@ export default function OrderDetailPage() {
           ← Voltar aos pedidos
         </Link>
       </div>
+
+      {showReturnModal && token && (
+        <ReturnModal
+          orderId={order.id}
+          token={token}
+          onClose={() => setShowReturnModal(false)}
+          onSuccess={() => {
+            setShowReturnModal(false);
+            getReturnsByOrder(token, order.id)
+              .then(setReturnRequests)
+              .catch(() => {});
+          }}
+        />
+      )}
     </main>
   );
 }

@@ -6,6 +6,7 @@ import { AuthProvider } from '@/contexts/auth-context';
 import { CartProvider } from '@/contexts/cart-context';
 import { QueryProvider } from '@/providers/query-provider';
 import { ConditionalHeader } from '@/components/layout/conditional-header';
+import { ConditionalFooter } from '@/components/layout/conditional-footer';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,6 +28,7 @@ export default function RootLayout({
             <CartProvider>
               <ConditionalHeader />
               {children}
+              <ConditionalFooter />
             </CartProvider>
           </AuthProvider>
         </QueryProvider>

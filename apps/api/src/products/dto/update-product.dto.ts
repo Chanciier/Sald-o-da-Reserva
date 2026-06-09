@@ -94,6 +94,10 @@ export class UpdateProductDto {
   pickupAvailable?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  featuredOffer?: boolean;
+
+  @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus;
 

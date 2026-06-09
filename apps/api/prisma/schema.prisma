@@ -80,6 +80,21 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum ReturnReason {
+  REGRET
+  DEFECT
+  WRONG_ITEM
+  OTHER
+}
+
+enum ReturnStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -90,12 +105,13 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  refreshTokens  RefreshToken[]
-  passwordResets PasswordReset[]
-  auditLogs      AuditLog[]
-  images         Image[]
-  orders         Order[]
-  products       Product[]
+  refreshTokens   RefreshToken[]
+  passwordResets  PasswordReset[]
+  auditLogs       AuditLog[]
+  images          Image[]
+  orders          Order[]
+  products        Product[]
+  returnRequests  ReturnRequest[]
 
   @@map("users")
 }
@@ -160,6 +176,7 @@ model Product {
   stock            Int           @default(0)
   minimumStock     Int           @default(0) @map("minimum_stock")
   pickupAvailable  Boolean       @default(false) @map("pickup_available")
+  featuredOffer    Boolean       @default(false) @map("featured_offer")
   status           ProductStatus @default(ACTIVE)
   metaTitle        String?       @map("meta_title") @db.VarChar(200)
   metaDescription  String?       @map("meta_description") @db.VarChar(500)
@@ -259,12 +276,13 @@ model Order {
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coupon   Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  items    OrderItem[]
-  payment  Payment?
-  shipment Shipment?
-  invoices Invoice[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon         Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  payment        Payment?
+  shipment       Shipment?
+  invoices       Invoice[]
+  returnRequests ReturnRequest[]
 
   @@index([userId])
   @@map("orders")
@@ -396,4 +414,33 @@ model Invoice {
   @@index([focusReference])
   @@index([status])
   @@map("invoices")
+}
+
+model ReturnRequest {
+  id                String       @id @default(cuid())
+  orderId           String       @map("order_id")
+  userId            String       @map("user_id")
+  reason            ReturnReason
+  notes             String?      @db.Text
+  status            ReturnStatus @default(PENDING)
+  adminNotes        String?      @map("admin_notes") @db.Text
+  meOrderId         String?      @unique @map("me_order_id")
+  trackingCode      String?      @map("tracking_code")
+  labelUrl          String?      @map("label_url") @db.Text
+  postedAt          DateTime?    @map("posted_at")
+  returnDeliveredAt DateTime?    @map("return_delivered_at")
+  refundId          String?      @map("refund_id")
+  refundAmount      Decimal?     @map("refund_amount") @db.Decimal(10, 2)
+  refundStatus      String?      @map("refund_status")
+  refundedAt        DateTime?    @map("refunded_at")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@map("return_requests")
 }

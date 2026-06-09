@@ -1,41 +1,78 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Tag, Menu, X } from 'lucide-react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
+
+const anchorLinks = [
+  { label: 'Ofertas', href: '#produtos' },
+  { label: 'Como Funciona', href: '#como-funciona' },
+  { label: 'Benefícios', href: '#beneficios' },
+];
+
+const navLinks = [
+  { label: 'Produtos', href: '/produtos' },
+  { label: 'Categorias', href: '/categorias' },
+];
 
 export function Header() {
   const { user, logout } = useAuth();
   const { cart, setOpen } = useCart();
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const itemCount = cart?.itemCount ?? 0;
+  const isHome = pathname === '/';
+  const links = isHome ? anchorLinks : navLinks;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur">
+      {/* Top strip */}
+      <div className="bg-secondary text-secondary-foreground">
+        <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-1.5 text-center text-xs font-medium sm:text-sm">
+          <Tag className="size-3.5 text-primary" aria-hidden="true" />
+          <span>Frete grátis acima de R$ 199</span>
+        </div>
+      </div>
+
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="text-lg font-bold tracking-tight">
-          Saldão da Reversa
+        {/* Logo */}
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2"
+          aria-label="Saldão da Reversa - início"
+        >
+          <span className="flex size-9 items-center justify-center rounded-lg bg-primary font-mono text-base font-black text-primary-foreground">
+            SR
+          </span>
+          <span className="hidden text-lg font-extrabold leading-none tracking-tight text-foreground sm:block">
+            Saldão<span className="text-accent"> da Reversa</span>
+          </span>
         </Link>
 
-        <nav className="hidden items-center gap-6 text-sm md:flex">
-          <Link
-            href="/produtos"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Produtos
-          </Link>
-          <Link
-            href="/categorias"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Categorias
-          </Link>
+        {/* Nav desktop */}
+        <nav className="hidden items-center gap-5 text-sm md:flex" aria-label="Navegação principal">
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {/* Cart */}
           <button
             onClick={() => setOpen(true)}
             className="relative flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+            aria-label="Carrinho de compras"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -47,7 +84,7 @@ export function Header() {
             </svg>
             <span className="hidden sm:inline">Carrinho</span>
             {itemCount > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
                 {itemCount > 99 ? '99+' : itemCount}
               </span>
             )}
@@ -76,8 +113,40 @@ export function Header() {
               Entrar
             </Link>
           )}
+
+          {/* Mobile menu toggle */}
+          <button
+            className="rounded-lg border border-border p-1.5 hover:bg-muted transition-colors md:hidden"
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label={mobileOpen ? 'Fechar menu' : 'Abrir menu'}
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile nav */}
+      {mobileOpen && (
+        <nav
+          className="border-t border-border bg-background px-4 py-3 md:hidden"
+          aria-label="Navegação mobile"
+        >
+          <ul className="flex flex-col gap-1">
+            {links.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="block rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }

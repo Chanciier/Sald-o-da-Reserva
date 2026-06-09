@@ -66,6 +66,11 @@ export class QueryProductDto {
   inStock?: boolean;
 
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  featuredOffer?: boolean;
+
+  @IsOptional()
   @IsString()
   sortBy?: SortBy = 'createdAt';
 

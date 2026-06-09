@@ -36,7 +36,7 @@ interface MeHistory {
   created_at: string;
 }
 
-interface MeTracking {
+export interface MeTracking {
   id: string;
   status: string;
   tracking: string | null;
@@ -337,6 +337,120 @@ export class ShippingService {
 
     this.logger.log(`Label purchased: shipment=${shipment.id} meOrderId=${meOrderId}`);
     return { meOrderId, labelUrl };
+  }
+
+  // ── Reverse label (returns) ───────────────────────────────────────────────
+
+  async generateReverseLabel(
+    orderId: string,
+  ): Promise<{ meOrderId: string; labelUrl: string | null }> {
+    if (!this.token) throw new BadRequestException('Melhor Envio não configurado.');
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { product: true } }, user: true, shipment: true },
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    const addr = order.shippingAddress as Record<string, string>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const products = order.items.map((i: any) => ({
+      name: i.name,
+      quantity: i.quantity,
+      unitary_value: i.price.toNumber(),
+    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const totalValue = order.items.reduce(
+      (acc: number, i: any) => acc + i.price.toNumber() * i.quantity,
+      0,
+    );
+    const { height, width, length, weight } = this.calcPackage(order.items);
+    const serviceId = (order.shipment as { serviceId?: number } | null)?.serviceId ?? 1;
+
+    const cartRes = await fetch(`${this.baseUrl}/me/cart`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({
+        service: serviceId,
+        from: {
+          name: addr.name,
+          email: order.user.email,
+          phone: '',
+          document: '',
+          address: addr.street,
+          complement: addr.complement ?? '',
+          number: addr.number,
+          district: addr.neighborhood,
+          city: addr.city,
+          state_abbr: addr.state,
+          country_id: 'BR',
+          postal_code: addr.cep.replace(/\D/g, ''),
+        },
+        to: this.from,
+        products,
+        volumes: [{ height, width, length, weight }],
+        options: {
+          insurance_value: totalValue,
+          receipt: false,
+          own_hand: false,
+          reverse: true,
+          non_commercial: true,
+        },
+        tag: `return-${orderId.slice(-8).toUpperCase()}`,
+      }),
+    });
+
+    if (!cartRes.ok) {
+      const body = await cartRes.text();
+      throw new BadRequestException(`Erro ao gerar etiqueta reversa: ${body}`);
+    }
+
+    const cartData = (await cartRes.json()) as { id: string };
+    const meOrderId = cartData.id;
+
+    const checkRes = await fetch(`${this.baseUrl}/me/shipment/checkout`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ orders: [meOrderId] }),
+    });
+    if (!checkRes.ok) {
+      const body = await checkRes.text();
+      throw new BadRequestException(`Erro ao comprar etiqueta reversa: ${body}`);
+    }
+
+    await fetch(`${this.baseUrl}/me/shipment/generate`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ orders: [meOrderId] }),
+    });
+
+    let labelUrl: string | null = null;
+    const printRes = await fetch(`${this.baseUrl}/me/shipment/print`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ mode: 'public', orders: [meOrderId] }),
+    });
+    if (printRes.ok) {
+      const printData = (await printRes.json()) as { url?: string };
+      labelUrl = printData.url ?? null;
+    }
+
+    this.logger.log(`Reverse label: orderId=${orderId} meOrderId=${meOrderId}`);
+    return { meOrderId, labelUrl };
+  }
+
+  async fetchMeTrackingRaw(meOrderId: string): Promise<MeTracking | null> {
+    if (!this.token) return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/me/shipment/tracking?orders[]=${meOrderId}`, {
+        headers: this.headers(),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as Record<string, MeTracking>;
+      return data[meOrderId] ?? null;
+    } catch {
+      return null;
+    }
   }
 
   // ── Webhook ───────────────────────────────────────────────────────────────

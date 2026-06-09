@@ -115,7 +115,7 @@ export default function ProntosPage() {
               Imprimir Etiquetas ({selected.size})
             </button>
             <button
-              onClick={() => batchNfeMutation.mutate([...selected])}
+              onClick={() => batchNfeMutation.mutate(Array.from(selected))}
               disabled={batchNfeMutation.isPending}
               className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >

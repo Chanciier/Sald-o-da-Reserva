@@ -109,6 +109,7 @@ export class ProductsService {
         stock: dto.stock ?? 0,
         minimumStock: dto.minimumStock ?? 0,
         pickupAvailable: dto.pickupAvailable ?? false,
+        featuredOffer: dto.featuredOffer ?? false,
         status: dto.status,
         categoryId: dto.categoryId,
         metaTitle: dto.metaTitle,
@@ -170,6 +171,7 @@ export class ProductsService {
       ...(brand && { brand: { contains: brand, mode: 'insensitive' } }),
       ...(inStock === true && { stock: { gt: 0 } }),
       ...(createdById && { createdById }),
+      ...(query.featuredOffer === true && { featuredOffer: true }),
     };
 
     const [items, total] = await Promise.all([
@@ -288,6 +290,27 @@ export class ProductsService {
     });
 
     return serializeProduct(updated);
+  }
+
+  async getMinOfferDiscount(): Promise<{ discountPct: number }> {
+    const offers = await this.prisma.product.findMany({
+      where: { featuredOffer: true, status: 'ACTIVE', salePrice: { not: null } },
+      select: { price: true, salePrice: true },
+    });
+
+    if (!offers.length) return { discountPct: 0 };
+
+    const discounts = offers
+      .map((p) => {
+        const price = p.price.toNumber();
+        const sale = (p.salePrice as Prisma.Decimal).toNumber();
+        if (price <= 0 || sale >= price) return 0;
+        return Math.round(((price - sale) / price) * 100);
+      })
+      .filter((d) => d > 0);
+
+    if (!discounts.length) return { discountPct: 0 };
+    return { discountPct: Math.min(...discounts) };
   }
 
   async remove(id: string, user: AuthenticatedUser) {

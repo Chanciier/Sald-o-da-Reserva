@@ -39,6 +39,12 @@ export class ProductsController {
   }
 
   // Must be declared BEFORE :slug to avoid route conflict
+  @Get('offers-discount')
+  @Public()
+  getMinOfferDiscount() {
+    return this.productsService.getMinOfferDiscount();
+  }
+
   @Get('id/:id')
   @Roles(Role.ADMIN, Role.VENDEDOR)
   findById(@Param('id') id: string) {

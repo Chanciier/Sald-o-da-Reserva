@@ -21,6 +21,7 @@ import {
   Store,
   ExternalLink,
   ClipboardList,
+  RotateCcw,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -69,6 +70,15 @@ const NAV: NavItem[] = [
       { href: '/admin/pedidos', label: 'Todos os Pedidos' },
       { href: '/admin/financeiro/pagamentos', label: 'Pagamentos' },
       { href: '/admin/pedidos?status=CANCELLED', label: 'Cancelamentos' },
+    ],
+  },
+  {
+    label: 'Devoluções',
+    icon: RotateCcw,
+    children: [
+      { href: '/admin/devolucoes', label: 'Todas as Solicitações' },
+      { href: '/admin/devolucoes?status=PENDING', label: 'Solicitadas' },
+      { href: '/admin/devolucoes?status=IN_REVIEW', label: 'Em Análise' },
     ],
   },
   {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
@@ -42,7 +42,7 @@ const schema = z.object({
   shortDescription: z.string().max(500).optional(),
   description: z.string().max(10000).optional(),
   categoryId: z.string().optional(),
-  price: z.coerce.number({ invalid_type_error: 'Informe o preço' }).min(0, 'Preço inválido'),
+  price: z.coerce.number({ message: 'Informe o preço' }).min(0, 'Preço inválido'),
   salePrice: z.coerce.number().min(0).optional().nullable(),
   stock: z.coerce.number().int().min(0),
   minimumStock: z.coerce.number().int().min(0),
@@ -51,6 +51,7 @@ const schema = z.object({
   dimHeight: z.coerce.number().min(0).optional().nullable(),
   dimDepth: z.coerce.number().min(0).optional().nullable(),
   pickupAvailable: z.boolean().default(false),
+  featuredOffer: z.boolean().default(false),
   status: z.enum(['ACTIVE', 'INACTIVE', 'DRAFT', 'ARCHIVED', 'OUT_OF_STOCK']),
   metaTitle: z.string().max(200).optional(),
   metaDescription: z.string().max(500).optional(),
@@ -102,7 +103,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
     setValue,
     formState: { errors },
   } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as Resolver<FormData>,
     defaultValues: initialData
       ? {
           name: initialData.name,
@@ -122,6 +123,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           dimHeight: dims?.height ?? undefined,
           dimDepth: dims?.depth ?? undefined,
           pickupAvailable: initialData.pickupAvailable ?? false,
+          featuredOffer: initialData.featuredOffer ?? false,
           status: initialData.status as FormData['status'],
           metaTitle: initialData.metaTitle ?? '',
           metaDescription: initialData.metaDescription ?? '',
@@ -131,6 +133,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           stock: 0,
           minimumStock: 0,
           pickupAvailable: false,
+          featuredOffer: false,
           sku: generateSku(),
         },
   });
@@ -231,6 +234,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           }
         : undefined,
       pickupAvailable: data.pickupAvailable,
+      featuredOffer: data.featuredOffer,
       status: data.status,
       metaTitle: data.metaTitle || undefined,
       metaDescription: data.metaDescription || undefined,
@@ -607,6 +611,25 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                 <p className="text-sm font-medium leading-tight">Disponível para retirada</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Clientes poderão retirar este produto na loja sem custo de frete.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Página de Ofertas */}
+          <div className={cardCls}>
+            <h2 className="text-sm font-semibold">Página de Ofertas</h2>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                {...register('featuredOffer')}
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div>
+                <p className="text-sm font-medium leading-tight">Exibir na página de ofertas</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  O percentual de desconto exibido no hero será o menor desconto entre todos os
+                  produtos marcados aqui.
                 </p>
               </div>
             </label>

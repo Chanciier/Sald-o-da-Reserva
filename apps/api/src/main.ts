@@ -9,7 +9,8 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  app.setGlobalPrefix('api/v1');
+  // /health is accessible without the prefix for load balancer / uptime checks
+  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -19,8 +20,15 @@ async function bootstrap() {
     }),
   );
 
+  // FRONTEND_URL supports comma-separated origins, e.g.:
+  // https://app.vercel.app,https://staging.vercel.app,http://localhost:3000
+  const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
