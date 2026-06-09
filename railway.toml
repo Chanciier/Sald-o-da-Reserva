@@ -4,4 +4,4 @@ buildCommand = "npm install && npm run build -w apps/api"
 
 [deploy]
 startCommand = "node apps/api/dist/main"
-preDeployCommand = "cd apps/api && npx prisma migrate deploy"
+preDeployCommand = "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma"
