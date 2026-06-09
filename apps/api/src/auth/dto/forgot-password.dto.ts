@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class ForgotPasswordDto {
@@ -6,7 +6,7 @@ export class ForgotPasswordDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.toLowerCase().trim() : value))
   email: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Token de segurança é obrigatório.' })
-  turnstileToken: string;
+  turnstileToken?: string;
 }
