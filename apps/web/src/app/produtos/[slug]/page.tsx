@@ -28,9 +28,29 @@ function formatPrice(value: number) {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const product = await getProduct(params.slug).catch(() => null);
   if (!product) return { title: 'Produto não encontrado' };
+
+  const description =
+    product.shortDescription ??
+    product.description?.replace(/<[^>]+>/g, '').slice(0, 160) ??
+    undefined;
+  const image = product.images?.[0]?.url;
+
   return {
     title: product.name,
-    description: product.shortDescription ?? product.description?.slice(0, 160) ?? undefined,
+    description,
+    openGraph: {
+      title: product.name,
+      description,
+      type: 'website',
+      url: `/produtos/${params.slug}`,
+      ...(image && { images: [{ url: image, alt: product.name }] }),
+    },
+    twitter: {
+      card: image ? 'summary_large_image' : 'summary',
+      title: product.name,
+      description,
+      ...(image && { images: [image] }),
+    },
   };
 }
 
