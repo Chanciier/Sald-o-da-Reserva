@@ -491,14 +491,50 @@ export class PaymentsService {
   }
 }
 
+const MP_ERROR_MAP: Record<string, string> = {
+  internal_error: 'Erro no processamento do cartão. Verifique os dados e tente novamente.',
+  cc_rejected_call_for_authorize:
+    'Cartão requer autorização. Entre em contato com o banco emissor.',
+  cc_rejected_insufficient_amount: 'Saldo insuficiente no cartão.',
+  cc_rejected_bad_filled_security_code: 'Código de segurança (CVV) incorreto.',
+  cc_rejected_bad_filled_date: 'Data de validade incorreta.',
+  cc_rejected_bad_filled_card_number: 'Número do cartão incorreto.',
+  cc_rejected_blacklist: 'Cartão não aceito para esta transação.',
+  cc_rejected_card_disabled: 'Cartão desabilitado. Entre em contato com o banco emissor.',
+  cc_rejected_duplicated_payment: 'Pagamento duplicado. Aguarde alguns minutos e tente novamente.',
+  cc_rejected_high_risk: 'Pagamento recusado por segurança.',
+  cc_rejected_max_attempts: 'Número máximo de tentativas excedido. Tente outro cartão.',
+  pending_contingency: 'Pagamento em processamento. Aguarde a confirmação.',
+  pending_review_manual: 'Pagamento em análise. Você será notificado em breve.',
+  rejected_by_bank: 'Pagamento recusado pelo banco. Entre em contato com o banco emissor.',
+};
+
 function extractMpError(err: unknown): string {
   if (err && typeof err === 'object') {
     const e = err as Record<string, unknown>;
-    // MP SDK v2 wraps API errors with cause/message
+
+    // MP SDK v2: cause can be an array of { code, description }
+    const causeArr = e.cause as Array<{ code?: number; description?: string }> | undefined;
+    if (Array.isArray(causeArr) && causeArr.length > 0) {
+      const desc = causeArr[0].description?.toLowerCase();
+      if (desc && MP_ERROR_MAP[desc]) return MP_ERROR_MAP[desc];
+      if (desc) return desc;
+    }
+
+    // MP SDK v2: cause as object
     const cause = e.cause as Record<string, unknown> | undefined;
-    if (cause?.message) return String(cause.message);
-    if (cause?.error) return String(cause.error);
-    if (e.message) return String(e.message);
+    if (cause?.message) {
+      const msg = String(cause.message).toLowerCase();
+      return MP_ERROR_MAP[msg] ?? String(cause.message);
+    }
+    if (cause?.error) {
+      const msg = String(cause.error).toLowerCase();
+      return MP_ERROR_MAP[msg] ?? String(cause.error);
+    }
+    if (e.message) {
+      const msg = String(e.message).toLowerCase();
+      return MP_ERROR_MAP[msg] ?? String(e.message);
+    }
   }
   return 'Erro ao processar pagamento. Verifique os dados do cartão e tente novamente.';
 }
