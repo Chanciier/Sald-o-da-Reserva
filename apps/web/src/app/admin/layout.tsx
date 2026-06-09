@@ -22,6 +22,8 @@ import {
   ExternalLink,
   ClipboardList,
   RotateCcw,
+  Menu,
+  X,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -149,6 +151,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || (user.role !== 'ADMIN' && user.role !== 'VENDEDOR'))) {
@@ -156,7 +159,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [user, loading, router]);
 
-  // Auto-open groups that contain the active route
   useEffect(() => {
     const autoOpen: Record<string, boolean> = {};
     for (const item of NAV) {
@@ -165,6 +167,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
     }
     setOpen((prev) => ({ ...prev, ...autoOpen }));
+  }, [pathname]);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
   }, [pathname]);
 
   if (loading || !user || (user.role !== 'ADMIN' && user.role !== 'VENDEDOR')) {
@@ -196,12 +203,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="no-print flex w-60 shrink-0 flex-col border-r bg-card">
+      <aside
+        className={`no-print fixed inset-y-0 left-0 z-50 flex w-72 shrink-0 flex-col border-r bg-card transition-transform duration-200 md:static md:w-60 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
         {/* Brand */}
-        <div className="flex h-14 items-center border-b px-5 gap-2">
-          <span className="text-xs font-bold text-primary uppercase tracking-widest">Admin</span>
-          <span className="text-xs text-muted-foreground">· Saldão</span>
+        <div className="flex h-14 items-center justify-between border-b px-5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-primary uppercase tracking-widest">Admin</span>
+            <span className="text-xs text-muted-foreground">· Saldão</span>
+          </div>
+          <button
+            className="rounded-md p-1 hover:bg-muted md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar menu"
+          >
+            <X className="size-4" />
+          </button>
         </div>
 
         {/* Nav */}
@@ -305,9 +331,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-7xl p-6">{children}</div>
-      </main>
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Mobile top bar */}
+        <div className="flex items-center gap-3 border-b bg-card px-4 py-3 md:hidden">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir menu"
+            className="rounded-md p-1.5 hover:bg-muted transition-colors"
+          >
+            <Menu className="size-5" />
+          </button>
+          <span className="text-sm font-semibold">Admin · Saldão</span>
+        </div>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-7xl p-4 sm:p-6">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

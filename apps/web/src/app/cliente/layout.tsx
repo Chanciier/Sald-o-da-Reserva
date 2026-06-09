@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import {
   LayoutDashboard,
@@ -13,6 +13,8 @@ import {
   User,
   LogOut,
   LayoutGrid,
+  Menu,
+  X,
 } from 'lucide-react';
 
 const NAV = [
@@ -28,12 +30,18 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   if (loading || !user) {
     return (
@@ -45,11 +53,29 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="flex w-60 shrink-0 flex-col border-r bg-card">
-        <div className="flex h-14 items-center border-b px-5 gap-2">
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 shrink-0 flex-col border-r bg-card transition-transform duration-200 md:static md:w-60 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="flex h-14 items-center justify-between border-b px-5">
           <span className="text-xs font-bold text-primary uppercase tracking-widest">
             Minha Conta
           </span>
+          <button
+            className="rounded-md p-1 hover:bg-muted md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar menu"
+          >
+            <X className="size-4" />
+          </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
@@ -96,9 +122,24 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl p-6">{children}</div>
-      </main>
+      {/* Main */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Mobile top bar */}
+        <div className="flex items-center gap-3 border-b bg-card px-4 py-3 md:hidden">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir menu"
+            className="rounded-md p-1.5 hover:bg-muted transition-colors"
+          >
+            <Menu className="size-5" />
+          </button>
+          <span className="text-sm font-semibold">Minha Conta</span>
+        </div>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-5xl p-4 sm:p-6">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
