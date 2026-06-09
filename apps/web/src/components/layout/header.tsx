@@ -144,6 +144,40 @@ export function Header() {
                 </Link>
               </li>
             ))}
+            {user ? (
+              <>
+                <li>
+                  <Link
+                    href="/cliente"
+                    onClick={() => setMobileOpen(false)}
+                    className="block rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    Minha Conta
+                  </Link>
+                </li>
+                <li>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setMobileOpen(false);
+                    }}
+                    className="w-full text-left rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    Sair
+                  </button>
+                </li>
+              </>
+            ) : (
+              <li>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="block rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  Entrar
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
       )}
