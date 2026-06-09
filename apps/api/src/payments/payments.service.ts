@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
+import { MailService } from '../mail/mail.service';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 import type { CreatePaymentDto } from './dto/create-payment.dto';
 import type { CreateCardPaymentDto } from './dto/create-card-payment.dto';
@@ -21,6 +22,7 @@ export class PaymentsService {
     private readonly mp: MercadoPagoService,
     private readonly config: ConfigService,
     private readonly invoiceService: InvoiceService,
+    private readonly mail: MailService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
   }
@@ -313,6 +315,16 @@ export class PaymentsService {
           this.invoiceService
             .emitForOrder(orderId)
             .catch((e) => this.logger.error('Invoice emission failed', e));
+
+          this.prisma.order
+            .findUnique({ where: { id: orderId }, include: { user: true } })
+            .then((o) => {
+              if (o?.user)
+                this.mail
+                  .sendOrderConfirmedEmail(o.user.email, o.user.name, orderId, o.total.toNumber())
+                  .catch((e) => this.logger.error('Order confirmed email failed', e));
+            })
+            .catch(() => {});
         }
         return p;
       });
@@ -383,6 +395,21 @@ export class PaymentsService {
       this.invoiceService
         .emitForOrder(payment.orderId)
         .catch((e) => this.logger.error('Invoice emission failed', e));
+
+      this.prisma.order
+        .findUnique({ where: { id: payment.orderId }, include: { user: true } })
+        .then((o) => {
+          if (o?.user)
+            this.mail
+              .sendOrderConfirmedEmail(
+                o.user.email,
+                o.user.name,
+                payment.orderId,
+                o.total.toNumber(),
+              )
+              .catch((e) => this.logger.error('Order confirmed email failed', e));
+        })
+        .catch(() => {});
     }
 
     return updated;

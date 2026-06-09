@@ -13,9 +13,169 @@ export class MailService {
     const apiKey = this.config.get<string>('RESEND_API_KEY', '');
     this.from = this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@saldaodareserva.com.br');
     this.frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
-    this.resend = apiKey ? new Resend(apiKey) : null;
-    if (!apiKey) this.logger.warn('RESEND_API_KEY não configurado — e-mails apenas logados.');
+    this.resend = apiKey && !apiKey.startsWith('re_REPLACE') ? new Resend(apiKey) : null;
+    if (!this.resend) this.logger.warn('RESEND_API_KEY não configurado — e-mails apenas logados.');
   }
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+
+  async sendPasswordResetEmail(email: string, token: string, name?: string): Promise<void> {
+    const resetUrl = `${this.frontendUrl}/auth/reset-password?token=${token}`;
+    const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
+    const subject = 'Recuperação de senha — Saldão da Reserva';
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:20px;color:#1a1a1a">Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 16px">${greeting}</p>
+          <p style="margin:0 0 24px">Recebemos uma solicitação para redefinir a senha da sua conta. Clique no botão abaixo para continuar:</p>
+          <a href="${resetUrl}" style="display:inline-block;background:#f59e0b;color:#1a1a1a;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700">
+            Redefinir minha senha
+          </a>
+          <p style="margin:24px 0 0;font-size:13px;color:#666">
+            Se você não solicitou isso, ignore este e-mail — sua senha permanece a mesma.<br>
+            O link expira em <strong>1 hora</strong>.
+          </p>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#999">Saldão da Reserva · Este é um e-mail automático, não responda.</p>
+        </div>
+      </div>
+    `;
+
+    await this.send({ to: email, subject, html });
+  }
+
+  // ── Orders ────────────────────────────────────────────────────────────────
+
+  async sendOrderConfirmedEmail(
+    email: string,
+    name: string | null | undefined,
+    orderId: string,
+    total: number,
+  ): Promise<void> {
+    const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
+    const shortId = orderId.slice(-8).toUpperCase();
+    const fmtTotal = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const orderUrl = `${this.frontendUrl}/pedidos/${orderId}`;
+    const subject = `Pedido confirmado #${shortId} — Saldão da Reserva`;
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:20px;color:#1a1a1a">Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 8px">${greeting}</p>
+          <p style="margin:0 0 24px">Recebemos seu pagamento e seu pedido está confirmado! 🎉</p>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:0 0 24px">
+            <p style="margin:0 0 6px;font-size:13px;color:#166534">Número do pedido</p>
+            <p style="margin:0 0 12px;font-size:20px;font-weight:700;color:#15803d">#${shortId}</p>
+            <p style="margin:0;font-size:14px;color:#166534">Total pago: <strong>${fmtTotal}</strong></p>
+          </div>
+          <p style="margin:0 0 16px;font-size:14px;color:#444">Estamos preparando seu pedido. Você receberá um novo e-mail com o código de rastreamento assim que for enviado.</p>
+          <a href="${orderUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600">
+            Acompanhar pedido
+          </a>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#999">Saldão da Reserva · Este é um e-mail automático, não responda.</p>
+        </div>
+      </div>
+    `;
+
+    await this.send({ to: email, subject, html });
+  }
+
+  async sendOrderShippedEmail(
+    email: string,
+    name: string | null | undefined,
+    orderId: string,
+    trackingCode?: string | null,
+    trackingUrl?: string | null,
+  ): Promise<void> {
+    const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
+    const shortId = orderId.slice(-8).toUpperCase();
+    const orderUrl = `${this.frontendUrl}/cliente/rastreamento`;
+    const subject = `Seu pedido foi enviado #${shortId} — Saldão da Reserva`;
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:20px;color:#1a1a1a">Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 8px">${greeting}</p>
+          <p style="margin:0 0 24px">Seu pedido <strong>#${shortId}</strong> foi enviado e está a caminho! 📦</p>
+          ${
+            trackingCode
+              ? `
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:20px;margin:0 0 24px">
+            <p style="margin:0 0 6px;font-size:13px;color:#1d4ed8">Código de rastreamento</p>
+            <p style="margin:0;font-size:18px;font-weight:700;color:#1e40af;letter-spacing:2px">${trackingCode}</p>
+          </div>
+          `
+              : ''
+          }
+          ${
+            trackingUrl
+              ? `<a href="${trackingUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;margin-bottom:16px">
+              Rastrear pelo site dos Correios
+            </a><br>`
+              : ''
+          }
+          <a href="${orderUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600">
+            Ver rastreamento
+          </a>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#999">Saldão da Reserva · Este é um e-mail automático, não responda.</p>
+        </div>
+      </div>
+    `;
+
+    await this.send({ to: email, subject, html });
+  }
+
+  // ── Invoice ───────────────────────────────────────────────────────────────
+
+  async sendInvoiceEmail(
+    email: string,
+    name: string | null | undefined,
+    danfeUrl: string,
+    xmlUrl?: string | null,
+    invoiceNumber?: string | null,
+    accessKey?: string | null,
+  ): Promise<void> {
+    const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
+    const subject = 'Sua Nota Fiscal está disponível — Saldão da Reserva';
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:20px;color:#1a1a1a">Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 8px">${greeting}</p>
+          <p style="margin:0 0 16px">Sua Nota Fiscal Eletrônica foi emitida e autorizada pela SEFAZ.</p>
+          ${invoiceNumber ? `<p style="margin:4px 0"><strong>Número NF-e:</strong> ${invoiceNumber}</p>` : ''}
+          ${accessKey ? `<p style="margin:4px 0;font-size:12px;color:#555;word-break:break-all"><strong>Chave de acesso:</strong> ${accessKey}</p>` : ''}
+          <div style="margin:24px 0;display:flex;gap:8px;flex-wrap:wrap">
+            <a href="${danfeUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600">
+              Baixar DANFE (PDF)
+            </a>
+            ${xmlUrl ? `<a href="${xmlUrl}" style="display:inline-block;background:#444;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600">Baixar XML</a>` : ''}
+          </div>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#999">Saldão da Reserva · Este é um e-mail automático, não responda.</p>
+        </div>
+      </div>
+    `;
+
+    await this.send({ to: email, subject, html });
+  }
+
+  // ── Returns ───────────────────────────────────────────────────────────────
 
   async sendReturnApprovedEmail(
     email: string,
@@ -46,9 +206,7 @@ export class MailService {
             </a>
           </div>
           `
-              : `
-          <p style="margin:16px 0;font-size:14px;color:#666">Nossa equipe entrará em contato com as instruções para envio do produto.</p>
-          `
+              : `<p style="margin:16px 0;font-size:14px;color:#666">Nossa equipe entrará em contato com as instruções para envio do produto.</p>`
           }
           <p style="margin:16px 0 0;font-size:14px;color:#666">Após recebermos o produto, seu reembolso será processado em até 5 dias úteis.</p>
           <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
@@ -100,6 +258,8 @@ export class MailService {
 
     await this.send({ to: email, subject, html });
   }
+
+  // ── Private ───────────────────────────────────────────────────────────────
 
   private async send(opts: { to: string; subject: string; html: string }): Promise<void> {
     if (!this.resend) {

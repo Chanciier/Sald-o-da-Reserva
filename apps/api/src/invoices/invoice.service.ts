@@ -6,10 +6,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
-import { Resend } from 'resend';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { AuthenticatedUser } from '../auth/types/auth.types';
 import { FocusNfeProvider } from './focusnfe.provider';
 import { InvoiceRepository } from './invoice.repository';
@@ -18,19 +17,13 @@ import { QueryInvoiceDto } from './dto/query-invoice.dto';
 @Injectable()
 export class InvoiceService {
   private readonly logger = new Logger(InvoiceService.name);
-  private readonly resend: Resend | null;
-  private readonly fromEmail: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly focus: FocusNfeProvider,
     private readonly repo: InvoiceRepository,
-    private readonly config: ConfigService,
-  ) {
-    const resendKey = this.config.get<string>('RESEND_API_KEY', '');
-    this.resend = resendKey && !resendKey.startsWith('re_REPLACE') ? new Resend(resendKey) : null;
-    this.fromEmail = this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@saldaodareserva.com.br');
-  }
+    private readonly mail: MailService,
+  ) {}
 
   // ── Emit for order (called from payments webhook, idempotent) ─────────────
 
@@ -134,14 +127,16 @@ export class InvoiceService {
       });
 
       if (result.status === 'AUTHORIZED' && result.danfeUrl) {
-        this.sendInvoiceEmail(
-          order.user.email,
-          order.user.name,
-          result.danfeUrl,
-          result.xmlUrl,
-          result.invoiceNumber,
-          result.accessKey,
-        ).catch((e) => this.logger.warn('Email send failed', e));
+        this.mail
+          .sendInvoiceEmail(
+            order.user.email,
+            order.user.name,
+            result.danfeUrl,
+            result.xmlUrl,
+            result.invoiceNumber,
+            result.accessKey,
+          )
+          .catch((e) => this.logger.warn('Invoice email failed', e));
       }
 
       this.logger.log(`Invoice ${invoice.id} emitted → ref=${reference} status=${result.status}`);
@@ -244,14 +239,16 @@ export class InvoiceService {
 
     if (result.status === 'AUTHORIZED' && invoice.status !== 'AUTHORIZED' && result.danfeUrl) {
       const { user } = invoice.order;
-      this.sendInvoiceEmail(
-        user.email,
-        user.name,
-        result.danfeUrl,
-        result.xmlUrl ?? undefined,
-        result.invoiceNumber,
-        result.accessKey,
-      ).catch((e) => this.logger.warn('Email send failed', e));
+      this.mail
+        .sendInvoiceEmail(
+          user.email,
+          user.name,
+          result.danfeUrl,
+          result.xmlUrl ?? undefined,
+          result.invoiceNumber,
+          result.accessKey,
+        )
+        .catch((e) => this.logger.warn('Invoice email failed', e));
     }
 
     return updated;
@@ -330,38 +327,6 @@ export class InvoiceService {
       throw new ForbiddenException('Acesso negado.');
     }
     return invoice;
-  }
-
-  private async sendInvoiceEmail(
-    to: string,
-    name: string | null,
-    danfeUrl: string,
-    xmlUrl?: string | null,
-    invoiceNumber?: string | null,
-    accessKey?: string | null,
-  ) {
-    if (!this.resend) return;
-
-    await this.resend.emails.send({
-      from: this.fromEmail,
-      to,
-      subject: 'Sua Nota Fiscal está disponível – Saldão da Reversa',
-      html: `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#111;">
-          <h2 style="margin-bottom:8px;">Olá${name ? `, ${name.split(' ')[0]}` : ''}!</h2>
-          <p>Sua Nota Fiscal Eletrônica foi emitida e autorizada pela SEFAZ.</p>
-          ${invoiceNumber ? `<p style="margin:4px 0;"><strong>Número NF-e:</strong> ${invoiceNumber}</p>` : ''}
-          ${accessKey ? `<p style="margin:4px 0;font-size:12px;color:#555;word-break:break-all;"><strong>Chave de acesso:</strong> ${accessKey}</p>` : ''}
-          <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
-            <a href="${danfeUrl}" style="display:inline-block;background:#111;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:14px;">
-              Baixar DANFE (PDF)
-            </a>
-            ${xmlUrl ? `<a href="${xmlUrl}" style="display:inline-block;background:#444;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:14px;">Baixar XML</a>` : ''}
-          </div>
-          <p style="margin-top:24px;color:#888;font-size:12px;">Saldão da Reversa</p>
-        </div>
-      `,
-    });
   }
 
   private async audit(action: string, userId?: string, metadata?: object) {

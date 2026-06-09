@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 
 type ShipmentStatus =
   | 'PENDING'
@@ -71,6 +72,7 @@ export class ShippingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly mail: MailService,
   ) {
     const sandbox = this.config.get<string>('MELHOR_ENVIO_SANDBOX', 'true') !== 'false';
     this.token = this.config.get<string>('MELHOR_ENVIO_TOKEN', '');
@@ -511,6 +513,23 @@ export class ShippingService {
           where: { id: shipment.orderId },
           data: { status: newOrderStatus },
         });
+
+        if (newOrderStatus === OrderStatus.SHIPPED) {
+          this.prisma.order
+            .findUnique({ where: { id: shipment.orderId }, include: { user: true } })
+            .then((o) => {
+              if (o?.user)
+                this.mail
+                  .sendOrderShippedEmail(
+                    o.user.email,
+                    o.user.name,
+                    shipment.orderId,
+                    tracking ?? undefined,
+                  )
+                  .catch((e) => this.logger.error('Order shipped email failed', e));
+            })
+            .catch(() => {});
+        }
       }
 
       await tx.auditLog.create({
