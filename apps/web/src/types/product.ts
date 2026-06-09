@@ -32,6 +32,7 @@ export interface Product {
   slug: string;
   sku: string;
   brand: string | null;
+  shortDescription: string | null;
   description: string | null;
   price: number;
   salePrice: number | null;

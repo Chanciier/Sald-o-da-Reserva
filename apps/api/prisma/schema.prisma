@@ -113,6 +113,7 @@ model User {
   products        Product[]
   returnRequests  ReturnRequest[]
   consents        UserConsent[]
+  reviews         Review[]
 
   @@map("users")
 }
@@ -190,6 +191,7 @@ model Product {
   createdBy  User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
   images     Image[]
   orderItems OrderItem[]
+  reviews    Review[]
 
   @@index([categoryId])
   @@index([status])
@@ -485,4 +487,21 @@ model ReturnRequest {
   @@index([userId])
   @@index([status])
   @@map("return_requests")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  userId    String   @map("user_id")
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@map("reviews")
 }

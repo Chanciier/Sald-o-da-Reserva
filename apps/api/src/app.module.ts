@@ -24,6 +24,7 @@ import { ExpedicaoModule } from './expedicao/expedicao.module';
 import { ReturnsModule } from './returns/returns.module';
 import { MailModule } from './mail/mail.module';
 import { ContentModule } from './content/content.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -62,6 +63,7 @@ import { envValidation } from './config/env.validation';
     ReturnsModule,
     MailModule,
     ContentModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [

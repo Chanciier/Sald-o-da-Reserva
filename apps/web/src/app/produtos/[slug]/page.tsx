@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { getProduct } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { AddToCartButton } from '@/components/products/add-to-cart-button';
+import { ProductImages } from '@/components/products/product-images';
+import { ProductReviews } from '@/components/products/product-reviews';
 import type { Metadata } from 'next';
 
 interface PageProps {
@@ -26,8 +28,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const product = await getProduct(params.slug).catch(() => null);
   if (!product) return { title: 'Produto não encontrado' };
   return {
-    title: `${product.name} | Saldão da Reversa`,
-    description: product.description ?? undefined,
+    title: product.name,
+    description: product.shortDescription ?? product.description?.slice(0, 160) ?? undefined,
   };
 }
 
@@ -43,6 +45,7 @@ export default async function ProductPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
+      {/* Breadcrumb */}
       <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/produtos" className="hover:text-foreground">
           Produtos
@@ -62,32 +65,9 @@ export default async function ProductPage({ params }: PageProps) {
         <span className="text-foreground">{product.name}</span>
       </nav>
 
+      {/* Main grid: image + info */}
       <div className="grid gap-8 md:grid-cols-2">
-        {product.images?.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-border bg-muted">
-            <img
-              src={product.images[0].url}
-              alt={product.name}
-              className="h-80 w-full object-contain"
-            />
-            {product.images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto p-2">
-                {product.images.slice(1).map((img) => (
-                  <img
-                    key={img.id}
-                    src={img.url}
-                    alt=""
-                    className="h-16 w-16 shrink-0 rounded-lg object-cover opacity-70 hover:opacity-100"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex h-80 items-center justify-center rounded-xl border border-dashed border-border bg-muted text-muted-foreground">
-            Sem imagem
-          </div>
-        )}
+        <ProductImages images={product.images ?? []} name={product.name} />
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">
@@ -104,6 +84,7 @@ export default async function ProductPage({ params }: PageProps) {
 
           <h1 className="text-2xl font-bold leading-tight">{product.name}</h1>
 
+          {/* Price */}
           <div>
             {hasDiscount ? (
               <div className="flex items-baseline gap-3">
@@ -119,6 +100,14 @@ export default async function ProductPage({ params }: PageProps) {
             )}
           </div>
 
+          {/* Short description */}
+          {product.shortDescription && (
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {product.shortDescription}
+            </p>
+          )}
+
+          {/* Details table */}
           <div className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 text-sm">
             <div>
               <span className="text-muted-foreground">SKU</span>
@@ -145,20 +134,31 @@ export default async function ProductPage({ params }: PageProps) {
             )}
           </div>
 
-          {product.description && (
-            <div>
-              <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Descrição
-              </h2>
-              <p className="whitespace-pre-line text-sm leading-relaxed">{product.description}</p>
-            </div>
-          )}
-
           {product.status === 'ACTIVE' && (
             <AddToCartButton productId={product.id} stock={product.stock} />
           )}
         </div>
       </div>
+
+      {/* Full description — below the grid */}
+      {product.description && (
+        <section className="mt-10 border-t border-border pt-8">
+          <h2 className="mb-4 text-lg font-semibold">Descrição completa</h2>
+          <div
+            className="prose prose-sm max-w-none text-foreground/80
+              [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-foreground
+              [&_h3]:mt-4 [&_h3]:mb-1 [&_h3]:font-medium [&_h3]:text-foreground
+              [&_p]:mb-3 [&_p]:leading-relaxed
+              [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5
+              [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5
+              [&_li]:mb-1 [&_strong]:font-semibold [&_em]:italic"
+            dangerouslySetInnerHTML={{ __html: product.description }}
+          />
+        </section>
+      )}
+
+      {/* Reviews */}
+      <ProductReviews productId={product.id} />
     </main>
   );
 }
