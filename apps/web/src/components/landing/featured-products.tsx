@@ -132,7 +132,7 @@ export function FeaturedProducts() {
       setLoading(false);
       return;
     }
-    fetch(`${apiUrl}/products?limit=12&status=ACTIVE`)
+    fetch(`${apiUrl}/api/v1/products?limit=12&status=ACTIVE`)
       .then((r) => r.json())
       .then((d) => setProducts(d.data ?? d ?? []))
       .catch(() => {})
