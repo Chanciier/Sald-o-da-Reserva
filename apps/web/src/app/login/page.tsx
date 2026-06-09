@@ -1,9 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
+
+function generateCaptcha() {
+  const a = Math.floor(Math.random() * 9) + 1;
+  const b = Math.floor(Math.random() * 9) + 1;
+  return { a, b, answer: a + b };
+}
 
 export default function LoginPage() {
   const { login, register } = useAuth();
@@ -13,16 +19,43 @@ export default function LoginPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [captcha, setCaptcha] = useState(generateCaptcha);
+  const [captchaInput, setCaptchaInput] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
+  useEffect(() => {
+    if (mode === 'register') {
+      setCaptcha(generateCaptcha());
+      setCaptchaInput('');
+    }
+  }, [mode]);
+
+  const passwordMismatch =
+    mode === 'register' && confirmPassword.length > 0 && password !== confirmPassword;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    if (mode === 'register') {
+      if (password !== confirmPassword) {
+        setError('As senhas não coincidem.');
+        return;
+      }
+      if (parseInt(captchaInput, 10) !== captcha.answer) {
+        setError('Resposta incorreta. Tente novamente.');
+        setCaptcha(generateCaptcha());
+        setCaptchaInput('');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       if (mode === 'login') {
@@ -95,42 +128,80 @@ export default function LoginPage() {
             </div>
 
             {mode === 'register' && (
-              <div className="space-y-2">
-                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Confirmar senha</label>
                   <input
-                    type="checkbox"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
-                    className="mt-0.5 accent-primary shrink-0"
+                    minLength={8}
+                    placeholder="••••••••"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm placeholder:text-muted-foreground bg-background focus:outline-none focus:ring-2 focus:ring-ring ${
+                      passwordMismatch ? 'border-destructive' : 'border-input'
+                    }`}
                   />
-                  <span>
-                    Li e aceito os{' '}
-                    <a
-                      href="/termos-de-uso"
-                      target="_blank"
-                      className="text-primary hover:underline"
-                    >
-                      Termos de Uso
-                    </a>
-                  </span>
-                </label>
-                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                  {passwordMismatch && (
+                    <p className="mt-1 text-xs text-destructive">As senhas não coincidem.</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Verificação: quanto é {captcha.a} + {captcha.b}?
+                  </label>
                   <input
-                    type="checkbox"
+                    type="number"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
                     required
-                    checked={privacyAccepted}
-                    onChange={(e) => setPrivacyAccepted(e.target.checked)}
-                    className="mt-0.5 accent-primary shrink-0"
+                    placeholder="Digite o resultado"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
-                  <span>
-                    Li e concordo com a{' '}
-                    <a href="/privacidade" target="_blank" className="text-primary hover:underline">
-                      Política de Privacidade
-                    </a>
-                  </span>
-                </label>
-              </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-0.5 accent-primary shrink-0"
+                    />
+                    <span>
+                      Li e aceito os{' '}
+                      <a
+                        href="/termos-de-uso"
+                        target="_blank"
+                        className="text-primary hover:underline"
+                      >
+                        Termos de Uso
+                      </a>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={privacyAccepted}
+                      onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                      className="mt-0.5 accent-primary shrink-0"
+                    />
+                    <span>
+                      Li e concordo com a{' '}
+                      <a
+                        href="/privacidade"
+                        target="_blank"
+                        className="text-primary hover:underline"
+                      >
+                        Política de Privacidade
+                      </a>
+                    </span>
+                  </label>
+                </div>
+              </>
             )}
 
             {error && (
@@ -141,7 +212,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading || (mode === 'register' && (!termsAccepted || !privacyAccepted))}
+              disabled={
+                loading ||
+                (mode === 'register' && (!termsAccepted || !privacyAccepted || passwordMismatch))
+              }
               className="rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
             >
               {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'}
@@ -154,6 +228,8 @@ export default function LoginPage() {
               onClick={() => {
                 setMode(mode === 'login' ? 'register' : 'login');
                 setError('');
+                setPassword('');
+                setConfirmPassword('');
               }}
               className="font-medium text-primary hover:underline"
             >

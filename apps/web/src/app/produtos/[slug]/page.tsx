@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { AddToCartButton } from '@/components/products/add-to-cart-button';
 import { ProductImages } from '@/components/products/product-images';
 import { ProductReviews } from '@/components/products/product-reviews';
+import { ShareButton } from '@/components/products/share-button';
 import type { Metadata } from 'next';
 
 interface PageProps {
@@ -82,7 +83,10 @@ export default async function ProductPage({ params }: PageProps) {
             </p>
           )}
 
-          <h1 className="text-2xl font-bold leading-tight">{product.name}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-bold leading-tight">{product.name}</h1>
+            <ShareButton title={product.name} text={product.shortDescription} />
+          </div>
 
           {/* Price */}
           <div>
