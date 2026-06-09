@@ -3,5 +3,5 @@ builder = "NIXPACKS"
 buildCommand = "npm install --include=dev && cd apps/api && npx prisma generate && npx nest build"
 
 [deploy]
-startCommand = "sh -c 'find /app -name main.js 2>/dev/null | head -10; node apps/api/dist/main'"
+startCommand = "node apps/api/dist/src/main"
 preDeployCommand = "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma"
