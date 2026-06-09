@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Tag, Menu, X } from 'lucide-react';
 import { useState } from 'react';
@@ -42,15 +43,17 @@ export function Header() {
         {/* Logo */}
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2"
+          className="flex shrink-0 items-center"
           aria-label="Saldão da Reversa - início"
         >
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary font-mono text-base font-black text-primary-foreground">
-            SR
-          </span>
-          <span className="hidden text-lg font-extrabold leading-none tracking-tight text-foreground sm:block">
-            Saldão<span className="text-accent"> da Reversa</span>
-          </span>
+          <Image
+            src="/logo.png"
+            alt="Saldão da Reversa"
+            width={120}
+            height={48}
+            className="h-12 w-auto"
+            priority
+          />
         </Link>
 
         {/* Nav desktop */}
