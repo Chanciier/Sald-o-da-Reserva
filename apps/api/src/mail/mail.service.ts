@@ -259,6 +259,32 @@ export class MailService {
     await this.send({ to: email, subject, html });
   }
 
+  // ── Contact ───────────────────────────────────────────────────────────────
+
+  async sendContactEmail(
+    form: { name: string; email: string; subject: string; message: string },
+    ip?: string,
+  ): Promise<void> {
+    const to = this.config.get<string>('CONTACT_EMAIL', this.from);
+    const subject = `[Contato] ${form.subject}`;
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:18px">Novo contato — Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 8px"><strong>Nome:</strong> ${form.name}</p>
+          <p style="margin:0 0 8px"><strong>E-mail:</strong> ${form.email}</p>
+          <p style="margin:0 0 8px"><strong>Assunto:</strong> ${form.subject}</p>
+          ${ip ? `<p style="margin:0 0 16px;font-size:12px;color:#999">IP: ${ip}</p>` : ''}
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0">
+          <p style="white-space:pre-wrap;margin:0">${form.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+        </div>
+      </div>
+    `;
+    await this.send({ to, subject, html });
+  }
+
   // ── Private ───────────────────────────────────────────────────────────────
 
   private async send(opts: { to: string; subject: string; html: string }): Promise<void> {

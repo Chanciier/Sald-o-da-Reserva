@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ShieldCheck, Truck, Headphones } from 'lucide-react';
 
 const reassurance = [
@@ -78,6 +79,16 @@ export function Footer() {
                   Rastrear pedido
                 </a>
               </li>
+              <li>
+                <Link href="/faq" className="hover:text-foreground">
+                  Perguntas frequentes
+                </Link>
+              </li>
+              <li>
+                <Link href="/contato" className="hover:text-foreground">
+                  Fale conosco
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -88,7 +99,7 @@ export function Footer() {
               <li>Sáb, 9h às 15h</li>
               <li>
                 <a href="mailto:contato@saldaodareserva.com.br" className="hover:text-foreground">
-                  Fale conosco
+                  contato@saldaodareserva.com.br
                 </a>
               </li>
             </ul>
@@ -96,15 +107,33 @@ export function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-center text-xs text-muted-foreground sm:flex-row sm:text-left">
-          <p>© {new Date().getFullYear()} Saldão da Reversa. Todos os direitos reservados.</p>
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-foreground">
+        <div className="mt-10 flex flex-col items-center gap-3 border-t border-border pt-6 text-center text-xs text-muted-foreground sm:gap-2">
+          <p>© {new Date().getFullYear()} Saldão da Reserva. Todos os direitos reservados.</p>
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+            <Link href="/termos-de-uso" className="hover:text-foreground">
+              Termos de Uso
+            </Link>
+            <Link href="/privacidade" className="hover:text-foreground">
               Privacidade
-            </a>
-            <a href="#" className="hover:text-foreground">
-              Termos
-            </a>
+            </Link>
+            <Link href="/cookies" className="hover:text-foreground">
+              Cookies
+            </Link>
+            <Link href="/trocas-e-devolucoes" className="hover:text-foreground">
+              Trocas e Devoluções
+            </Link>
+            <Link href="/entregas" className="hover:text-foreground">
+              Entregas
+            </Link>
+            <Link href="/sobre" className="hover:text-foreground">
+              Sobre Nós
+            </Link>
+            <Link href="/contato" className="hover:text-foreground">
+              Contato
+            </Link>
+            <Link href="/faq" className="hover:text-foreground">
+              FAQ
+            </Link>
           </div>
         </div>
       </div>

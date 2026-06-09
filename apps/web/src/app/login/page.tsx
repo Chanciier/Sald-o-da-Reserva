@@ -13,8 +13,12 @@ export default function LoginPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,6 +29,14 @@ export default function LoginPage() {
         await login(email, password);
       } else {
         await register(name, email, password);
+        const accessToken = localStorage.getItem('saldao:access');
+        if (accessToken) {
+          fetch(`${API}/api/v1/content/consent`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ types: ['TERMS', 'PRIVACY'], documentVersion: 1 }),
+          }).catch(() => {});
+        }
       }
       router.push('/');
     } catch (err) {
@@ -82,6 +94,45 @@ export default function LoginPage() {
               />
             </div>
 
+            {mode === 'register' && (
+              <div className="space-y-2">
+                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="mt-0.5 accent-primary shrink-0"
+                  />
+                  <span>
+                    Li e aceito os{' '}
+                    <a
+                      href="/termos-de-uso"
+                      target="_blank"
+                      className="text-primary hover:underline"
+                    >
+                      Termos de Uso
+                    </a>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={privacyAccepted}
+                    onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                    className="mt-0.5 accent-primary shrink-0"
+                  />
+                  <span>
+                    Li e concordo com a{' '}
+                    <a href="/privacidade" target="_blank" className="text-primary hover:underline">
+                      Política de Privacidade
+                    </a>
+                  </span>
+                </label>
+              </div>
+            )}
+
             {error && (
               <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
@@ -90,7 +141,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (mode === 'register' && (!termsAccepted || !privacyAccepted))}
               className="rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
             >
               {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'}

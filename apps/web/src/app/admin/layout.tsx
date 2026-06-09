@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Menu,
   X,
+  FileText,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -124,6 +125,14 @@ const NAV: NavItem[] = [
       { href: '/admin/configuracoes?tab=integracoes', label: 'Integrações' },
       { href: '/admin/configuracoes?tab=seguranca', label: 'Segurança' },
       { href: '/admin/configuracoes?tab=sistema', label: 'Sistema' },
+    ],
+  },
+  {
+    label: 'Conteúdo',
+    icon: FileText,
+    children: [
+      { href: '/admin/conteudo/paginas', label: 'Páginas Jurídicas' },
+      { href: '/admin/conteudo/faq', label: 'FAQ' },
     ],
   },
   {

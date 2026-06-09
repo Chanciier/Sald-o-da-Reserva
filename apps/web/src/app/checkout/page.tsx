@@ -95,6 +95,8 @@ export default function CheckoutPage() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('PIX');
   const [cepLoading, setCepLoading] = useState(false);
   const [shippingLoading, setShippingLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [returnsAccepted, setReturnsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const lastQuotedCep = useRef('');
@@ -195,7 +197,7 @@ export default function CheckoutPage() {
   const shippingCost = isPickup ? 0 : (selectedShipping?.price ?? 0);
   const total = (cart?.total ?? 0) + shippingCost;
 
-  const canSubmit = isPickup ? true : !!selectedShipping;
+  const canSubmit = (isPickup ? true : !!selectedShipping) && termsAccepted && returnsAccepted;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -567,6 +569,47 @@ export default function CheckoutPage() {
                   </span>
                 </div>
               )}
+
+              <div className="space-y-2 border-t border-border pt-3">
+                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="mt-0.5 accent-primary shrink-0"
+                  />
+                  <span>
+                    Li e concordo com os{' '}
+                    <a
+                      href="/termos-de-uso"
+                      target="_blank"
+                      className="text-primary hover:underline"
+                    >
+                      Termos de Uso
+                    </a>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={returnsAccepted}
+                    onChange={(e) => setReturnsAccepted(e.target.checked)}
+                    className="mt-0.5 accent-primary shrink-0"
+                  />
+                  <span>
+                    Li e concordo com a{' '}
+                    <a
+                      href="/trocas-e-devolucoes"
+                      target="_blank"
+                      className="text-primary hover:underline"
+                    >
+                      Política de Trocas e Devoluções
+                    </a>
+                  </span>
+                </label>
+              </div>
 
               {error && (
                 <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">

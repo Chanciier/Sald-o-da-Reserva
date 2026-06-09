@@ -112,6 +112,7 @@ model User {
   orders          Order[]
   products        Product[]
   returnRequests  ReturnRequest[]
+  consents        UserConsent[]
 
   @@map("users")
 }
@@ -414,6 +415,47 @@ model Invoice {
   @@index([focusReference])
   @@index([status])
   @@map("invoices")
+}
+
+model LegalPage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String   @db.Text
+  published Boolean  @default(false)
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("legal_pages")
+}
+
+model Faq {
+  id        String   @id @default(cuid())
+  category  String
+  question  String
+  answer    String   @db.Text
+  position  Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("faqs")
+}
+
+model UserConsent {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  type            String
+  documentVersion Int      @default(1) @map("document_version")
+  ipAddress       String?  @map("ip_address")
+  acceptedAt      DateTime @default(now()) @map("accepted_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_consents")
 }
 
 model ReturnRequest {

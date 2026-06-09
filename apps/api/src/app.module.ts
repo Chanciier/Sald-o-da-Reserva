@@ -23,6 +23,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { ExpedicaoModule } from './expedicao/expedicao.module';
 import { ReturnsModule } from './returns/returns.module';
 import { MailModule } from './mail/mail.module';
+import { ContentModule } from './content/content.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -60,6 +61,7 @@ import { envValidation } from './config/env.validation';
     ExpedicaoModule,
     ReturnsModule,
     MailModule,
+    ContentModule,
   ],
   controllers: [AppController],
   providers: [

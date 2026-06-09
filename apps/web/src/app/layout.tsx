@@ -7,12 +7,25 @@ import { CartProvider } from '@/contexts/cart-context';
 import { QueryProvider } from '@/providers/query-provider';
 import { ConditionalHeader } from '@/components/layout/conditional-header';
 import { ConditionalFooter } from '@/components/layout/conditional-footer';
+import { CookieBanner } from '@/components/cookie-banner';
 
 const inter = Inter({ subsets: ['latin'] });
 
+const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://saldaodareserva.com.br';
+
 export const metadata: Metadata = {
-  title: 'Saldão da Reversa',
-  description: 'Plataforma de vendas Saldão da Reversa',
+  title: { default: 'Saldão da Reserva', template: '%s — Saldão da Reserva' },
+  description:
+    'Produtos de logística reversa revisados e garantidos com economia de até 80%. Frete grátis acima de R$ 300 e entrega para todo o Brasil.',
+  metadataBase: new URL(BASE),
+  openGraph: {
+    type: 'website',
+    siteName: 'Saldão da Reserva',
+    title: 'Saldão da Reserva',
+    description: 'Produtos revisados com até 80% de desconto. Compra segura, NF-e e frete grátis.',
+    locale: 'pt_BR',
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
@@ -29,6 +42,7 @@ export default function RootLayout({
               <ConditionalHeader />
               {children}
               <ConditionalFooter />
+              <CookieBanner />
             </CartProvider>
           </AuthProvider>
         </QueryProvider>
