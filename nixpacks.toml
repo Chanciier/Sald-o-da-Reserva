@@ -5,4 +5,4 @@ nixPkgs = ["nodejs_20"]
 cmds = []
 
 [phases.build]
-cmds = ["cd ../.. && npm install && npm run build -w apps/api"]
+cmds = ["npm install && npm run build -w apps/api"]

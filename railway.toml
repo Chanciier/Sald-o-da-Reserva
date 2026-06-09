@@ -1,0 +1,7 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install && npm run build -w apps/api"
+
+[deploy]
+startCommand = "node apps/api/dist/main"
+preDeployCommand = "cd apps/api && npx prisma migrate deploy"
