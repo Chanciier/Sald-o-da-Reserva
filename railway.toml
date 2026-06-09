@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build -w apps/api"
+buildCommand = "npm install --include=dev && npm run build -w apps/api"
 
 [deploy]
 startCommand = "node apps/api/dist/main"
