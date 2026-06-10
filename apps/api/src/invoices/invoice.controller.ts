@@ -8,7 +8,9 @@ import {
   Param,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { InvoiceService } from './invoice.service';
 import { QueryInvoiceDto } from './dto/query-invoice.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -85,8 +87,28 @@ export class InvoiceController {
 
   @Get(':id/danfe')
   @Roles('ADMIN', 'VENDEDOR')
-  getDanfe(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.invoiceService.getDanfeUrl(id, user);
+  async getDanfe(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.invoiceService.streamDanfe(id, user);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="danfe.pdf"');
+    res.send(buffer);
+  }
+
+  @Get(':id/xml/download')
+  @Roles('ADMIN', 'VENDEDOR')
+  async getXmlDownload(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.invoiceService.streamXml(id, user);
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Disposition', 'attachment; filename="nfe.xml"');
+    res.send(buffer);
   }
 
   // ── Sync ──────────────────────────────────────────────────────────────────

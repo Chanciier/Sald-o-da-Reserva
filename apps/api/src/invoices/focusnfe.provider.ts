@@ -172,8 +172,30 @@ export class FocusNfeProvider implements InvoiceProvider {
     return this.request<string>('GET', `/nfe/${encodeURIComponent(reference)}/xml`);
   }
 
-  async downloadDanfe(reference: string): Promise<string> {
-    return this.request<string>('GET', `/nfe/${encodeURIComponent(reference)}/danfe`);
+  async downloadDanfe(reference: string): Promise<Buffer> {
+    const url = `${this.baseUrl}/nfe/${encodeURIComponent(reference)}/danfe`;
+    const res = await fetch(url, {
+      headers: { Authorization: this.authHeader },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`FocusNFe DANFE → HTTP ${res.status}: ${text}`);
+    }
+    return Buffer.from(await res.arrayBuffer());
+  }
+
+  async downloadXmlBuffer(reference: string): Promise<Buffer> {
+    const url = `${this.baseUrl}/nfe/${encodeURIComponent(reference)}/xml`;
+    const res = await fetch(url, {
+      headers: { Authorization: this.authHeader },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`FocusNFe XML → HTTP ${res.status}: ${text}`);
+    }
+    return Buffer.from(await res.arrayBuffer());
   }
 
   async syncStatus(reference: string): Promise<IssuedInvoice> {

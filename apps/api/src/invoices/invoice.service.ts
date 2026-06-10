@@ -274,6 +274,22 @@ export class InvoiceService {
     return { url: invoice.danfeUrl };
   }
 
+  async streamDanfe(invoiceId: string, user: AuthenticatedUser): Promise<Buffer> {
+    const invoice = await this.getWithAccess(invoiceId, user);
+    if (!invoice.focusReference) throw new NotFoundException('Nota sem referência Focus NFe.');
+    if (!this.focus.isConfigured()) throw new BadRequestException('Focus NFe não configurado.');
+    await this.audit('INVOICE_DOWNLOAD_DANFE', user.id, { invoiceId });
+    return this.focus.downloadDanfe(invoice.focusReference);
+  }
+
+  async streamXml(invoiceId: string, user: AuthenticatedUser): Promise<Buffer> {
+    const invoice = await this.getWithAccess(invoiceId, user);
+    if (!invoice.focusReference) throw new NotFoundException('Nota sem referência Focus NFe.');
+    if (!this.focus.isConfigured()) throw new BadRequestException('Focus NFe não configurado.');
+    await this.audit('INVOICE_DOWNLOAD_XML', user.id, { invoiceId });
+    return this.focus.downloadXmlBuffer(invoice.focusReference);
+  }
+
   // ── Queries ───────────────────────────────────────────────────────────────
 
   async findAll(query: QueryInvoiceDto, user: AuthenticatedUser) {

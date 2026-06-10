@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FileText, Tag, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
-import { fetchInvoices, emitInvoice, reemitInvoice, syncInvoice } from '@/actions/invoices';
+import { fetchInvoices, emitInvoice, reemitInvoice } from '@/actions/invoices';
 import { purchaseLabel } from '@/lib/shipping';
 import { marcarPronto, confirmarRetirada, cancelarPedido } from '@/actions/expedicao';
 import type { Order } from '@/types/order';
@@ -98,23 +98,25 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     onError: (e: Error) => setInvoiceError(e.message),
   });
 
+  const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
+
   async function openDanfe() {
     setInvoiceError('');
     setDanfePending(true);
     try {
-      let url = invoice?.danfeUrl;
-      if (!url) {
-        const updated = await syncInvoice(token!, invoice!.id);
-        await refetchInvoice();
-        url = updated.danfeUrl ?? null;
+      const res = await fetch(`${API_BASE}/invoices/${invoice!.id}/danfe`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { message?: string }).message ?? `Erro HTTP ${res.status}`);
       }
-      if (url) {
-        window.open(url, '_blank');
-      } else {
-        setInvoiceError('URL do DANFE ainda não disponível. Aguarde e tente novamente.');
-      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
-      setInvoiceError(e instanceof Error ? e.message : 'Erro ao buscar DANFE');
+      setInvoiceError(e instanceof Error ? e.message : 'Erro ao baixar DANFE');
     } finally {
       setDanfePending(false);
     }
@@ -124,19 +126,22 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     setInvoiceError('');
     setDanfePending(true);
     try {
-      let url = invoice?.xmlUrl;
-      if (!url) {
-        const updated = await syncInvoice(token!, invoice!.id);
-        await refetchInvoice();
-        url = updated.xmlUrl ?? null;
+      const res = await fetch(`${API_BASE}/invoices/${invoice!.id}/xml/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { message?: string }).message ?? `Erro HTTP ${res.status}`);
       }
-      if (url) {
-        window.open(url, '_blank');
-      } else {
-        setInvoiceError('URL do XML ainda não disponível. Aguarde e tente novamente.');
-      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'nfe.xml';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
-      setInvoiceError(e instanceof Error ? e.message : 'Erro ao buscar XML');
+      setInvoiceError(e instanceof Error ? e.message : 'Erro ao baixar XML');
     } finally {
       setDanfePending(false);
     }
