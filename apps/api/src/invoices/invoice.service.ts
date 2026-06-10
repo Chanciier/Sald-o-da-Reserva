@@ -100,6 +100,10 @@ export class InvoiceService {
               }
             : undefined,
         },
+        isPickup: order.deliveryMethod === 'PICKUP' || !!order.pickupCode,
+        customerState: (address?.state ?? (address as Record<string, string> | null)?.estado) as
+          | string
+          | undefined,
         items: order.items.map((item) => ({
           sku: item.sku,
           name: item.name,
@@ -107,7 +111,7 @@ export class InvoiceService {
           unitPrice: Number(item.price),
           total: Number(item.subtotal),
           ncm: item.product?.ncm ?? undefined,
-          cfop: item.product?.cfop ?? undefined,
+          cfopOverride: item.product?.cfop ?? undefined,
           icmsOrigem: item.product?.origem ?? undefined,
           icmsSituacaoTributaria: item.product?.cstCsosn ?? undefined,
         })),

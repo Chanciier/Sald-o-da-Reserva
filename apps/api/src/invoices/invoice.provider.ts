@@ -22,7 +22,7 @@ export interface InvoiceItemPayload {
   sku: string;
   name: string;
   ncm?: string;
-  cfop?: string;
+  cfopOverride?: string;
   icmsOrigem?: number;
   icmsSituacaoTributaria?: string;
   quantity: number;
@@ -55,6 +55,8 @@ export interface InvoicePayload {
   freight?: number;
   discount?: number;
   additionalInfo?: string;
+  isPickup?: boolean;
+  customerState?: string;
 }
 
 export interface InvoiceProvider {

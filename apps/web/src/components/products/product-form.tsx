@@ -65,7 +65,6 @@ const schema = z.object({
   metaDescription: z.string().max(500).optional(),
   ncm: z.string().max(20).optional(),
   origem: z.coerce.number().int().min(0).max(8).optional(),
-  cfop: z.string().max(10).optional(),
   cstCsosn: z.string().max(10).optional(),
 });
 
@@ -99,6 +98,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
   const [ncmResults, setNcmResults] = useState<{ codigo: string; descricao: string }[]>([]);
   const [ncmSearching, setNcmSearching] = useState(false);
   const ncmDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ncmNameDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     data: categoriesData,
@@ -157,8 +157,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           metaDescription: initialData.metaDescription ?? '',
           ncm: initialData.ncm ?? '',
           origem: initialData.origem ?? 0,
-          cfop: initialData.cfop ?? '',
-          cstCsosn: initialData.cstCsosn ?? '',
+          cstCsosn: initialData.cstCsosn ?? '102',
         }
       : {
           status: 'ACTIVE',
@@ -167,11 +166,13 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           pickupAvailable: false,
           featuredOffer: false,
           sku: generateSku(),
+          cstCsosn: '102',
         },
   });
 
   const nameValue = watch('name');
   const categoryIdValue = watch('categoryId');
+  const ncmValue = watch('ncm');
 
   useEffect(() => {
     if (!slugManual && nameValue) {
@@ -196,6 +197,26 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
     const cat = categories.find((c) => c.id === categoryIdValue);
     if (cat) setValue('ncm', cat.ncm ?? '');
   }, [categoryIdValue, categories, setValue, initialData?.ncm]);
+
+  // Auto-search NCM from product name when NCM is empty and manual search is idle
+  useEffect(() => {
+    if (ncmValue || ncmQuery || !nameValue || nameValue.length < 3) return;
+    if (ncmNameDebounce.current) clearTimeout(ncmNameDebounce.current);
+    ncmNameDebounce.current = setTimeout(async () => {
+      setNcmSearching(true);
+      try {
+        const res = await fetch(
+          `https://brasilapi.com.br/api/ncm/v1?search=${encodeURIComponent(nameValue)}`,
+        );
+        if (res.ok) setNcmResults((await res.json()).slice(0, 8));
+      } finally {
+        setNcmSearching(false);
+      }
+    }, 800);
+    return () => {
+      if (ncmNameDebounce.current) clearTimeout(ncmNameDebounce.current);
+    };
+  }, [nameValue, ncmValue, ncmQuery]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -279,7 +300,6 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       metaDescription: data.metaDescription || undefined,
       ncm: data.ncm || undefined,
       origem: data.origem ?? 0,
-      cfop: data.cfop || undefined,
       cstCsosn: data.cstCsosn || undefined,
       imageIds: images.map((i) => i.id),
     };
@@ -718,15 +738,15 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               <input
                 {...register('ncm')}
                 className={inputCls}
-                placeholder="Herdado da categoria"
+                placeholder="Preenchido automaticamente"
                 maxLength={20}
               />
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Preenchido automaticamente pela categoria
+                Buscado pelo nome do produto ou herdado da categoria
               </p>
             </div>
             <div className="relative">
-              <label className={labelCls}>Buscar NCM por descrição</label>
+              <label className={labelCls}>Buscar NCM manualmente</label>
               <div className="relative flex items-center">
                 <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <input
@@ -802,24 +822,10 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               </select>
             </div>
             <div>
-              <label className={labelCls}>CFOP</label>
-              <select {...register('cfop')} className={inputCls}>
-                <option value="">Padrão (5102)</option>
-                <option value="5102">5102 – Venda mercadoria (dentro do estado)</option>
-                <option value="6102">6102 – Venda mercadoria (fora do estado)</option>
-                <option value="5405">5405 – Venda c/ substituição tributária (dentro)</option>
-                <option value="6404">6404 – Venda c/ substituição tributária (fora)</option>
-                <option value="5949">5949 – Outra saída (dentro)</option>
-                <option value="6949">6949 – Outra saída (fora)</option>
-              </select>
-              <p className="mt-0.5 text-xs text-muted-foreground">Se vazio, usa 5102 como padrão</p>
-            </div>
-            <div>
               <label className={labelCls}>CSOSN / CST</label>
               <select {...register('cstCsosn')} className={inputCls}>
-                <option value="">Padrão (102)</option>
                 <optgroup label="Simples Nacional (CSOSN)">
-                  <option value="102">102 – Tributada SN s/ crédito</option>
+                  <option value="102">102 – Tributada SN s/ crédito (padrão)</option>
                   <option value="103">103 – Isenção SN (faixa de receita)</option>
                   <option value="300">300 – Imune</option>
                   <option value="400">400 – Não tributada pelo SN</option>
@@ -836,7 +842,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                 </optgroup>
               </select>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Se vazio, usa 102 (Simples Nacional)
+                CFOP definido automaticamente: 5102 (mesmo estado / retirada) ou 6102 (outro estado)
               </p>
             </div>
           </div>

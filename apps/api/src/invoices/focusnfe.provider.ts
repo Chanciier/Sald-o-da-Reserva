@@ -308,8 +308,29 @@ export class FocusNfeProvider implements InvoiceProvider {
     return map[method] ?? '99'; // 99 = outros
   }
 
+  private resolveCfop(
+    item: { cfopOverride?: string },
+    isPickup: boolean,
+    customerState?: string,
+  ): string {
+    if (item.cfopOverride) return item.cfopOverride;
+    if (isPickup) return '5102';
+    const dest = (customerState ?? '').toUpperCase().trim();
+    const emit = this.uf.toUpperCase().trim();
+    return dest && dest !== emit ? '6102' : '5102';
+  }
+
   private buildNfePayload(payload: InvoicePayload, isoDt: string): Record<string, unknown> {
-    const { customer, items, total, freight = 0, discount = 0, additionalInfo } = payload;
+    const {
+      customer,
+      items,
+      total,
+      freight = 0,
+      discount = 0,
+      additionalInfo,
+      isPickup = false,
+      customerState,
+    } = payload;
 
     const valorProdutos = items.reduce((s, i) => s + i.total, 0);
 
@@ -368,7 +389,7 @@ export class FocusNfeProvider implements InvoiceProvider {
         numero_item: idx + 1,
         codigo_produto: item.sku,
         descricao: item.name,
-        cfop: item.cfop || '5102',
+        cfop: this.resolveCfop(item, isPickup, customerState),
         codigo_ncm: (item.ncm?.replace(/\D/g, '') || this.defaultNcm).padStart(8, '0').slice(0, 8),
         unidade_comercial: item.unit ?? 'UN',
         quantidade_comercial: item.quantity,
