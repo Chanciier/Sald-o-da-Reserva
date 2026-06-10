@@ -52,7 +52,7 @@ export function Header() {
               alt="Saldão da Reversa"
               width={140}
               height={56}
-              className="h-14 w-auto"
+              className="h-14 w-auto rounded-xl"
               priority
             />
           </Link>
