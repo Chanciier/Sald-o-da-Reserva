@@ -23,6 +23,8 @@ export interface InvoiceItemPayload {
   name: string;
   ncm?: string;
   cfop?: string;
+  icmsOrigem?: number;
+  icmsSituacaoTributaria?: string;
   quantity: number;
   unit?: string;
   unitPrice: number;

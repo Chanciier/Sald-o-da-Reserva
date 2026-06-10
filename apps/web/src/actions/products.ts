@@ -44,6 +44,9 @@ export interface Product {
   metaTitle: string | null;
   metaDescription: string | null;
   ncm: string | null;
+  origem: number | null;
+  cfop: string | null;
+  cstCsosn: string | null;
   categoryId: string | null;
   createdById: string | null;
   createdAt: string;

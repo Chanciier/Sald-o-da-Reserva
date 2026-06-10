@@ -1,0 +1,3 @@
+ALTER TABLE "products" ADD COLUMN "origem" INTEGER DEFAULT 0;
+ALTER TABLE "products" ADD COLUMN "cfop" VARCHAR(10);
+ALTER TABLE "products" ADD COLUMN "cst_csosn" VARCHAR(10);

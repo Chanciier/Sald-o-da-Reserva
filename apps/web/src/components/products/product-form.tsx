@@ -64,6 +64,9 @@ const schema = z.object({
   metaTitle: z.string().max(200).optional(),
   metaDescription: z.string().max(500).optional(),
   ncm: z.string().max(20).optional(),
+  origem: z.coerce.number().int().min(0).max(8).optional(),
+  cfop: z.string().max(10).optional(),
+  cstCsosn: z.string().max(10).optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -153,6 +156,9 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           metaTitle: initialData.metaTitle ?? '',
           metaDescription: initialData.metaDescription ?? '',
           ncm: initialData.ncm ?? '',
+          origem: initialData.origem ?? 0,
+          cfop: initialData.cfop ?? '',
+          cstCsosn: initialData.cstCsosn ?? '',
         }
       : {
           status: 'ACTIVE',
@@ -272,6 +278,9 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       metaTitle: data.metaTitle || undefined,
       metaDescription: data.metaDescription || undefined,
       ncm: data.ncm || undefined,
+      origem: data.origem ?? 0,
+      cfop: data.cfop || undefined,
+      cstCsosn: data.cstCsosn || undefined,
       imageIds: images.map((i) => i.id),
     };
     await onSubmit(payload);
@@ -772,6 +781,63 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                   ))}
                 </ul>
               )}
+            </div>
+          </div>
+
+          {/* Fiscal */}
+          <div className={cardCls}>
+            <h2 className="text-sm font-semibold">Dados Fiscais (NF-e)</h2>
+            <div>
+              <label className={labelCls}>Origem</label>
+              <select {...register('origem')} className={inputCls}>
+                <option value={0}>0 – Nacional</option>
+                <option value={1}>1 – Estrangeira (importação direta)</option>
+                <option value={2}>2 – Estrangeira (mercado interno)</option>
+                <option value={3}>3 – Nacional (import. &gt; 40% e ≤ 70%)</option>
+                <option value={4}>4 – Nacional (processo básico)</option>
+                <option value={5}>5 – Nacional (import. ≤ 40%)</option>
+                <option value={6}>6 – Estrangeira direta s/ similar nacional</option>
+                <option value={7}>7 – Estrangeira interna s/ similar nacional</option>
+                <option value={8}>8 – Nacional (import. &gt; 70%)</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>CFOP</label>
+              <select {...register('cfop')} className={inputCls}>
+                <option value="">Padrão (5102)</option>
+                <option value="5102">5102 – Venda mercadoria (dentro do estado)</option>
+                <option value="6102">6102 – Venda mercadoria (fora do estado)</option>
+                <option value="5405">5405 – Venda c/ substituição tributária (dentro)</option>
+                <option value="6404">6404 – Venda c/ substituição tributária (fora)</option>
+                <option value="5949">5949 – Outra saída (dentro)</option>
+                <option value="6949">6949 – Outra saída (fora)</option>
+              </select>
+              <p className="mt-0.5 text-xs text-muted-foreground">Se vazio, usa 5102 como padrão</p>
+            </div>
+            <div>
+              <label className={labelCls}>CSOSN / CST</label>
+              <select {...register('cstCsosn')} className={inputCls}>
+                <option value="">Padrão (102)</option>
+                <optgroup label="Simples Nacional (CSOSN)">
+                  <option value="102">102 – Tributada SN s/ crédito</option>
+                  <option value="103">103 – Isenção SN (faixa de receita)</option>
+                  <option value="300">300 – Imune</option>
+                  <option value="400">400 – Não tributada pelo SN</option>
+                  <option value="500">500 – ICMS por substituição tributária</option>
+                  <option value="900">900 – Outros (SN)</option>
+                </optgroup>
+                <optgroup label="Regime Normal (CST)">
+                  <option value="00">00 – Tributada integralmente</option>
+                  <option value="10">10 – Trib. + cobrança ST</option>
+                  <option value="20">20 – Com redução de base</option>
+                  <option value="40">40 – Isenta</option>
+                  <option value="41">41 – Não tributada</option>
+                  <option value="60">60 – ICMS cobrado p/ ST</option>
+                </optgroup>
+              </select>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Se vazio, usa 102 (Simples Nacional)
+              </p>
             </div>
           </div>
 

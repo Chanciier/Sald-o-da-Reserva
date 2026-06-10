@@ -124,6 +124,22 @@ export class CreateProductDto {
   ncm?: string;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  origem?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  cfop?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  cstCsosn?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   imageIds?: string[];
