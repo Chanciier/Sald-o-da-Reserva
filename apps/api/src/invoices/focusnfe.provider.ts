@@ -282,6 +282,14 @@ export class FocusNfeProvider implements InvoiceProvider {
         icms_origem: 0,
         icms_situacao_tributaria: '102',
         incluir_no_total: 1,
+        pis_situacao_tributaria: '07',
+        pis_base_calculo: 0,
+        pis_aliquota_porcentual: 0,
+        pis_valor: 0,
+        cofins_situacao_tributaria: '07',
+        cofins_base_calculo: 0,
+        cofins_aliquota_porcentual: 0,
+        cofins_valor: 0,
       })),
 
       // Totals
