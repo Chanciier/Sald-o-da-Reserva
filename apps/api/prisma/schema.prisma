@@ -99,6 +99,7 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String?
+  cpf          String?  @map("cpf")
   passwordHash String   @map("password_hash")
   role         Role     @default(CLIENTE)
   isActive     Boolean  @default(true) @map("is_active")

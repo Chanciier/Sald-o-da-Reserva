@@ -12,6 +12,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+
 import { Type } from 'class-transformer';
 import { DeliveryMethod } from '@prisma/client';
 
@@ -106,4 +107,9 @@ export class CreateOrderDto {
   @IsString()
   @MaxLength(500)
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{11}$/, { message: 'CPF deve conter 11 dígitos numéricos.' })
+  cpf?: string;
 }

@@ -188,6 +188,10 @@ export class CheckoutService {
 
     await this.cartService.clearCart(userId);
 
+    if (dto.cpf) {
+      await this.prisma.user.update({ where: { id: userId }, data: { cpf: dto.cpf } });
+    }
+
     return serializeOrder(order as unknown as Record<string, unknown>);
   }
 

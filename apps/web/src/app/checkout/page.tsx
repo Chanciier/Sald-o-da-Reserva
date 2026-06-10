@@ -16,6 +16,14 @@ function formatBRL(n: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 }
 
+function formatCpf(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
 interface AddressForm {
   name: string;
   cep: string;
@@ -97,6 +105,7 @@ export default function CheckoutPage() {
   const [shippingLoading, setShippingLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [returnsAccepted, setReturnsAccepted] = useState(false);
+  const [cpf, setCpf] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const lastQuotedCep = useRef('');
@@ -205,8 +214,16 @@ export default function CheckoutPage() {
     setError('');
     setSubmitting(true);
     try {
+      const cleanCpf = cpf.replace(/\D/g, '');
+      if (cleanCpf.length !== 11) {
+        setError('Informe um CPF válido.');
+        setSubmitting(false);
+        return;
+      }
+
       const order = await createOrder(token, {
         deliveryMethod,
+        cpf: cleanCpf,
         ...(isPickup
           ? {}
           : {
@@ -317,6 +334,26 @@ export default function CheckoutPage() {
                   Você receberá uma notificação quando seu pedido estiver pronto para retirada.
                 </div>
               )}
+            </section>
+
+            {/* CPF — required for NF-e and shipping label */}
+            <section className="rounded-xl border border-border p-5 space-y-3">
+              <h2 className="font-semibold">Dados do comprador</h2>
+              <div>
+                <label className="mb-1 block text-sm font-medium">CPF do titular da compra</label>
+                <input
+                  required
+                  value={cpf}
+                  onChange={(e) => setCpf(formatCpf(e.target.value))}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                  inputMode="numeric"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Necessário para emissão de nota fiscal.
+                </p>
+              </div>
             </section>
 
             {/* Shipping address — hidden for PICKUP */}

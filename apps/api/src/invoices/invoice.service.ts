@@ -82,6 +82,7 @@ export class InvoiceService {
         customer: {
           name: order.user.name ?? order.user.email,
           email: order.user.email,
+          cpf: order.user.cpf ?? undefined,
           address: address?.cep
             ? {
                 cep: address.cep,
