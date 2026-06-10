@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FileText, Tag, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
-import { fetchInvoices, emitInvoice, reemitInvoice } from '@/actions/invoices';
+import { fetchInvoices, emitInvoice, reemitInvoice, syncInvoice } from '@/actions/invoices';
 import { purchaseLabel } from '@/lib/shipping';
 import { marcarPronto, confirmarRetirada, cancelarPedido } from '@/actions/expedicao';
 import type { Order } from '@/types/order';
@@ -96,6 +96,32 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     },
     onError: (e: Error) => setInvoiceError(e.message),
   });
+
+  const syncMutation = useMutation({
+    mutationFn: () => syncInvoice(token!, invoice!.id),
+    onSuccess: () => refetchInvoice(),
+    onError: (e: Error) => setInvoiceError(e.message),
+  });
+
+  async function openDanfe() {
+    if (invoice?.danfeUrl) {
+      window.open(invoice.danfeUrl, '_blank');
+      return;
+    }
+    const updated = await syncInvoice(token!, invoice!.id);
+    await refetchInvoice();
+    if (updated.danfeUrl) window.open(updated.danfeUrl, '_blank');
+  }
+
+  async function openXml() {
+    if (invoice?.xmlUrl) {
+      window.open(invoice.xmlUrl, '_blank');
+      return;
+    }
+    const updated = await syncInvoice(token!, invoice!.id);
+    await refetchInvoice();
+    if (updated.xmlUrl) window.open(updated.xmlUrl, '_blank');
+  }
 
   const labelMutation = useMutation({
     mutationFn: () => purchaseLabel(params.id, token!),
@@ -270,27 +296,21 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                   </span>
                 )}
               </div>
-              <div className="flex gap-2">
-                {invoice.danfeUrl && (
-                  <a
-                    href={invoice.danfeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
-                  >
-                    Imprimir DANFE
-                  </a>
-                )}
-                {invoice.xmlUrl && (
-                  <a
-                    href={invoice.xmlUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
-                  >
-                    Baixar XML
-                  </a>
-                )}
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={openDanfe}
+                  disabled={syncMutation.isPending}
+                  className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  {syncMutation.isPending ? 'Buscando...' : 'Imprimir DANFE'}
+                </button>
+                <button
+                  onClick={openXml}
+                  disabled={syncMutation.isPending}
+                  className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  Baixar XML
+                </button>
               </div>
             </div>
           ) : (
