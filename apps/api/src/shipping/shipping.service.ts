@@ -127,7 +127,7 @@ export class ShippingService {
 
       const services: MeService[] = await res.json();
       return services
-        .filter((s) => !s.error && s.price)
+        .filter((s) => !s.error && s.price && s.id > 0)
         .map((s) => ({
           serviceId: s.id,
           method: s.name.toUpperCase().replace(/\s+/g, '_'),
