@@ -220,16 +220,14 @@ export class ShippingService {
     if (shipment.status !== 'PENDING') {
       throw new BadRequestException(`Etiqueta já processada. Status: ${shipment.status}`);
     }
+    if (!shipment.serviceId) {
+      throw new BadRequestException(
+        'Pedido sem serviço de envio configurado. Recrie o pedido para obter as opções de frete.',
+      );
+    }
 
     const order = shipment.order;
     const addr = order.shippingAddress as Record<string, string>;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const products = order.items.map((i: any) => ({
-      name: i.name,
-      quantity: i.quantity,
-      unitary_value: i.price.toNumber(),
-    }));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const totalValue = order.items.reduce(
@@ -259,7 +257,6 @@ export class ShippingService {
           country_id: 'BR',
           postal_code: addr.cep.replace(/\D/g, ''),
         },
-        products,
         volumes: [{ height, width, length, weight }],
         options: {
           insurance_value: totalValue,
