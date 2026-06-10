@@ -6,7 +6,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { X, ChevronUp, ChevronDown, Loader2, ImageIcon, RefreshCw, Camera } from 'lucide-react';
+import {
+  X,
+  ChevronUp,
+  ChevronDown,
+  Loader2,
+  ImageIcon,
+  RefreshCw,
+  Camera,
+  Search,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import type { Product, ProductImage, CategoryItem } from '@/actions/products';
 
@@ -83,6 +92,10 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
   const [uploadError, setUploadError] = useState('');
   const [slugManual, setSlugManual] = useState(!!initialData);
   const [skuManual, setSkuManual] = useState(!!initialData);
+  const [ncmQuery, setNcmQuery] = useState('');
+  const [ncmResults, setNcmResults] = useState<{ codigo: string; descricao: string }[]>([]);
+  const [ncmSearching, setNcmSearching] = useState(false);
+  const ncmDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     data: categoriesData,
@@ -702,6 +715,63 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Preenchido automaticamente pela categoria
               </p>
+            </div>
+            <div className="relative">
+              <label className={labelCls}>Buscar NCM por descrição</label>
+              <div className="relative flex items-center">
+                <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={ncmQuery}
+                  onChange={(e) => {
+                    const q = e.target.value;
+                    setNcmQuery(q);
+                    if (ncmDebounce.current) clearTimeout(ncmDebounce.current);
+                    if (q.length < 3) {
+                      setNcmResults([]);
+                      return;
+                    }
+                    ncmDebounce.current = setTimeout(async () => {
+                      setNcmSearching(true);
+                      try {
+                        const res = await fetch(
+                          `https://brasilapi.com.br/api/ncm/v1?search=${encodeURIComponent(q)}`,
+                        );
+                        if (res.ok) setNcmResults((await res.json()).slice(0, 8));
+                      } finally {
+                        setNcmSearching(false);
+                      }
+                    }, 400);
+                  }}
+                  className={`${inputCls} pl-8`}
+                  placeholder="Ex: escape, capacete, motor..."
+                />
+                {ncmSearching && (
+                  <Loader2 className="absolute right-2.5 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              {ncmResults.length > 0 && (
+                <ul className="absolute z-10 mt-1 w-full rounded-lg border bg-popover shadow-md overflow-hidden">
+                  {ncmResults.map((r) => (
+                    <li key={r.codigo}>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-xs hover:bg-muted transition-colors"
+                        onClick={() => {
+                          setValue('ncm', r.codigo);
+                          setNcmQuery('');
+                          setNcmResults([]);
+                        }}
+                      >
+                        <span className="font-mono font-medium">{r.codigo}</span>
+                        <span className="ml-2 text-muted-foreground line-clamp-1">
+                          {r.descricao}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
