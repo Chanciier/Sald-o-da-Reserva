@@ -93,7 +93,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
     queryFn: async (): Promise<{ data: CategoryItem[] }> => {
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${BASE}/api/v1/categories?limit=200`, { headers });
+      const res = await fetch(`${BASE}/api/v1/categories?limit=100`, { headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
