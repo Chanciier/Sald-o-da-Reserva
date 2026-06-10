@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Tag, Menu, X } from 'lucide-react';
+import { Clock, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
+import { useCountdown, pad } from '@/hooks/use-countdown';
 
 const anchorLinks = [
   { label: 'Produtos', href: '/produtos' },
@@ -25,6 +26,7 @@ export function Header() {
   const { cart, setOpen } = useCart();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { minutes, seconds } = useCountdown(0.25);
 
   const itemCount = cart?.itemCount ?? 0;
   const isHome = pathname === '/';
@@ -35,8 +37,11 @@ export function Header() {
       {/* Top strip */}
       <div className="bg-secondary text-secondary-foreground">
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-1.5 text-center text-xs font-medium sm:text-sm">
-          <Tag className="size-3.5 text-primary" aria-hidden="true" />
-          <span>Frete grátis acima de R$ 199</span>
+          <Clock className="size-3.5 text-primary" aria-hidden="true" />
+          <span>Oferta por tempo limitado — encerra em</span>
+          <span className="font-mono font-bold text-primary tabular-nums">
+            {pad(minutes)}:{pad(seconds)}
+          </span>
         </div>
       </div>
 

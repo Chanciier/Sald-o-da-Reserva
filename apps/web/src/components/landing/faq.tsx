@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: 'Vocês entregam para todo o Brasil?',
-    a: 'Sim, enviamos para todas as regiões do país com código de rastreio. O prazo e o valor do frete são calculados no checkout pelo seu CEP. Compras acima de R$ 199 têm frete grátis.',
+    a: 'Sim, enviamos para todas as regiões do país com código de rastreio. O prazo e o valor do frete são calculados no checkout pelo seu CEP.',
   },
   {
     q: 'É seguro comprar no site?',

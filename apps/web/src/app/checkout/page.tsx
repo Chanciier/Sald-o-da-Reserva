@@ -149,26 +149,8 @@ export default function CheckoutPage() {
     setSelectedShipping(null);
     try {
       const options = await getShippingQuote(cleaned, token);
-      const FREE_THRESHOLD = 300;
-      const subtotal = cart?.subtotal ?? 0;
-      const allOptions: ShippingOption[] =
-        subtotal >= FREE_THRESHOLD
-          ? [
-              {
-                serviceId: 0,
-                method: 'FREE',
-                name: 'Frete Grátis',
-                carrier: '',
-                description: '5–8 dias úteis',
-                price: 0,
-                deliveryMin: 5,
-                deliveryMax: 8,
-              },
-              ...options,
-            ]
-          : options;
-      setShippingOptions(allOptions);
-      if (allOptions.length) setSelectedShipping(allOptions[0]);
+      setShippingOptions(options);
+      if (options.length) setSelectedShipping(options[0]);
     } catch {
       // ignore
     } finally {

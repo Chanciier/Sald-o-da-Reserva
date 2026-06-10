@@ -57,7 +57,7 @@ export function FinalCta() {
             <ArrowRight className="size-5" />
           </a>
           <p className="mt-4 text-sm text-secondary-foreground/60">
-            Frete grátis acima de R$ 199 • Garantia inclusa
+            Compra segura • Garantia inclusa • NF-e em todos os pedidos
           </p>
         </motion.div>
       </div>
