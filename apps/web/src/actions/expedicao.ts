@@ -154,10 +154,14 @@ export async function confirmarRetirada(token: string, orderId: string) {
 export async function cancelarPedido(
   token: string,
   orderId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; refundError?: string } | { ok: false; error: string }> {
   try {
-    await apiFetch(token, `/expedicao/${orderId}/cancelar`, { method: 'PATCH' });
-    return { ok: true };
+    const result = await apiFetch<{ ok: true; refundError?: string }>(
+      token,
+      `/expedicao/${orderId}/cancelar`,
+      { method: 'PATCH' },
+    );
+    return result;
   } catch (err) {
     return { ok: false, error: (err as Error).message ?? 'Erro ao cancelar pedido.' };
   }

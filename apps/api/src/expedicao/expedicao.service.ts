@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeliveryMethod, OrderStatus } from '@prisma/client';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { DeliveryMethod, OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 
 const CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.PAID,
@@ -46,7 +47,12 @@ function paginateResult<T>(
 
 @Injectable()
 export class ExpedicaoService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ExpedicaoService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mp: MercadoPagoService,
+  ) {}
 
   async getStats(userId: string | null) {
     const userFilter = userId ? { userId } : {};
@@ -375,10 +381,13 @@ export class ExpedicaoService {
     });
   }
 
-  async cancelarPedido(orderId: string) {
+  async cancelarPedido(orderId: string): Promise<{ ok: true; refundError?: string }> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: { select: { productId: true, quantity: true } } },
+      include: {
+        items: { select: { productId: true, quantity: true } },
+        payment: { select: { id: true, status: true, gatewayPaymentId: true, method: true } },
+      },
     });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
@@ -386,11 +395,36 @@ export class ExpedicaoService {
       throw new BadRequestException(`Pedido não pode ser cancelado no status ${order.status}.`);
     }
 
+    // Attempt refund before cancellation transaction
+    let refundError: string | undefined;
+    const payment = order.payment;
+    const canRefund =
+      payment?.status === PaymentStatus.APPROVED &&
+      !!payment.gatewayPaymentId &&
+      payment.method !== 'BOLETO' &&
+      this.mp.isConfigured();
+
+    if (canRefund) {
+      try {
+        await this.mp.createRefund(payment!.gatewayPaymentId!);
+        this.logger.log(`Refund issued for order ${orderId}, payment ${payment!.gatewayPaymentId}`);
+      } catch (err) {
+        refundError = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Refund failed for order ${orderId}: ${refundError}`);
+      }
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: orderId },
         data: { status: OrderStatus.CANCELLED },
       });
+      if (payment && canRefund && !refundError) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: PaymentStatus.REFUNDED },
+        });
+      }
       for (const item of order.items) {
         await tx.product.update({
           where: { id: item.productId },
@@ -399,7 +433,7 @@ export class ExpedicaoService {
       }
     });
 
-    return { ok: true };
+    return refundError ? { ok: true, refundError } : { ok: true };
   }
 
   async batchAction(ids: string[], action: string) {

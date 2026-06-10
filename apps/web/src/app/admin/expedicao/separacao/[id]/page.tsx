@@ -95,6 +95,7 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
   const [initialized, setInitialized] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelError, setCancelError] = useState('');
+  const [refundWarning, setRefundWarning] = useState('');
 
   const { data: order, isLoading } = useQuery<Order>({
     queryKey: ['order', params.id],
@@ -126,6 +127,11 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
     onSuccess: (result) => {
       if (!result.ok) {
         setCancelError(result.error);
+        return;
+      }
+      if (result.refundError) {
+        setRefundWarning(result.refundError);
+        setConfirmCancel(false);
         return;
       }
       router.push('/admin/expedicao/fila');
@@ -222,6 +228,13 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
         )}
 
         {cancelError && <p className="text-center text-xs text-destructive">{cancelError}</p>}
+
+        {refundWarning && (
+          <div className="rounded-lg border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
+            Pedido cancelado, mas o estorno automático falhou: {refundWarning}. Realize o estorno
+            manualmente no Mercado Pago.
+          </div>
+        )}
 
         {confirmCancel ? (
           <div className="flex items-center justify-center gap-3 rounded-xl border border-destructive/40 bg-destructive/5 py-3 px-4">

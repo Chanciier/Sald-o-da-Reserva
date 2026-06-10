@@ -57,6 +57,7 @@ export default function ProntosPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [refundWarning, setRefundWarning] = useState<string | null>(null);
 
   const cancelMutation = useMutation({
     mutationFn: (orderId: string) => cancelarPedido(token!, orderId),
@@ -66,6 +67,7 @@ export default function ProntosPage() {
         return;
       }
       setConfirmCancel(null);
+      if (result.refundError) setRefundWarning(result.refundError);
       qc.invalidateQueries({ queryKey: ['expedicao-prontos'] });
     },
   });
@@ -148,6 +150,21 @@ export default function ProntosPage() {
           <button
             onClick={() => setCancelError(null)}
             className="shrink-0 text-destructive/70 hover:text-destructive"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {refundWarning && (
+        <div className="rounded-lg border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300 flex items-center justify-between gap-3">
+          <span>
+            Pedido cancelado, mas o estorno automático falhou: {refundWarning}. Realize o estorno
+            manualmente no Mercado Pago.
+          </span>
+          <button
+            onClick={() => setRefundWarning(null)}
+            className="shrink-0 opacity-70 hover:opacity-100"
           >
             ✕
           </button>

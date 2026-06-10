@@ -54,6 +54,7 @@ export default function FilaPage() {
   const [deliveryMethod, setDeliveryMethod] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [refundWarning, setRefundWarning] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['expedicao-fila', page, search, deliveryMethod],
@@ -81,6 +82,7 @@ export default function FilaPage() {
         return;
       }
       setConfirmCancel(null);
+      if (result.refundError) setRefundWarning(result.refundError);
       qc.invalidateQueries({ queryKey: ['expedicao-fila'] });
     },
   });
@@ -153,6 +155,21 @@ export default function FilaPage() {
           <button
             onClick={() => setActionError(null)}
             className="shrink-0 text-destructive/70 hover:text-destructive"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {refundWarning && (
+        <div className="rounded-lg border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300 flex items-center justify-between gap-3">
+          <span>
+            Pedido cancelado, mas o estorno automático falhou: {refundWarning}. Realize o estorno
+            manualmente no Mercado Pago.
+          </span>
+          <button
+            onClick={() => setRefundWarning(null)}
+            className="shrink-0 opacity-70 hover:opacity-100"
           >
             ✕
           </button>
