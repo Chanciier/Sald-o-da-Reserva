@@ -153,7 +153,7 @@ export class FocusNfeProvider implements InvoiceProvider {
   async getInvoice(reference: string): Promise<IssuedInvoice> {
     const res = await this.request<FocusNfeResponse>(
       'GET',
-      `/nfe/${encodeURIComponent(reference)}`,
+      `/nfe/${encodeURIComponent(reference)}?completo=1`,
     );
     return this.mapResponse(reference, res);
   }
