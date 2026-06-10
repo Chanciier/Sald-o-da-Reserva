@@ -173,10 +173,9 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
   }, [initialData]);
 
   useEffect(() => {
-    if (categoryIdValue && !initialData?.ncm) {
-      const cat = categories.find((c) => c.id === categoryIdValue);
-      if (cat?.ncm) setValue('ncm', cat.ncm);
-    }
+    if (!categoryIdValue || initialData?.ncm) return;
+    const cat = categories.find((c) => c.id === categoryIdValue);
+    if (cat) setValue('ncm', cat.ncm ?? '');
   }, [categoryIdValue, categories, setValue, initialData?.ncm]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
