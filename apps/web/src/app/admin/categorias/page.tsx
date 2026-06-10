@@ -166,7 +166,7 @@ export default function AdminCategorias() {
       name: form.name.trim(),
       slug: form.slug || slugify(form.name),
       description: form.description || '',
-      ncm: form.ncm || undefined,
+      ncm: form.ncm,
       showOnHome: form.showOnHome,
     };
     if (modal === 'create') createMutation.mutate(body);
