@@ -43,6 +43,7 @@ export class FocusNfeProvider implements InvoiceProvider {
   private readonly uf: string;
   private readonly cep: string;
   private readonly crt: string;
+  private readonly defaultNcm: string;
 
   constructor(private readonly config: ConfigService) {
     const env = this.config.get<string>('FOCUS_NFE_ENVIRONMENT', 'sandbox');
@@ -64,6 +65,7 @@ export class FocusNfeProvider implements InvoiceProvider {
     this.uf = this.config.get<string>('FOCUS_NFE_UF', 'SP');
     this.cep = this.config.get<string>('FOCUS_NFE_CEP', '');
     this.crt = this.config.get<string>('FOCUS_NFE_CRT', '1'); // 1=Simples Nacional
+    this.defaultNcm = this.config.get<string>('FOCUS_NFE_DEFAULT_NCM', '87149900'); // partes p/ motocicletas
   }
 
   private get authHeader(): string {
@@ -272,7 +274,7 @@ export class FocusNfeProvider implements InvoiceProvider {
         codigo_produto: item.sku,
         descricao: item.name,
         cfop: item.cfop || '5102',
-        ncm: (item.ncm?.replace(/\D/g, '') || '00000000').padStart(8, '0').slice(0, 8),
+        ncm: (item.ncm?.replace(/\D/g, '') || this.defaultNcm).padStart(8, '0').slice(0, 8),
         unidade_comercial: item.unit ?? 'UN',
         quantidade_comercial: item.quantity,
         valor_unitario_comercial: item.unitPrice,
