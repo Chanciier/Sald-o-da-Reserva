@@ -385,11 +385,11 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                     </button>
                     {labelError && <span className="text-xs text-red-500">{labelError}</span>}
                   </>
-                ) : (
+                ) : shipment?.service === 'FREE' || order.shipping === 0 ? (
                   <span className="text-xs text-muted-foreground">
-                    Frete sem integração automática — gere a etiqueta diretamente na transportadora.
+                    Frete grátis — sem etiqueta necessária.
                   </span>
-                )}
+                ) : null}
               </div>
             ) : (
               <div className="space-y-2">
@@ -428,6 +428,38 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
             >
               Imprimir Etiqueta Interna
             </Link>
+          </div>
+        </section>
+      )}
+
+      {/* 3b. Destinatário (sempre visível para envios) */}
+      {!isPickup && (
+        <section className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="border-b px-4 py-3">
+            <h2 className="font-semibold text-sm">Destinatário</h2>
+          </div>
+          <div className="p-4 text-sm space-y-0.5">
+            <p className="font-medium">{order.shippingAddress.name}</p>
+            <p className="text-muted-foreground">
+              {order.shippingAddress.street}, {order.shippingAddress.number}
+              {order.shippingAddress.complement ? ` — ${order.shippingAddress.complement}` : ''}
+            </p>
+            <p className="text-muted-foreground">
+              {order.shippingAddress.neighborhood} · {order.shippingAddress.city}/
+              {order.shippingAddress.state}
+            </p>
+            <p className="font-mono text-xs text-muted-foreground">
+              CEP {order.shippingAddress.cep}
+            </p>
+            {shipment && (
+              <p className="pt-1 text-xs text-muted-foreground">
+                Transportadora:{' '}
+                <span className="font-medium text-foreground">
+                  {shipment.carrier || 'Frete Grátis'}{' '}
+                  {shipment.service && shipment.service !== 'FREE' ? `— ${shipment.service}` : ''}
+                </span>
+              </p>
+            )}
           </div>
         </section>
       )}

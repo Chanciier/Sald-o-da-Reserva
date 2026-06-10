@@ -104,7 +104,8 @@ export class ShippingService {
     if (cleaned.length !== 8) throw new BadRequestException('CEP inválido.');
 
     if (!this.token || !this.from.postal_code) {
-      return this.fallbackOptions();
+      this.logger.warn('Melhor Envio não configurado — sem opções de frete.');
+      return [];
     }
 
     try {
@@ -121,11 +122,11 @@ export class ShippingService {
 
       if (!res.ok) {
         this.logger.warn(`ME quote failed: ${res.status}`);
-        return this.fallbackOptions();
+        return [];
       }
 
       const services: MeService[] = await res.json();
-      const results = services
+      return services
         .filter((s) => !s.error && s.price)
         .map((s) => ({
           serviceId: s.id,
@@ -137,11 +138,9 @@ export class ShippingService {
           deliveryMin: s.delivery_range.min,
           deliveryMax: s.delivery_range.max,
         }));
-
-      return results.length ? results : this.fallbackOptions();
     } catch (err) {
       this.logger.error('ME quote error', err);
-      return this.fallbackOptions();
+      return [];
     }
   }
 

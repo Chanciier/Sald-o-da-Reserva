@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
@@ -175,33 +175,6 @@ export default function CheckoutPage() {
       setShippingLoading(false);
     }
   }
-
-  useEffect(() => {
-    if (!token || !cart || shippingOptions.length || isPickup) return;
-    getShippingQuote('', token)
-      .then((opts) => {
-        const FREE_THRESHOLD = 300;
-        const allOptions: ShippingOption[] =
-          cart.subtotal >= FREE_THRESHOLD
-            ? [
-                {
-                  serviceId: 0,
-                  method: 'FREE',
-                  name: 'Frete Grátis',
-                  carrier: '',
-                  description: '5–8 dias úteis',
-                  price: 0,
-                  deliveryMin: 5,
-                  deliveryMax: 8,
-                },
-                ...opts,
-              ]
-            : opts;
-        setShippingOptions(allOptions);
-        if (allOptions.length && !selectedShipping) setSelectedShipping(allOptions[0]);
-      })
-      .catch(() => {});
-  }, [token, cart?.subtotal, isPickup]);
 
   const shippingCost = isPickup ? 0 : (selectedShipping?.price ?? 0);
   const total = (cart?.total ?? 0) + shippingCost;
