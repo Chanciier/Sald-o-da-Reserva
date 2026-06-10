@@ -116,8 +116,16 @@ export async function fetchConcluidos(
   return apiFetch<ExpedicaoListResponse>(token, `/expedicao/concluidos${qs(params)}`);
 }
 
-export async function iniciarSeparacao(token: string, orderId: string) {
-  return apiFetch(token, `/expedicao/${orderId}/iniciar-separacao`, { method: 'PATCH' });
+export async function iniciarSeparacao(
+  token: string,
+  orderId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await apiFetch(token, `/expedicao/${orderId}/iniciar-separacao`, { method: 'PATCH' });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message ?? 'Erro ao iniciar separação.' };
+  }
 }
 
 export async function atualizarItensSeparados(

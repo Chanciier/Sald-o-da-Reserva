@@ -52,6 +52,7 @@ export default function FilaPage() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['expedicao-fila', page, search, deliveryMethod],
@@ -61,7 +62,11 @@ export default function FilaPage() {
 
   const mutation = useMutation({
     mutationFn: (orderId: string) => iniciarSeparacao(token!, orderId),
-    onSuccess: (_data, orderId) => {
+    onSuccess: (result, orderId) => {
+      if (!result.ok) {
+        setActionError(result.error);
+        return;
+      }
       qc.invalidateQueries({ queryKey: ['expedicao-fila'] });
       router.push(`/admin/expedicao/separacao/${orderId}`);
     },
@@ -128,6 +133,18 @@ export default function FilaPage() {
           ))}
         </select>
       </div>
+
+      {actionError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3">
+          <span>{actionError}</span>
+          <button
+            onClick={() => setActionError(null)}
+            className="shrink-0 text-destructive/70 hover:text-destructive"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
