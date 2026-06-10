@@ -93,6 +93,16 @@ export class ProductsService {
     if (slugConflict) throw new ConflictException('Já existe um produto com esse slug.');
     if (skuConflict) throw new ConflictException('Já existe um produto com esse SKU.');
 
+    // Inherit NCM from category if not explicitly provided
+    let ncm = dto.ncm;
+    if (!ncm && dto.categoryId) {
+      const cat = await this.prisma.category.findUnique({
+        where: { id: dto.categoryId },
+        select: { ncm: true },
+      });
+      ncm = cat?.ncm ?? undefined;
+    }
+
     const product = await this.prisma.product.create({
       data: {
         name: dto.name,
@@ -114,6 +124,7 @@ export class ProductsService {
         categoryId: dto.categoryId,
         metaTitle: dto.metaTitle,
         metaDescription: dto.metaDescription,
+        ncm,
         createdById: userId,
       },
       include: INCLUDE_FULL,

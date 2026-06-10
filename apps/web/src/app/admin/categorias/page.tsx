@@ -12,6 +12,8 @@ interface Category {
   name: string;
   slug: string;
   description?: string | null;
+  ncm?: string | null;
+  showOnHome?: boolean;
   _count?: { products: number };
 }
 
@@ -19,9 +21,11 @@ interface CategoryForm {
   name: string;
   slug: string;
   description: string;
+  ncm: string;
+  showOnHome: boolean;
 }
 
-const empty: CategoryForm = { name: '', slug: '', description: '' };
+const empty: CategoryForm = { name: '', slug: '', description: '', ncm: '', showOnHome: false };
 
 function slugify(s: string) {
   return s
@@ -130,7 +134,13 @@ export default function AdminCategorias() {
   }
   function openEdit(cat: Category) {
     setSelected(cat);
-    setForm({ name: cat.name, slug: cat.slug, description: cat.description ?? '' });
+    setForm({
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description ?? '',
+      ncm: cat.ncm ?? '',
+      showOnHome: cat.showOnHome ?? false,
+    });
     setFormError('');
     setModal('edit');
   }
@@ -156,6 +166,8 @@ export default function AdminCategorias() {
       name: form.name.trim(),
       slug: form.slug || slugify(form.name),
       description: form.description || '',
+      ncm: form.ncm || undefined,
+      showOnHome: form.showOnHome,
     };
     if (modal === 'create') createMutation.mutate(body);
     else updateMutation.mutate(body);
@@ -240,7 +252,8 @@ export default function AdminCategorias() {
               <tr className="text-left text-xs text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Nome</th>
                 <th className="px-4 py-3 font-medium">Slug</th>
-                <th className="px-4 py-3 font-medium">Descrição</th>
+                <th className="px-4 py-3 font-medium">NCM</th>
+                <th className="px-4 py-3 font-medium text-center">Home</th>
                 <th className="px-4 py-3 font-medium text-center">Produtos</th>
                 <th className="px-4 py-3 font-medium text-right">Ações</th>
               </tr>
@@ -250,8 +263,17 @@ export default function AdminCategorias() {
                 <tr key={cat.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3 font-medium">{cat.name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{cat.slug}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground max-w-xs truncate">
-                    {cat.description ?? '—'}
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    {cat.ncm ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {cat.showOnHome ? (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        Sim
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
@@ -343,6 +365,31 @@ export default function AdminCategorias() {
                 placeholder="Descrição opcional..."
                 className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
               />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium">NCM</label>
+              <input
+                type="text"
+                value={form.ncm}
+                onChange={(e) => setForm((f) => ({ ...f, ncm: e.target.value }))}
+                placeholder="Ex: 6109.10.00"
+                maxLength={20}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Código NCM herdado pelos produtos desta categoria
+              </p>
+            </div>
+            <div>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.showOnHome}
+                  onChange={(e) => setForm((f) => ({ ...f, showOnHome: e.target.checked }))}
+                  className="h-4 w-4 accent-primary"
+                />
+                <span className="text-xs font-medium">Exibir na página inicial</span>
+              </label>
             </div>
             {formError && <p className="text-xs text-destructive">{formError}</p>}
             <div className="flex gap-2 pt-1">

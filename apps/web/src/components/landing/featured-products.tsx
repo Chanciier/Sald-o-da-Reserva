@@ -20,15 +20,7 @@ interface ApiProduct {
   images?: { url: string }[];
 }
 
-const categories = [
-  'Todos',
-  'Eletrônicos',
-  'Cozinha',
-  'Ferramentas',
-  'Casa',
-  'Áudio',
-  'Informática',
-];
+const DEFAULT_CATEGORIES = ['Todos'];
 
 function formatBRL(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -125,6 +117,7 @@ export function FeaturedProducts() {
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState('Todos');
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
 
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -132,10 +125,23 @@ export function FeaturedProducts() {
       setLoading(false);
       return;
     }
-    fetch(`${apiUrl}/api/v1/products?limit=12&status=ACTIVE`)
-      .then((r) => r.json())
-      .then((d) => setProducts(d.data ?? d ?? []))
-      .catch(() => {})
+
+    Promise.all([
+      fetch(`${apiUrl}/api/v1/products?limit=12&status=ACTIVE`)
+        .then((r) => r.json())
+        .then((d) => d.data ?? d ?? [])
+        .catch(() => []),
+      fetch(`${apiUrl}/api/v1/categories?showOnHome=true&limit=50`)
+        .then((r) => r.json())
+        .then((d) => (d.data ?? []).map((c: { name: string }) => c.name))
+        .catch(() => []),
+    ])
+      .then(([prods, cats]) => {
+        setProducts(prods as ApiProduct[]);
+        if ((cats as string[]).length > 0) {
+          setCategories(['Todos', ...(cats as string[])]);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 

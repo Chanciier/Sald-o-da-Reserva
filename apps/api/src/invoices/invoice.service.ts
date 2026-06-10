@@ -105,6 +105,7 @@ export class InvoiceService {
           quantity: item.quantity,
           unitPrice: Number(item.price),
           total: Number(item.subtotal),
+          ncm: item.product?.ncm ?? undefined,
         })),
         paymentMethod: order.payment?.method ?? 'PIX',
         total: Number(order.total),

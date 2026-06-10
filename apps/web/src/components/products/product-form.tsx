@@ -55,6 +55,7 @@ const schema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE', 'DRAFT', 'ARCHIVED', 'OUT_OF_STOCK']),
   metaTitle: z.string().max(200).optional(),
   metaDescription: z.string().max(500).optional(),
+  ncm: z.string().max(20).optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -127,6 +128,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           status: initialData.status as FormData['status'],
           metaTitle: initialData.metaTitle ?? '',
           metaDescription: initialData.metaDescription ?? '',
+          ncm: initialData.ncm ?? '',
         }
       : {
           status: 'ACTIVE',
@@ -139,6 +141,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
   });
 
   const nameValue = watch('name');
+  const categoryIdValue = watch('categoryId');
 
   useEffect(() => {
     if (!slugManual && nameValue) {
@@ -157,6 +160,13 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       setImages([...initialData.images].sort((a, b) => a.position - b.position));
     }
   }, [initialData]);
+
+  useEffect(() => {
+    if (categoryIdValue && !initialData?.ncm) {
+      const cat = categories.find((c) => c.id === categoryIdValue);
+      if (cat?.ncm) setValue('ncm', cat.ncm);
+    }
+  }, [categoryIdValue, categories, setValue, initialData?.ncm]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -238,6 +248,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       status: data.status,
       metaTitle: data.metaTitle || undefined,
       metaDescription: data.metaDescription || undefined,
+      ncm: data.ncm || undefined,
       imageIds: images.map((i) => i.id),
     };
     await onSubmit(payload);
@@ -646,6 +657,23 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* NCM */}
+          <div className={cardCls}>
+            <h2 className="text-sm font-semibold">NCM</h2>
+            <div>
+              <label className={labelCls}>Código NCM</label>
+              <input
+                {...register('ncm')}
+                className={inputCls}
+                placeholder="Herdado da categoria"
+                maxLength={20}
+              />
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Preenchido automaticamente pela categoria
+              </p>
+            </div>
           </div>
 
           {/* SEO */}

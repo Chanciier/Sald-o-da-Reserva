@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreateCategoryDto {
@@ -17,4 +17,13 @@ export class CreateCategoryDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  ncm?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnHome?: boolean;
 }

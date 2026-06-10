@@ -43,6 +43,7 @@ export interface Product {
   status: string;
   metaTitle: string | null;
   metaDescription: string | null;
+  ncm: string | null;
   categoryId: string | null;
   createdById: string | null;
   createdAt: string;
@@ -64,6 +65,7 @@ export interface CategoryItem {
   id: string;
   name: string;
   slug: string;
+  ncm?: string | null;
 }
 
 export async function fetchProducts(

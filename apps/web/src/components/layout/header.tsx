@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 
 const anchorLinks = [
+  { label: 'Produtos', href: '/produtos' },
   { label: 'Ofertas', href: '#produtos' },
   { label: 'Como Funciona', href: '#como-funciona' },
   { label: 'Benefícios', href: '#beneficios' },

@@ -154,6 +154,8 @@ model Category {
   name        String
   slug        String   @unique
   description String?
+  ncm         String?
+  showOnHome  Boolean  @default(false) @map("show_on_home")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -178,6 +180,7 @@ model Product {
   dimensions       Json?
   stock            Int           @default(0)
   minimumStock     Int           @default(0) @map("minimum_stock")
+  ncm              String?
   pickupAvailable  Boolean       @default(false) @map("pickup_available")
   featuredOffer    Boolean       @default(false) @map("featured_offer")
   status           ProductStatus @default(ACTIVE)

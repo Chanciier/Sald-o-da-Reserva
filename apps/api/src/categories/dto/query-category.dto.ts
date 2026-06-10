@@ -1,5 +1,5 @@
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class QueryCategoryDto {
   @IsOptional()
@@ -18,4 +18,9 @@ export class QueryCategoryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  showOnHome?: boolean;
 }

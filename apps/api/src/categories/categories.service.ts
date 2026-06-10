@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { StorageService } from '../storage/storage.service';
@@ -26,7 +27,13 @@ export class CategoriesService {
     if (existing) throw new ConflictException('Já existe uma categoria com esse slug.');
 
     const category = await this.prisma.category.create({
-      data: { name: dto.name, slug, description: dto.description },
+      data: {
+        name: dto.name,
+        slug,
+        description: dto.description,
+        ncm: dto.ncm,
+        showOnHome: dto.showOnHome ?? false,
+      },
     });
 
     await this.redis.delPattern('categories:*');
@@ -35,12 +42,15 @@ export class CategoriesService {
 
   async findAll(query: QueryCategoryDto) {
     const { page = 1, limit = 20, search } = query;
-    const cacheKey = `${KEY_LIST}:${page}:${limit}:${search ?? ''}`;
+    const cacheKey = `${KEY_LIST}:${page}:${limit}:${search ?? ''}:${query.showOnHome ?? ''}`;
 
     const cached = await this.redis.getJson(cacheKey);
     if (cached) return cached;
 
-    const where = search ? { name: { contains: search, mode: 'insensitive' as const } } : undefined;
+    const where: Prisma.CategoryWhereInput = {
+      ...(search ? { name: { contains: search, mode: 'insensitive' as const } } : {}),
+      ...(query.showOnHome === true ? { showOnHome: true } : {}),
+    };
 
     const [data, total] = await Promise.all([
       this.prisma.category.findMany({

@@ -116,6 +116,11 @@ export class UpdateProductDto {
   metaDescription?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  ncm?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   imageIds?: string[];
