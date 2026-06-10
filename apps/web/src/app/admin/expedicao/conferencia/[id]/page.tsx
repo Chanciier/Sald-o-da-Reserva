@@ -57,6 +57,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const qc = useQueryClient();
   const [labelError, setLabelError] = useState('');
   const [invoiceError, setInvoiceError] = useState('');
+  const [danfePending, setDanfePending] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelError, setCancelError] = useState('');
   const [refundWarning, setRefundWarning] = useState('');
@@ -97,30 +98,48 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     onError: (e: Error) => setInvoiceError(e.message),
   });
 
-  const syncMutation = useMutation({
-    mutationFn: () => syncInvoice(token!, invoice!.id),
-    onSuccess: () => refetchInvoice(),
-    onError: (e: Error) => setInvoiceError(e.message),
-  });
-
   async function openDanfe() {
-    if (invoice?.danfeUrl) {
-      window.open(invoice.danfeUrl, '_blank');
-      return;
+    setInvoiceError('');
+    setDanfePending(true);
+    try {
+      let url = invoice?.danfeUrl;
+      if (!url) {
+        const updated = await syncInvoice(token!, invoice!.id);
+        await refetchInvoice();
+        url = updated.danfeUrl ?? null;
+      }
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        setInvoiceError('URL do DANFE ainda não disponível. Aguarde e tente novamente.');
+      }
+    } catch (e) {
+      setInvoiceError(e instanceof Error ? e.message : 'Erro ao buscar DANFE');
+    } finally {
+      setDanfePending(false);
     }
-    const updated = await syncInvoice(token!, invoice!.id);
-    await refetchInvoice();
-    if (updated.danfeUrl) window.open(updated.danfeUrl, '_blank');
   }
 
   async function openXml() {
-    if (invoice?.xmlUrl) {
-      window.open(invoice.xmlUrl, '_blank');
-      return;
+    setInvoiceError('');
+    setDanfePending(true);
+    try {
+      let url = invoice?.xmlUrl;
+      if (!url) {
+        const updated = await syncInvoice(token!, invoice!.id);
+        await refetchInvoice();
+        url = updated.xmlUrl ?? null;
+      }
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        setInvoiceError('URL do XML ainda não disponível. Aguarde e tente novamente.');
+      }
+    } catch (e) {
+      setInvoiceError(e instanceof Error ? e.message : 'Erro ao buscar XML');
+    } finally {
+      setDanfePending(false);
     }
-    const updated = await syncInvoice(token!, invoice!.id);
-    await refetchInvoice();
-    if (updated.xmlUrl) window.open(updated.xmlUrl, '_blank');
   }
 
   const labelMutation = useMutation({
@@ -299,14 +318,14 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={openDanfe}
-                  disabled={syncMutation.isPending}
+                  disabled={danfePending}
                   className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors disabled:opacity-50"
                 >
-                  {syncMutation.isPending ? 'Buscando...' : 'Imprimir DANFE'}
+                  {danfePending ? 'Buscando...' : 'Imprimir DANFE'}
                 </button>
                 <button
                   onClick={openXml}
-                  disabled={syncMutation.isPending}
+                  disabled={danfePending}
                   className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors disabled:opacity-50"
                 >
                   Baixar XML
