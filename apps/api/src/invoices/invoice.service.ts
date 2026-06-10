@@ -60,8 +60,11 @@ export class InvoiceService {
       this.logger.warn(`emitForOrder: order ${orderId} not found`);
       return;
     }
-    if (order.status !== 'PAID') {
-      this.logger.warn(`emitForOrder: order ${orderId} status=${order.status} – not PAID, skip`);
+    const BLOCKED = ['PENDING_PAYMENT', 'CANCELLED', 'REFUNDED'];
+    if (BLOCKED.includes(order.status)) {
+      this.logger.warn(
+        `emitForOrder: order ${orderId} status=${order.status} – not emittable, skip`,
+      );
       return;
     }
 
