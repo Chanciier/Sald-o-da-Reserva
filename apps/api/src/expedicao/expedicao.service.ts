@@ -426,10 +426,17 @@ export class ExpedicaoService {
         });
       }
       for (const item of order.items) {
-        await tx.product.update({
+        const updated = await tx.product.update({
           where: { id: item.productId },
           data: { stock: { increment: item.quantity } },
+          select: { stock: true, status: true },
         });
+        if (updated.stock > 0 && updated.status === 'INACTIVE') {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { status: 'ACTIVE' },
+          });
+        }
       }
     });
 
