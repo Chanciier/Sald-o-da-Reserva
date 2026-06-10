@@ -60,7 +60,7 @@ export interface InvoiceProvider {
   getInvoice(reference: string): Promise<IssuedInvoice>;
   cancelInvoice(reference: string, reason: string): Promise<void>;
   downloadXml(reference: string): Promise<string>;
-  downloadDanfe(reference: string): Promise<string>;
+  downloadDanfe(reference: string): Promise<Buffer>;
   syncStatus(reference: string): Promise<IssuedInvoice>;
   isConfigured(): boolean;
 }
