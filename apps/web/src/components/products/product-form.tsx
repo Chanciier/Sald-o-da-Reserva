@@ -8,8 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { X, ChevronUp, ChevronDown, Loader2, ImageIcon, RefreshCw, Camera } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchCategories } from '@/actions/products';
-import type { Product, ProductImage } from '@/actions/products';
+import type { Product, ProductImage, CategoryItem } from '@/actions/products';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -87,7 +86,11 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories-list'],
-    queryFn: fetchCategories,
+    queryFn: async (): Promise<{ data: CategoryItem[] }> => {
+      const res = await fetch(`${BASE}/api/v1/categories?limit=200`);
+      if (!res.ok) return { data: [] };
+      return res.json();
+    },
     staleTime: 5 * 60 * 1000,
   });
   const categories = categoriesData?.data ?? [];
