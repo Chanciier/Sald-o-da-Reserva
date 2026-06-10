@@ -274,7 +274,7 @@ export class FocusNfeProvider implements InvoiceProvider {
         codigo_produto: item.sku,
         descricao: item.name,
         cfop: item.cfop || '5102',
-        ncm: (item.ncm?.replace(/\D/g, '') || this.defaultNcm).padStart(8, '0').slice(0, 8),
+        codigo_ncm: (item.ncm?.replace(/\D/g, '') || this.defaultNcm).padStart(8, '0').slice(0, 8),
         unidade_comercial: item.unit ?? 'UN',
         quantidade_comercial: item.quantity,
         valor_unitario_comercial: item.unitPrice,
