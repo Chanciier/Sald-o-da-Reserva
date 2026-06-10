@@ -2,6 +2,13 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { DeliveryMethod, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+const CANCELLABLE_STATUSES: OrderStatus[] = [
+  OrderStatus.PAID,
+  OrderStatus.SEPARATING,
+  OrderStatus.SEPARATED,
+  OrderStatus.READY_TO_SHIP,
+];
+
 function serializeOrder(order: Record<string, unknown>) {
   return {
     ...order,
@@ -366,6 +373,33 @@ export class ExpedicaoService {
       where: { id: orderId },
       data: { status: OrderStatus.DELIVERED },
     });
+  }
+
+  async cancelarPedido(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { select: { productId: true, quantity: true } } },
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    if (!CANCELLABLE_STATUSES.includes(order.status)) {
+      throw new BadRequestException(`Pedido não pode ser cancelado no status ${order.status}.`);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.CANCELLED },
+      });
+      for (const item of order.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+    });
+
+    return { ok: true };
   }
 
   async batchAction(ids: string[], action: string) {

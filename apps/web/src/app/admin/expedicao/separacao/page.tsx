@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchSeparacao } from '@/actions/expedicao';
+import { fetchSeparacao, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
 
 function shortId(id: string) {
@@ -32,7 +32,22 @@ function DeliveryBadge({ method }: { method: string }) {
 
 export default function SeparacaoListPage() {
   const { token } = useAuth();
+  const qc = useQueryClient();
   const [page, setPage] = useState(1);
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const cancelMutation = useMutation({
+    mutationFn: (orderId: string) => cancelarPedido(token!, orderId),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setCancelError(result.error);
+        return;
+      }
+      setConfirmCancel(null);
+      qc.invalidateQueries({ queryKey: ['expedicao-separacao'] });
+    },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['expedicao-separacao', page],
@@ -46,6 +61,18 @@ export default function SeparacaoListPage() {
         <Package className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">Em Separação</h1>
       </div>
+
+      {cancelError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3">
+          <span>{cancelError}</span>
+          <button
+            onClick={() => setCancelError(null)}
+            className="shrink-0 text-destructive/70 hover:text-destructive"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
@@ -98,12 +125,43 @@ export default function SeparacaoListPage() {
                         {separated}/{total}
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          href={`/admin/expedicao/separacao/${o.id}`}
-                          className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
-                        >
-                          Continuar Separação
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          {confirmCancel === o.id ? (
+                            <>
+                              <span className="text-xs text-muted-foreground">Cancelar?</span>
+                              <button
+                                onClick={() => cancelMutation.mutate(o.id)}
+                                disabled={cancelMutation.isPending}
+                                className="rounded-lg bg-destructive px-2.5 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                              >
+                                {cancelMutation.isPending && cancelMutation.variables === o.id
+                                  ? '...'
+                                  : 'Sim'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmCancel(null)}
+                                className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted"
+                              >
+                                Não
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <Link
+                                href={`/admin/expedicao/separacao/${o.id}`}
+                                className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+                              >
+                                Continuar Separação
+                              </Link>
+                              <button
+                                onClick={() => setConfirmCancel(o.id)}
+                                className="rounded-lg border border-destructive/50 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                              >
+                                Cancelar
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

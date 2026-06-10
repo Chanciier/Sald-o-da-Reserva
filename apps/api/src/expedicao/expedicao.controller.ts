@@ -114,6 +114,11 @@ export class ExpedicaoController {
     return this.expedicaoService.confirmarRetirada(id);
   }
 
+  @Patch(':id/cancelar')
+  cancelarPedido(@Param('id') id: string) {
+    return this.expedicaoService.cancelarPedido(id);
+  }
+
   @Post('batch')
   batchAction(@Body() body: { ids: string[]; action: string }) {
     return this.expedicaoService.batchAction(body.ids, body.action);

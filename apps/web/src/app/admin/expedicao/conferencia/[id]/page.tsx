@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
 import { fetchInvoices, emitInvoice, reemitInvoice } from '@/actions/invoices';
 import { purchaseLabel } from '@/lib/shipping';
-import { marcarPronto, confirmarRetirada } from '@/actions/expedicao';
+import { marcarPronto, confirmarRetirada, cancelarPedido } from '@/actions/expedicao';
 import type { Order } from '@/types/order';
 import type { Invoice } from '@/actions/invoices';
 
@@ -56,6 +56,8 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const router = useRouter();
   const qc = useQueryClient();
   const [labelError, setLabelError] = useState('');
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   const { data: order, isLoading: orderLoading } = useQuery<Order>({
     queryKey: ['order', params.id],
@@ -109,6 +111,17 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['order', params.id] });
       router.push('/admin/expedicao/concluidos');
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelarPedido(token!, params.id),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setCancelError(result.error);
+        return;
+      }
+      router.push('/admin/expedicao/fila');
     },
   });
 
@@ -346,35 +359,73 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
         <div className="border-b px-4 py-3">
           <h2 className="font-semibold text-sm">Ações Finais</h2>
         </div>
-        <div className="p-4 flex flex-wrap gap-3">
-          {status !== 'READY_TO_SHIP' && status !== 'SHIPPED' && status !== 'DELIVERED' && (
-            <button
-              onClick={() => marcarMutation.mutate()}
-              disabled={marcarMutation.isPending}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {marcarMutation.isPending ? 'Marcando...' : 'Marcar como Pronto'}
-            </button>
-          )}
+        <div className="p-4 space-y-3">
+          <div className="flex flex-wrap gap-3">
+            {status !== 'READY_TO_SHIP' &&
+              status !== 'SHIPPED' &&
+              status !== 'DELIVERED' &&
+              status !== 'CANCELLED' && (
+                <button
+                  onClick={() => marcarMutation.mutate()}
+                  disabled={marcarMutation.isPending}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {marcarMutation.isPending ? 'Marcando...' : 'Marcar como Pronto'}
+                </button>
+              )}
 
-          {!isPickup && (status === 'READY_TO_SHIP' || status === 'SEPARATED') && (
-            <button
-              onClick={() => confirmarEnvioMutation.mutate()}
-              disabled={confirmarEnvioMutation.isPending}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {confirmarEnvioMutation.isPending ? 'Confirmando...' : 'Confirmar Envio'}
-            </button>
-          )}
+            {!isPickup && (status === 'READY_TO_SHIP' || status === 'SEPARATED') && (
+              <button
+                onClick={() => confirmarEnvioMutation.mutate()}
+                disabled={confirmarEnvioMutation.isPending}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {confirmarEnvioMutation.isPending ? 'Confirmando...' : 'Confirmar Envio'}
+              </button>
+            )}
 
-          {isPickup && status !== 'DELIVERED' && (
-            <button
-              onClick={() => confirmarRetiradaMutation.mutate()}
-              disabled={confirmarRetiradaMutation.isPending}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {confirmarRetiradaMutation.isPending ? 'Confirmando...' : 'Confirmar Retirada'}
-            </button>
+            {isPickup && status !== 'DELIVERED' && status !== 'CANCELLED' && (
+              <button
+                onClick={() => confirmarRetiradaMutation.mutate()}
+                disabled={confirmarRetiradaMutation.isPending}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {confirmarRetiradaMutation.isPending ? 'Confirmando...' : 'Confirmar Retirada'}
+              </button>
+            )}
+          </div>
+
+          {status !== 'DELIVERED' && status !== 'SHIPPED' && status !== 'CANCELLED' && (
+            <>
+              {cancelError && <p className="text-xs text-destructive">{cancelError}</p>}
+              {confirmCancel ? (
+                <div className="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3">
+                  <span className="text-sm text-destructive font-medium">
+                    Cancelar este pedido?
+                  </span>
+                  <button
+                    onClick={() => cancelMutation.mutate()}
+                    disabled={cancelMutation.isPending}
+                    className="rounded-lg bg-destructive px-3 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {cancelMutation.isPending ? 'Cancelando...' : 'Confirmar Cancelamento'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmCancel(false)}
+                    className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
+                  >
+                    Voltar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmCancel(true)}
+                  className="rounded-lg border border-destructive/50 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  Cancelar Pedido
+                </button>
+              )}
+            </>
           )}
         </div>
       </section>

@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchProntos } from '@/actions/expedicao';
+import { fetchProntos, cancelarPedido } from '@/actions/expedicao';
 import { emitInvoice } from '@/actions/invoices';
 import type { OrderSummary } from '@/actions/expedicao';
 
@@ -51,9 +51,24 @@ function EtiquetaBadge({ shipment }: { shipment: OrderSummary['shipment'] }) {
 
 export default function ProntosPage() {
   const { token } = useAuth();
+  const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [deliveryMethod, setDeliveryMethod] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const cancelMutation = useMutation({
+    mutationFn: (orderId: string) => cancelarPedido(token!, orderId),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setCancelError(result.error);
+        return;
+      }
+      setConfirmCancel(null);
+      qc.invalidateQueries({ queryKey: ['expedicao-prontos'] });
+    },
+  });
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['expedicao-prontos', page, deliveryMethod],
@@ -126,6 +141,18 @@ export default function ProntosPage() {
           </div>
         )}
       </div>
+
+      {cancelError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3">
+          <span>{cancelError}</span>
+          <button
+            onClick={() => setCancelError(null)}
+            className="shrink-0 text-destructive/70 hover:text-destructive"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div>
         <select
@@ -207,12 +234,43 @@ export default function ProntosPage() {
                       <EtiquetaBadge shipment={o.shipment} />
                     </td>
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/expedicao/conferencia/${o.id}`}
-                        className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
-                      >
-                        Conferência
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        {confirmCancel === o.id ? (
+                          <>
+                            <span className="text-xs text-muted-foreground">Cancelar?</span>
+                            <button
+                              onClick={() => cancelMutation.mutate(o.id)}
+                              disabled={cancelMutation.isPending}
+                              className="rounded-lg bg-destructive px-2.5 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                            >
+                              {cancelMutation.isPending && cancelMutation.variables === o.id
+                                ? '...'
+                                : 'Sim'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmCancel(null)}
+                              className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted"
+                            >
+                              Não
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <Link
+                              href={`/admin/expedicao/conferencia/${o.id}`}
+                              className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
+                            >
+                              Conferência
+                            </Link>
+                            <button
+                              onClick={() => setConfirmCancel(o.id)}
+                              className="rounded-lg border border-destructive/50 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -7,7 +7,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
-import { atualizarItensSeparados, finalizarSeparacao } from '@/actions/expedicao';
+import { atualizarItensSeparados, finalizarSeparacao, cancelarPedido } from '@/actions/expedicao';
 import type { Order, OrderItem } from '@/types/order';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -93,6 +93,8 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
   const router = useRouter();
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   const { data: order, isLoading } = useQuery<Order>({
     queryKey: ['order', params.id],
@@ -117,6 +119,17 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
   const finalizeMutation = useMutation({
     mutationFn: () => finalizarSeparacao(token!, params.id),
     onSuccess: () => router.push(`/admin/expedicao/conferencia/${params.id}`),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelarPedido(token!, params.id),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setCancelError(result.error);
+        return;
+      }
+      router.push('/admin/expedicao/fila');
+    },
   });
 
   const handleToggle = useCallback(
@@ -194,7 +207,7 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
         ))}
       </div>
 
-      <div className="pt-2">
+      <div className="pt-2 space-y-3">
         <button
           onClick={() => finalizeMutation.mutate()}
           disabled={!allChecked || finalizeMutation.isPending}
@@ -203,9 +216,37 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
           {finalizeMutation.isPending ? 'Finalizando...' : 'Finalizar Separação'}
         </button>
         {!allChecked && (
-          <p className="mt-2 text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-muted-foreground">
             Marque todos os itens para finalizar
           </p>
+        )}
+
+        {cancelError && <p className="text-center text-xs text-destructive">{cancelError}</p>}
+
+        {confirmCancel ? (
+          <div className="flex items-center justify-center gap-3 rounded-xl border border-destructive/40 bg-destructive/5 py-3 px-4">
+            <span className="text-sm text-destructive font-medium">Cancelar este pedido?</span>
+            <button
+              onClick={() => cancelMutation.mutate()}
+              disabled={cancelMutation.isPending}
+              className="rounded-lg bg-destructive px-3 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {cancelMutation.isPending ? 'Cancelando...' : 'Confirmar Cancelamento'}
+            </button>
+            <button
+              onClick={() => setConfirmCancel(false)}
+              className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
+            >
+              Voltar
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmCancel(true)}
+            className="w-full rounded-xl border border-destructive/50 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            Cancelar Pedido
+          </button>
         )}
       </div>
     </div>

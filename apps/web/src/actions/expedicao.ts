@@ -151,6 +151,18 @@ export async function confirmarRetirada(token: string, orderId: string) {
   return apiFetch(token, `/expedicao/${orderId}/confirmar-retirada`, { method: 'PATCH' });
 }
 
+export async function cancelarPedido(
+  token: string,
+  orderId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await apiFetch(token, `/expedicao/${orderId}/cancelar`, { method: 'PATCH' });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message ?? 'Erro ao cancelar pedido.' };
+  }
+}
+
 export async function batchExpedicao(token: string, ids: string[], action: string) {
   return apiFetch<{ success: string[]; failed: string[] }>(token, '/expedicao/batch', {
     method: 'POST',

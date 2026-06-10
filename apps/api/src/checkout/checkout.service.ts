@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeliveryMethod, Prisma } from '@prisma/client';
+import { DeliveryMethod, Prisma, ProductStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
@@ -155,10 +155,17 @@ export class CheckoutService {
       });
 
       for (const item of cart.items) {
-        await tx.product.update({
+        const updated = await tx.product.update({
           where: { id: item.productId },
           data: { stock: { decrement: item.quantity } },
+          select: { stock: true },
         });
+        if (updated.stock <= 0) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { status: ProductStatus.INACTIVE },
+          });
+        }
       }
 
       if (couponId) {

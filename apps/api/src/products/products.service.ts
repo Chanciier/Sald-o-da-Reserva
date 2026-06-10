@@ -278,7 +278,7 @@ export class ProductsService {
 
     const updated = await this.prisma.product.update({
       where: { id },
-      data: { stock },
+      data: { stock, ...(stock <= 0 && { status: 'INACTIVE' as const }) },
       include: { category: true, images: { orderBy: { position: 'asc' } } },
     });
 

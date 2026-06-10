@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchFila, iniciarSeparacao } from '@/actions/expedicao';
+import { fetchFila, iniciarSeparacao, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
 
 const DELIVERY_OPTIONS = [
@@ -53,6 +53,7 @@ export default function FilaPage() {
   const [searchInput, setSearchInput] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['expedicao-fila', page, search, deliveryMethod],
@@ -69,6 +70,18 @@ export default function FilaPage() {
       }
       qc.invalidateQueries({ queryKey: ['expedicao-fila'] });
       router.push(`/admin/expedicao/separacao/${orderId}`);
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (orderId: string) => cancelarPedido(token!, orderId),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setActionError(result.error);
+        return;
+      }
+      setConfirmCancel(null);
+      qc.invalidateQueries({ queryKey: ['expedicao-fila'] });
     },
   });
 
@@ -198,15 +211,46 @@ export default function FilaPage() {
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-sm">{fmt(o.total)}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => mutation.mutate(o.id)}
-                        disabled={mutation.isPending}
-                        className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                      >
-                        {mutation.isPending && mutation.variables === o.id
-                          ? 'Iniciando...'
-                          : 'Iniciar Separação'}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {confirmCancel === o.id ? (
+                          <>
+                            <span className="text-xs text-muted-foreground">Cancelar pedido?</span>
+                            <button
+                              onClick={() => cancelMutation.mutate(o.id)}
+                              disabled={cancelMutation.isPending}
+                              className="rounded-lg bg-destructive px-2.5 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                            >
+                              {cancelMutation.isPending && cancelMutation.variables === o.id
+                                ? '...'
+                                : 'Sim'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmCancel(null)}
+                              className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted"
+                            >
+                              Não
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => mutation.mutate(o.id)}
+                              disabled={mutation.isPending}
+                              className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                            >
+                              {mutation.isPending && mutation.variables === o.id
+                                ? 'Iniciando...'
+                                : 'Iniciar Separação'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmCancel(o.id)}
+                              className="rounded-lg border border-destructive/50 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
