@@ -65,7 +65,7 @@ export class FocusNfeProvider implements InvoiceProvider {
     this.uf = this.config.get<string>('FOCUS_NFE_UF', 'SP');
     this.cep = this.config.get<string>('FOCUS_NFE_CEP', '');
     this.crt = this.config.get<string>('FOCUS_NFE_CRT', '1'); // 1=Simples Nacional
-    this.defaultNcm = this.config.get<string>('FOCUS_NFE_DEFAULT_NCM', '87149900'); // partes p/ motocicletas
+    this.defaultNcm = this.config.get<string>('FOCUS_NFE_DEFAULT_NCM', '87141000'); // 8714.10.00 — partes p/ motocicletas
   }
 
   private get authHeader(): string {
