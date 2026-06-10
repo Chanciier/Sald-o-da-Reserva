@@ -369,19 +369,27 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
           </div>
           <div className="p-4">
             {!shipment || !shipment.labelUrl ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <p className="text-sm text-muted-foreground">Sem etiqueta gerada.</p>
-                <button
-                  onClick={() => {
-                    setLabelError('');
-                    labelMutation.mutate();
-                  }}
-                  disabled={labelMutation.isPending}
-                  className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                >
-                  {labelMutation.isPending ? 'Gerando...' : 'Gerar Etiqueta'}
-                </button>
-                {labelError && <span className="text-xs text-red-500">{labelError}</span>}
+                {shipment?.serviceId ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setLabelError('');
+                        labelMutation.mutate();
+                      }}
+                      disabled={labelMutation.isPending}
+                      className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                    >
+                      {labelMutation.isPending ? 'Gerando...' : 'Gerar Etiqueta'}
+                    </button>
+                    {labelError && <span className="text-xs text-red-500">{labelError}</span>}
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    Frete sem integração automática — gere a etiqueta diretamente na transportadora.
+                  </span>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
