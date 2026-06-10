@@ -56,6 +56,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const router = useRouter();
   const qc = useQueryClient();
   const [labelError, setLabelError] = useState('');
+  const [invoiceError, setInvoiceError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelError, setCancelError] = useState('');
   const [refundWarning, setRefundWarning] = useState('');
@@ -80,12 +81,20 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
 
   const emitMutation = useMutation({
     mutationFn: () => emitInvoice(token!, params.id),
-    onSuccess: () => refetchInvoice(),
+    onSuccess: () => {
+      setInvoiceError('');
+      refetchInvoice();
+    },
+    onError: (e: Error) => setInvoiceError(e.message),
   });
 
   const reemitMutation = useMutation({
     mutationFn: () => reemitInvoice(token!, invoice!.id),
-    onSuccess: () => refetchInvoice(),
+    onSuccess: () => {
+      setInvoiceError('');
+      refetchInvoice();
+    },
+    onError: (e: Error) => setInvoiceError(e.message),
   });
 
   const labelMutation = useMutation({
@@ -211,7 +220,18 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
           <FileText className="h-4 w-4 text-muted-foreground" />
           <h2 className="font-semibold text-sm">Nota Fiscal (NF-e)</h2>
         </div>
-        <div className="p-4">
+        <div className="p-4 space-y-3">
+          {invoiceError && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive flex items-center justify-between gap-2">
+              <span>Erro: {invoiceError}</span>
+              <button
+                onClick={() => setInvoiceError('')}
+                className="shrink-0 opacity-70 hover:opacity-100"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           {invoiceLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Verificando NF-e...
