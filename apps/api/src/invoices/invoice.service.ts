@@ -78,7 +78,8 @@ export class InvoiceService {
 
     try {
       const address = order.shippingAddress as Record<string, string> | null;
-      const reference = invoice.id; // Use invoice ID as Focus NFe reference (unique per attempt)
+      // Unique ref per attempt — avoids Focus NFe caching stale rejections for the same ref
+      const reference = `${invoice.id.replace(/-/g, '').slice(0, 20)}${Date.now()}`;
 
       const result = await this.focus.issueInvoice({
         reference,
