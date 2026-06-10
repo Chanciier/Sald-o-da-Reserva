@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -279,7 +280,13 @@ export class InvoiceService {
     if (!invoice.focusReference) throw new NotFoundException('Nota sem referência Focus NFe.');
     if (!this.focus.isConfigured()) throw new BadRequestException('Focus NFe não configurado.');
     await this.audit('INVOICE_DOWNLOAD_DANFE', user.id, { invoiceId });
-    return this.focus.downloadDanfe(invoice.focusReference);
+    try {
+      return await this.focus.downloadDanfe(invoice.focusReference);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`streamDanfe failed for invoice ${invoiceId}: ${msg}`);
+      throw new BadGatewayException(`Erro ao buscar DANFE: ${msg}`);
+    }
   }
 
   async streamXml(invoiceId: string, user: AuthenticatedUser): Promise<Buffer> {
@@ -287,7 +294,13 @@ export class InvoiceService {
     if (!invoice.focusReference) throw new NotFoundException('Nota sem referência Focus NFe.');
     if (!this.focus.isConfigured()) throw new BadRequestException('Focus NFe não configurado.');
     await this.audit('INVOICE_DOWNLOAD_XML', user.id, { invoiceId });
-    return this.focus.downloadXmlBuffer(invoice.focusReference);
+    try {
+      return await this.focus.downloadXmlBuffer(invoice.focusReference);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`streamXml failed for invoice ${invoiceId}: ${msg}`);
+      throw new BadGatewayException(`Erro ao buscar XML: ${msg}`);
+    }
   }
 
   // ── Queries ───────────────────────────────────────────────────────────────

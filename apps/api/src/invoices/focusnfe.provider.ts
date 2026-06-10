@@ -176,11 +176,26 @@ export class FocusNfeProvider implements InvoiceProvider {
     const url = `${this.baseUrl}/nfe/${encodeURIComponent(reference)}/danfe`;
     const res = await fetch(url, {
       headers: { Authorization: this.authHeader },
+      redirect: 'manual',
       signal: AbortSignal.timeout(20000),
     });
+
+    // Focus NFe may redirect to a CDN/S3 pre-signed URL — follow without auth header
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) throw new Error('FocusNFe DANFE: redirect sem Location header');
+      this.logger.debug(`FocusNFe DANFE redirect → ${location}`);
+      const cdn = await fetch(location, { signal: AbortSignal.timeout(30000) });
+      if (!cdn.ok) {
+        const text = await cdn.text().catch(() => '');
+        throw new Error(`FocusNFe DANFE CDN → HTTP ${cdn.status}: ${text.slice(0, 300)}`);
+      }
+      return Buffer.from(await cdn.arrayBuffer());
+    }
+
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`FocusNFe DANFE → HTTP ${res.status}: ${text}`);
+      throw new Error(`FocusNFe DANFE → HTTP ${res.status}: ${text.slice(0, 300)}`);
     }
     return Buffer.from(await res.arrayBuffer());
   }
@@ -189,11 +204,24 @@ export class FocusNfeProvider implements InvoiceProvider {
     const url = `${this.baseUrl}/nfe/${encodeURIComponent(reference)}/xml`;
     const res = await fetch(url, {
       headers: { Authorization: this.authHeader },
+      redirect: 'manual',
       signal: AbortSignal.timeout(20000),
     });
+
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) throw new Error('FocusNFe XML: redirect sem Location header');
+      const cdn = await fetch(location, { signal: AbortSignal.timeout(30000) });
+      if (!cdn.ok) {
+        const text = await cdn.text().catch(() => '');
+        throw new Error(`FocusNFe XML CDN → HTTP ${cdn.status}: ${text.slice(0, 300)}`);
+      }
+      return Buffer.from(await cdn.arrayBuffer());
+    }
+
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`FocusNFe XML → HTTP ${res.status}: ${text}`);
+      throw new Error(`FocusNFe XML → HTTP ${res.status}: ${text.slice(0, 300)}`);
     }
     return Buffer.from(await res.arrayBuffer());
   }
