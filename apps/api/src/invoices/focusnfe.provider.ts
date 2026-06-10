@@ -138,9 +138,7 @@ export class FocusNfeProvider implements InvoiceProvider {
     const now = new Date().toISOString();
     const body = this.buildNfePayload(payload, now);
 
-    this.logger.log(
-      `FocusNFe: emitting NF-e ref=${payload.reference} items=${JSON.stringify((body.items as Array<{ ncm: string; cfop: string; codigo_produto: string }>).map((i) => ({ sku: i.codigo_produto, ncm: i.ncm, cfop: i.cfop })))}`,
-    );
+    this.logger.log(`FocusNFe: payload=${JSON.stringify(body)}`);
     const res = await this.request<FocusNfeResponse>(
       'POST',
       `/nfe?ref=${encodeURIComponent(payload.reference)}`,
