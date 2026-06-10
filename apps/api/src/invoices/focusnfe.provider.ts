@@ -18,6 +18,8 @@ interface FocusNfeResponse {
   protocolo?: string;
   url?: string;
   danfe_url?: string;
+  caminho_danfe?: string;
+  caminho_xml_note_fiscal?: string;
   data_emissao?: string;
   data_cancelamento?: string;
   erros?: Array<{ codigo: string; mensagem: string; campo?: string }>;
@@ -173,39 +175,69 @@ export class FocusNfeProvider implements InvoiceProvider {
   }
 
   async downloadDanfe(reference: string): Promise<Buffer> {
-    const url = `${this.baseUrl}/nfe/${encodeURIComponent(reference)}/danfe`;
-    const res = await fetch(url, {
+    // Focus NFe doesn't expose /nfe/{ref}/danfe — get danfe_url from the NF-e details
+    const nfe = await this.request<FocusNfeResponse>(
+      'GET',
+      `/nfe/${encodeURIComponent(reference)}?completo=1`,
+    );
+
+    this.logger.debug(
+      `FocusNFe GET NF-e: status=${nfe.status} danfe_url=${nfe.danfe_url} caminho_danfe=${nfe.caminho_danfe}`,
+    );
+
+    // Prefer danfe_url; fall back to caminho_danfe (relative path, strip /v2 from base)
+    const rawBase = this.baseUrl.replace(/\/v2$/, '');
+    const danfeUrl = nfe.danfe_url ?? (nfe.caminho_danfe ? `${rawBase}${nfe.caminho_danfe}` : null);
+
+    if (!danfeUrl) {
+      throw new Error(
+        'DANFE não disponível via API do Focus NFe. Em homologação o PDF é enviado apenas por e-mail.',
+      );
+    }
+
+    const res = await fetch(danfeUrl, {
       headers: { Authorization: this.authHeader },
       redirect: 'manual',
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(30000),
     });
 
-    // Focus NFe may redirect to a CDN/S3 pre-signed URL — follow without auth header
+    // CDN/S3 pre-signed redirect — follow without auth header
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get('location');
       if (!location) throw new Error('FocusNFe DANFE: redirect sem Location header');
-      this.logger.debug(`FocusNFe DANFE redirect → ${location}`);
       const cdn = await fetch(location, { signal: AbortSignal.timeout(30000) });
       if (!cdn.ok) {
         const text = await cdn.text().catch(() => '');
-        throw new Error(`FocusNFe DANFE CDN → HTTP ${cdn.status}: ${text.slice(0, 300)}`);
+        throw new Error(`FocusNFe DANFE CDN → HTTP ${cdn.status}: ${text.slice(0, 200)}`);
       }
       return Buffer.from(await cdn.arrayBuffer());
     }
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`FocusNFe DANFE → HTTP ${res.status}: ${text.slice(0, 300)}`);
+      throw new Error(`FocusNFe DANFE → HTTP ${res.status}: ${text.slice(0, 200)}`);
     }
     return Buffer.from(await res.arrayBuffer());
   }
 
   async downloadXmlBuffer(reference: string): Promise<Buffer> {
-    const url = `${this.baseUrl}/nfe/${encodeURIComponent(reference)}/xml`;
-    const res = await fetch(url, {
+    const nfe = await this.request<FocusNfeResponse>(
+      'GET',
+      `/nfe/${encodeURIComponent(reference)}?completo=1`,
+    );
+
+    const rawBase = this.baseUrl.replace(/\/v2$/, '');
+    const xmlUrl =
+      nfe.url ?? (nfe.caminho_xml_note_fiscal ? `${rawBase}${nfe.caminho_xml_note_fiscal}` : null);
+
+    if (!xmlUrl) {
+      throw new Error('XML não disponível para esta NF-e no Focus NFe.');
+    }
+
+    const res = await fetch(xmlUrl, {
       headers: { Authorization: this.authHeader },
       redirect: 'manual',
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (res.status >= 300 && res.status < 400) {
@@ -214,14 +246,14 @@ export class FocusNfeProvider implements InvoiceProvider {
       const cdn = await fetch(location, { signal: AbortSignal.timeout(30000) });
       if (!cdn.ok) {
         const text = await cdn.text().catch(() => '');
-        throw new Error(`FocusNFe XML CDN → HTTP ${cdn.status}: ${text.slice(0, 300)}`);
+        throw new Error(`FocusNFe XML CDN → HTTP ${cdn.status}: ${text.slice(0, 200)}`);
       }
       return Buffer.from(await cdn.arrayBuffer());
     }
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`FocusNFe XML → HTTP ${res.status}: ${text.slice(0, 300)}`);
+      throw new Error(`FocusNFe XML → HTTP ${res.status}: ${text.slice(0, 200)}`);
     }
     return Buffer.from(await res.arrayBuffer());
   }
