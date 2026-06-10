@@ -84,14 +84,19 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
   const [slugManual, setSlugManual] = useState(!!initialData);
   const [skuManual, setSkuManual] = useState(!!initialData);
 
-  const { data: categoriesData } = useQuery({
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+  } = useQuery({
     queryKey: ['categories-list'],
     queryFn: async (): Promise<{ data: CategoryItem[] }> => {
       const res = await fetch(`${BASE}/api/v1/categories?limit=200`);
-      if (!res.ok) return { data: [] };
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
     staleTime: 5 * 60 * 1000,
+    retry: 2,
   });
   const categories = categoriesData?.data ?? [];
 
@@ -652,14 +657,33 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           {/* Categoria */}
           <div className={cardCls}>
             <h2 className="text-sm font-semibold">Categoria</h2>
-            <select {...register('categoryId')} className={inputCls}>
-              <option value="">Sem categoria</option>
+            <select {...register('categoryId')} className={inputCls} disabled={categoriesLoading}>
+              <option value="">
+                {categoriesLoading
+                  ? 'Carregando categorias...'
+                  : categoriesError
+                    ? 'Erro ao carregar categorias'
+                    : 'Sem categoria'}
+              </option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
             </select>
+            {categoriesError && (
+              <p className="mt-1 text-xs text-destructive">
+                Não foi possível carregar as categorias. Verifique a conexão com a API.
+              </p>
+            )}
+            {!categoriesLoading && !categoriesError && categories.length === 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Nenhuma categoria cadastrada.{' '}
+                <a href="/admin/categorias" className="underline">
+                  Criar categoria
+                </a>
+              </p>
+            )}
           </div>
 
           {/* NCM */}
