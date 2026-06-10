@@ -236,6 +236,17 @@ export class ShippingService {
     );
     const { height, width, length, weight } = this.calcPackage(order.items);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const products = order.items.map((i: any) => ({
+      name: (i.name ?? i.product?.name ?? 'Produto') as string,
+      quantity: i.quantity as number,
+      unitary_value: i.price.toNumber() as number,
+    }));
+
+    this.logger.log(
+      `purchaseLabel: from.document="${this.from.document}" serviceId=${shipment.serviceId}`,
+    );
+
     // Add to ME cart
     const cartRes = await fetch(`${this.baseUrl}/me/cart`, {
       method: 'POST',
@@ -257,12 +268,13 @@ export class ShippingService {
           country_id: 'BR',
           postal_code: addr.cep.replace(/\D/g, ''),
         },
+        products,
         volumes: [{ height, width, length, weight }],
         options: {
           insurance_value: totalValue,
           receipt: false,
           own_hand: false,
-          non_commercial: true,
+          non_commercial: false,
         },
         tag: `order-${orderId.slice(-8).toUpperCase()}`,
       }),
