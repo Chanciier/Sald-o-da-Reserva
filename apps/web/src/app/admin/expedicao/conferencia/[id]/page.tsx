@@ -389,6 +389,11 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                   <span className="text-xs text-muted-foreground">
                     Frete grátis — sem etiqueta necessária.
                   </span>
+                ) : shipment ? (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    Pedido sem integração ME — gere a etiqueta manualmente no site da
+                    transportadora.
+                  </span>
                 ) : null}
               </div>
             ) : (

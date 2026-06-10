@@ -34,28 +34,9 @@ export class CheckoutService {
     private readonly shippingService: ShippingService,
   ) {}
 
-  async getShippingOptions(subtotal: number, cep?: string): Promise<ShippingQuoteOption[]> {
-    const options = cep
-      ? await this.shippingService.quote(cep)
-      : this.shippingService['fallbackOptions']();
-
-    // Add free shipping if eligible
-    const FREE_THRESHOLD = 300;
-    if (subtotal >= FREE_THRESHOLD) {
-      const free: ShippingQuoteOption = {
-        serviceId: 0,
-        method: 'FREE',
-        name: 'Frete Grátis',
-        carrier: '',
-        description: '5–8 dias úteis',
-        price: 0,
-        deliveryMin: 5,
-        deliveryMax: 8,
-      };
-      return [free, ...options];
-    }
-
-    return options;
+  async getShippingOptions(_subtotal: number, cep?: string): Promise<ShippingQuoteOption[]> {
+    if (!cep) return [];
+    return this.shippingService.quote(cep);
   }
 
   async createOrder(userId: string, dto: CreateOrderDto) {
