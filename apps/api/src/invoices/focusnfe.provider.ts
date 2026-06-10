@@ -231,6 +231,18 @@ export class FocusNfeProvider implements InvoiceProvider {
 
     const valorProdutos = items.reduce((s, i) => s + i.total, 0);
 
+    // Distribute freight proportionally across items; last item absorbs rounding
+    const freightPerItem = items.map((item, idx) => {
+      if (freight === 0) return 0;
+      if (idx === items.length - 1) {
+        const allocated = items
+          .slice(0, -1)
+          .reduce((s, i) => s + Math.round((i.total / valorProdutos) * freight * 100) / 100, 0);
+        return Math.round((freight - allocated) * 100) / 100;
+      }
+      return Math.round((item.total / valorProdutos) * freight * 100) / 100;
+    });
+
     return {
       natureza_operacao: 'Venda de mercadoria',
       data_emissao: isoDt,
@@ -270,6 +282,7 @@ export class FocusNfeProvider implements InvoiceProvider {
 
       // Items
       items: items.map((item, idx) => ({
+        valor_frete: freightPerItem[idx],
         numero_item: idx + 1,
         codigo_produto: item.sku,
         descricao: item.name,
