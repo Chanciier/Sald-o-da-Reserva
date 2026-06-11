@@ -434,7 +434,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
             {!shipment || !shipment.labelUrl ? (
               <div className="flex items-center gap-3 flex-wrap">
                 <p className="text-sm text-muted-foreground">Sem etiqueta gerada.</p>
-                {shipment?.serviceId && shipment?.serviceCode ? (
+                {shipment?.serviceId ? (
                   <>
                     <button
                       onClick={() => {

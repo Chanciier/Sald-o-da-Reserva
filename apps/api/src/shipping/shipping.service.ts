@@ -266,6 +266,49 @@ export class ShippingService {
     return this.serializeShipment(fresh!);
   }
 
+  // ── Resolve serviceCode for legacy shipments ──────────────────────────────
+
+  private normalizeName(s: string): string {
+    return s
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  private async resolveServiceCode(
+    carrier: string,
+    service: string,
+    paidPrice: number,
+    cep: string,
+  ): Promise<string | null> {
+    const cleaned = cep.replace(/\D/g, '');
+    if (cleaned.length !== 8) return null;
+
+    const options = await this.quote(cleaned);
+    if (!options.length) return null;
+
+    const wantedCarrier = this.normalizeName(carrier);
+    const wantedService = this.normalizeName(service);
+
+    const sameCarrier = options.filter((o) => {
+      const c = this.normalizeName(o.carrier);
+      return c.includes(wantedCarrier) || wantedCarrier.includes(c);
+    });
+    if (!sameCarrier.length) return null;
+
+    const byService = sameCarrier.find((o) => {
+      const n = this.normalizeName(o.name);
+      return n.includes(wantedService) || wantedService.includes(n);
+    });
+    if (byService) return byService.serviceCode;
+
+    // Sem match exato de serviço: usa o da mesma transportadora com preço
+    // mais próximo do que o cliente pagou.
+    sameCarrier.sort((a, b) => Math.abs(a.price - paidPrice) - Math.abs(b.price - paidPrice));
+    return sameCarrier[0].serviceCode;
+  }
+
   // ── Purchase label (admin) ────────────────────────────────────────────────
 
   async purchaseLabel(orderId: string) {
@@ -287,16 +330,32 @@ export class ShippingService {
       );
     }
 
-    const serviceCode =
-      (shipment as unknown as { serviceCode?: string | null }).serviceCode ?? null;
-    if (!serviceCode) {
-      throw new BadRequestException(
-        'Código do serviço Frenet não encontrado. Atualize o transportador antes de gerar a etiqueta.',
-      );
-    }
-
     const order = shipment.order;
     const addr = order.shippingAddress as Record<string, string>;
+
+    let serviceCode = (shipment as unknown as { serviceCode?: string | null }).serviceCode ?? null;
+    if (!serviceCode) {
+      // Pedido criado antes da migração Frenet: resolve o código pelo nome da
+      // transportadora/serviço que o cliente escolheu no checkout.
+      serviceCode = await this.resolveServiceCode(
+        shipment.carrier,
+        shipment.service,
+        shipment.price.toNumber(),
+        addr.cep ?? '',
+      );
+      if (!serviceCode) {
+        throw new BadRequestException(
+          `Serviço "${shipment.carrier} — ${shipment.service}" indisponível na Frenet para este CEP. Use "Trocar" para selecionar outro.`,
+        );
+      }
+      await this.prisma.shipment.update({
+        where: { id: shipment.id },
+        data: { serviceCode } as Prisma.ShipmentUpdateInput,
+      });
+      this.logger.log(
+        `purchaseLabel: serviceCode "${serviceCode}" resolvido automaticamente para "${shipment.carrier} ${shipment.service}" (shipment ${shipment.id})`,
+      );
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const totalValue = order.items.reduce(
