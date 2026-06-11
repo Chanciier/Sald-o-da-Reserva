@@ -67,6 +67,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const [carrierLoading, setCarrierLoading] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState<ShippingOption | null>(null);
   const [carrierError, setCarrierError] = useState('');
+  const [autoGenerateAfterCarrier, setAutoGenerateAfterCarrier] = useState(false);
 
   const { data: order, isLoading: orderLoading } = useQuery<Order>({
     queryKey: ['order', params.id],
@@ -159,10 +160,11 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     onError: (e: Error) => setLabelError(e.message),
   });
 
-  async function openCarrierModal() {
+  async function openCarrierModal(legacyOrder = false) {
     setCarrierError('');
     setCarrierOptions([]);
     setSelectedCarrier(null);
+    setAutoGenerateAfterCarrier(legacyOrder);
     setCarrierModal(true);
     setCarrierLoading(true);
     try {
@@ -206,6 +208,10 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     onSuccess: () => {
       setCarrierModal(false);
       qc.invalidateQueries({ queryKey: ['order', params.id] });
+      if (autoGenerateAfterCarrier) {
+        setLabelError('');
+        labelMutation.mutate();
+      }
     },
     onError: (e: Error) => setCarrierError(e.message),
   });
@@ -456,16 +462,13 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                   </span>
                 ) : shipment ? (
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-xs text-amber-600 dark:text-amber-400">
-                      Pedido sem integração de frete — troque a transportadora ou gere a etiqueta
-                      manualmente.
-                    </span>
                     <button
-                      onClick={openCarrierModal}
-                      className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+                      onClick={() => openCarrierModal(true)}
+                      className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 transition-colors"
                     >
-                      <Truck className="h-3 w-3" /> Trocar Transportadora
+                      <Truck className="h-3 w-3" /> Gerar Etiqueta
                     </button>
+                    {labelError && <span className="text-xs text-red-500">{labelError}</span>}
                   </div>
                 ) : null}
               </div>
