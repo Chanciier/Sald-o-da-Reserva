@@ -457,8 +457,8 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                 ) : shipment ? (
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-xs text-amber-600 dark:text-amber-400">
-                      Pedido sem integração ME — gere a etiqueta manualmente no site da
-                      transportadora.
+                      Pedido sem integração de frete — troque a transportadora ou gere a etiqueta
+                      manualmente.
                     </span>
                     <button
                       onClick={openCarrierModal}
