@@ -81,10 +81,16 @@ export class ShippingService {
       ? 'https://sandbox.melhorenvio.com.br/api/v2'
       : 'https://melhorenvio.com.br/api/v2';
     this.userAgent = 'Saldão da Reversa (adriansanluz@gmail.com)';
+    // ME exige CPF em "document" e CNPJ em "company_document"
+    const fromDocument = this.config
+      .get<string>('MELHOR_ENVIO_FROM_DOCUMENT', '')
+      .replace(/\D/g, '');
     this.from = {
       name: this.config.get<string>('MELHOR_ENVIO_FROM_NAME', ''),
       email: this.config.get<string>('MELHOR_ENVIO_FROM_EMAIL', ''),
-      document: this.config.get<string>('MELHOR_ENVIO_FROM_DOCUMENT', '').replace(/\D/g, ''),
+      ...(fromDocument.length === 14
+        ? { company_document: fromDocument }
+        : { document: fromDocument }),
       phone: this.config.get<string>('MELHOR_ENVIO_FROM_PHONE', ''),
       address: this.config.get<string>('MELHOR_ENVIO_FROM_ADDRESS', ''),
       number: this.config.get<string>('MELHOR_ENVIO_FROM_NUMBER', ''),
@@ -282,7 +288,7 @@ export class ShippingService {
     }));
 
     this.logger.log(
-      `purchaseLabel: from.document="${this.from.document}" serviceId=${shipment.serviceId}`,
+      `purchaseLabel: from.document="${this.from.document ?? this.from.company_document}" serviceId=${shipment.serviceId}`,
     );
 
     // Add to ME cart
