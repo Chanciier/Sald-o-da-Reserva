@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/auth-context';
 
 const API = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
-type CouponType = 'PERCENTAGE' | 'FIXED';
+type CouponType = 'PERCENT' | 'FIXED';
 
 interface Coupon {
   id: string;
@@ -39,7 +39,7 @@ interface CouponForm {
 const emptyForm: CouponForm = {
   code: '',
   description: '',
-  type: 'PERCENTAGE',
+  type: 'PERCENT',
   value: '',
   minOrderValue: '',
   maxDiscount: '',
@@ -68,7 +68,7 @@ function fmt(n: number) {
 }
 
 function formatValue(type: CouponType, value: number) {
-  return type === 'PERCENTAGE' ? `${value}%` : fmt(value);
+  return type === 'PERCENT' ? `${value}%` : fmt(value);
 }
 
 function Modal({
@@ -211,7 +211,7 @@ export default function AdminCupons() {
     };
     if (form.description.trim()) body.description = form.description.trim();
     if (form.minOrderValue) body.minOrderValue = parseFloat(form.minOrderValue);
-    if (form.maxDiscount && form.type === 'PERCENTAGE')
+    if (form.maxDiscount && form.type === 'PERCENT')
       body.maxDiscount = parseFloat(form.maxDiscount);
     if (form.usageLimit) body.usageLimit = parseInt(form.usageLimit, 10);
     if (form.expiresAt) body.expiresAt = new Date(form.expiresAt).toISOString();
@@ -223,7 +223,7 @@ export default function AdminCupons() {
     setFormError('');
     if (!form.code.trim()) return setFormError('Código é obrigatório.');
     if (!form.value || isNaN(parseFloat(form.value))) return setFormError('Valor é obrigatório.');
-    if (form.type === 'PERCENTAGE' && parseFloat(form.value) > 100)
+    if (form.type === 'PERCENT' && parseFloat(form.value) > 100)
       return setFormError('Percentual não pode ser maior que 100.');
     const body = buildBody();
     if (modal === 'create') createMutation.mutate(body);
@@ -284,7 +284,7 @@ export default function AdminCupons() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {c.type === 'PERCENTAGE' ? 'Percentual' : 'Valor Fixo'}
+                      {c.type === 'PERCENT' ? 'Percentual' : 'Valor Fixo'}
                     </td>
                     <td className="px-4 py-3 font-semibold">{formatValue(c.type, c.value)}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
@@ -359,7 +359,7 @@ export default function AdminCupons() {
                   onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as CouponType }))}
                   className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="PERCENTAGE">Percentual (%)</option>
+                  <option value="PERCENT">Percentual (%)</option>
                   <option value="FIXED">Valor Fixo (R$)</option>
                 </select>
               </div>
@@ -368,19 +368,19 @@ export default function AdminCupons() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1.5 block text-xs font-medium">
-                  {form.type === 'PERCENTAGE' ? 'Desconto (%)' : 'Desconto (R$)'} *
+                  {form.type === 'PERCENT' ? 'Desconto (%)' : 'Desconto (R$)'} *
                 </label>
                 <input
                   type="number"
                   value={form.value}
                   onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
-                  placeholder={form.type === 'PERCENTAGE' ? '10' : '20.00'}
+                  placeholder={form.type === 'PERCENT' ? '10' : '20.00'}
                   min="0.01"
                   step="0.01"
                   className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
-              {form.type === 'PERCENTAGE' && (
+              {form.type === 'PERCENT' && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium">Desconto máximo (R$)</label>
                   <input
