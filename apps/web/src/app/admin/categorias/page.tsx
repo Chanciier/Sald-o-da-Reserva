@@ -417,7 +417,7 @@ export default function AdminCategorias() {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Tem certeza que deseja excluir{' '}
-              <strong className="text-foreground">"{selected.name}"</strong>?
+              <strong className="text-foreground">&ldquo;{selected.name}&rdquo;</strong>?
               {(selected._count?.products ?? 0) > 0 && (
                 <span className="block mt-1 text-amber-600 dark:text-amber-400">
                   Esta categoria possui {selected._count!.products} produto(s) vinculado(s).
