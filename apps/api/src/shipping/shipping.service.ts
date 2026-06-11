@@ -651,33 +651,6 @@ export class ShippingService {
     };
   }
 
-  // ── Private: fallback options ─────────────────────────────────────────────
-
-  private fallbackOptions(): ShippingQuoteOption[] {
-    return [
-      {
-        serviceId: 0,
-        method: 'PAC',
-        name: 'PAC',
-        carrier: 'Correios',
-        description: '5–8 dias úteis',
-        price: 19.9,
-        deliveryMin: 5,
-        deliveryMax: 8,
-      },
-      {
-        serviceId: 0,
-        method: 'SEDEX',
-        name: 'SEDEX',
-        carrier: 'Correios',
-        description: '1–3 dias úteis',
-        price: 34.9,
-        deliveryMin: 1,
-        deliveryMax: 3,
-      },
-    ];
-  }
-
   // ── Private: status mapping ───────────────────────────────────────────────
 
   private mapMeStatus(status: string): ShipmentStatus {

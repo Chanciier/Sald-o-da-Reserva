@@ -60,6 +60,12 @@ export class CheckoutService {
       throw new BadRequestException('Endereço de entrega obrigatório para envio.');
     }
 
+    if (!isPickup && (!dto.meServiceId || dto.meServiceId <= 0)) {
+      throw new BadRequestException(
+        'Selecione uma transportadora com integração Melhor Envio para prosseguir.',
+      );
+    }
+
     const cart = await this.cartService.getCart(userId);
     if (!cart.items.length) throw new BadRequestException('Carrinho está vazio.');
 
