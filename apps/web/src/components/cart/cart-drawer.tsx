@@ -190,7 +190,7 @@ export function CartDrawer() {
                   <button
                     onClick={handleApplyCoupon}
                     disabled={couponLoading || !couponInput.trim()}
-                    className="rounded-lg bg-secondary px-3 py-1.5 text-sm font-medium hover:bg-secondary/80 disabled:opacity-50 transition-colors"
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                   >
                     {couponLoading ? '...' : 'Aplicar'}
                   </button>
