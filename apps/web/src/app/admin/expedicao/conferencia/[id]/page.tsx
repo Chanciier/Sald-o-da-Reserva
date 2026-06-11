@@ -438,7 +438,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
       )}
 
       {/* 3b. Destinatário (sempre visível para envios) */}
-      {!isPickup && (
+      {!isPickup && order.shippingAddress && (
         <section className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="border-b px-4 py-3">
             <h2 className="font-semibold text-sm">Destinatário</h2>

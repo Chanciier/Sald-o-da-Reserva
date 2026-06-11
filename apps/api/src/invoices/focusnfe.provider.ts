@@ -371,6 +371,8 @@ export class FocusNfeProvider implements InvoiceProvider {
       nome_destinatario: customer.name,
       email_destinatario: customer.email,
       indicador_inscricao_estadual_destinatario: 9,
+      consumidor_final: 1,
+      presenca_comprador: isPickup ? 1 : 2,
       ...(customer.address
         ? {
             logradouro_destinatario: customer.address.street,
@@ -381,7 +383,16 @@ export class FocusNfeProvider implements InvoiceProvider {
             uf_destinatario: customer.address.state,
             cep_destinatario: customer.address.cep.replace(/\D/g, ''),
           }
-        : {}),
+        : isPickup
+          ? {
+              logradouro_destinatario: this.logradouro,
+              numero_destinatario: this.numero,
+              bairro_destinatario: this.bairro,
+              municipio_destinatario: this.municipio,
+              uf_destinatario: this.uf,
+              cep_destinatario: this.cep.replace(/\D/g, ''),
+            }
+          : {}),
 
       // Items
       items: items.map((item, idx) => ({
