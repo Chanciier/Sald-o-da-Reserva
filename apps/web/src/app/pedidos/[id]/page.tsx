@@ -427,17 +427,23 @@ export default function OrderDetailPage() {
           {/* Address */}
           <section className="rounded-xl border border-border p-5">
             <h2 className="mb-3 font-semibold">Endereço de entrega</h2>
-            <div className="space-y-0.5 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">{address.name}</p>
-              <p>
-                {address.street}, {address.number}
-                {address.complement ? `, ${address.complement}` : ''}
+            {address ? (
+              <div className="space-y-0.5 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">{address.name}</p>
+                <p>
+                  {address.street}, {address.number}
+                  {address.complement ? `, ${address.complement}` : ''}
+                </p>
+                <p>
+                  {address.neighborhood} — {address.city}/{address.state}
+                </p>
+                <p>CEP: {address.cep.replace(/(\d{5})(\d{3})/, '$1-$2')}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Retirada na loja — sem endereço de entrega.
               </p>
-              <p>
-                {address.neighborhood} — {address.city}/{address.state}
-              </p>
-              <p>CEP: {address.cep.replace(/(\d{5})(\d{3})/, '$1-$2')}</p>
-            </div>
+            )}
           </section>
 
           {/* Financial summary */}

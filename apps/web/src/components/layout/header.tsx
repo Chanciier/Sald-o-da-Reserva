@@ -151,13 +151,6 @@ export function Header() {
                     >
                       Entrar
                     </Link>
-                    <Link
-                      href="/registro"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="block px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
-                    >
-                      Criar conta
-                    </Link>
                   </>
                 )}
               </div>
