@@ -7,7 +7,7 @@ import { Clock, Menu, ShoppingCart, User, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
-import { useCountdown, pad } from '@/hooks/use-countdown';
+import { pad } from '@/hooks/use-countdown';
 
 const anchorLinks = [
   { label: 'Produtos', href: '/produtos' },
@@ -28,11 +28,52 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const { minutes, seconds } = useCountdown(0.25);
-
   const itemCount = cart?.itemCount ?? 0;
   const isHome = pathname === '/';
   const links = isHome ? anchorLinks : navLinks;
+  const hasItems = itemCount > 0;
+
+  const [cartTimer, setCartTimer] = useState({ minutes: 15, seconds: 0 });
+
+  useEffect(() => {
+    const DEADLINE_KEY = 'cart_checkout_deadline';
+    const DURATION_MS = 15 * 60 * 1000;
+
+    if (!hasItems) {
+      localStorage.removeItem(DEADLINE_KEY);
+      return;
+    }
+
+    function getOrCreateDeadline() {
+      const stored = localStorage.getItem(DEADLINE_KEY);
+      if (stored) {
+        const d = parseInt(stored);
+        if (d > Date.now()) return d;
+      }
+      const d = Date.now() + DURATION_MS;
+      localStorage.setItem(DEADLINE_KEY, String(d));
+      return d;
+    }
+
+    function tick(deadline: number) {
+      const diff = Math.max(0, deadline - Date.now());
+      const total = Math.floor(diff / 1000);
+      setCartTimer({ minutes: Math.floor(total / 60), seconds: total % 60 });
+    }
+
+    let deadline = getOrCreateDeadline();
+    tick(deadline);
+
+    const id = setInterval(() => {
+      if (Date.now() >= deadline) {
+        deadline = Date.now() + DURATION_MS;
+        localStorage.setItem(DEADLINE_KEY, String(deadline));
+      }
+      tick(deadline);
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [hasItems]);
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -46,16 +87,19 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur">
-      {/* Top strip */}
-      <div className="bg-secondary text-secondary-foreground">
-        <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-1.5 text-center text-xs font-medium sm:text-sm">
-          <Clock className="size-3.5 text-primary" aria-hidden="true" />
-          <span>Oferta por tempo limitado — encerra em</span>
-          <span className="font-mono font-bold text-primary tabular-nums">
-            {pad(minutes)}:{pad(seconds)}
-          </span>
+      {/* Top strip — only when cart has items */}
+      {hasItems && (
+        <div className="bg-secondary text-secondary-foreground">
+          <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-1.5 text-center text-xs font-medium sm:text-sm">
+            <Clock className="size-3.5 text-primary" aria-hidden="true" />
+            <span>Você tem</span>
+            <span className="font-mono font-bold text-primary tabular-nums">
+              {pad(cartTimer.minutes)}:{pad(cartTimer.seconds)}
+            </span>
+            <span>para concluir a compra</span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2">
         {/* Logo */}
