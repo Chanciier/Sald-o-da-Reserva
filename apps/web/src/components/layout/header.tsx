@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Clock, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { Clock, Menu, ShoppingCart, User, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import { useCountdown, pad } from '@/hooks/use-countdown';
@@ -26,11 +26,23 @@ export function Header() {
   const { cart, setOpen } = useCart();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const { minutes, seconds } = useCountdown(0.25);
 
   const itemCount = cart?.itemCount ?? 0;
   const isHome = pathname === '/';
   const links = isHome ? anchorLinks : navLinks;
+
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    if (userMenuOpen) document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [userMenuOpen]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur">
@@ -45,7 +57,7 @@ export function Header() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2">
         {/* Logo */}
         <Link
           href="/"
@@ -63,7 +75,7 @@ export function Header() {
         </Link>
 
         {/* Nav desktop */}
-        <nav className="hidden items-center gap-5 text-sm md:flex" aria-label="Navegação principal">
+        <nav className="hidden items-center gap-6 text-sm md:flex" aria-label="Navegação principal">
           {links.map((link) => (
             <Link
               key={link.href}
@@ -76,52 +88,81 @@ export function Header() {
         </nav>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
-          {/* Cart */}
+        <div className="flex items-center gap-1">
+          {/* Cart icon */}
           <button
             onClick={() => setOpen(true)}
-            className="relative flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+            className="relative rounded-lg p-2 hover:bg-muted transition-colors"
             aria-label="Carrinho de compras"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-            <span className="hidden sm:inline">Carrinho</span>
+            <ShoppingCart className="size-5" />
             {itemCount > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
+              <span className="absolute -right-0.5 -top-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
                 {itemCount > 99 ? '99+' : itemCount}
               </span>
             )}
           </button>
 
-          {user ? (
-            <div className="flex items-center gap-2">
-              <Link
-                href="/cliente"
-                className="hidden text-sm text-muted-foreground hover:text-foreground transition-colors sm:block"
-              >
-                Minha Conta
-              </Link>
-              <button
-                onClick={logout}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
-              >
-                Sair
-              </button>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          {/* User icon + dropdown */}
+          <div ref={userMenuRef} className="relative">
+            <button
+              onClick={() => setUserMenuOpen((o) => !o)}
+              className="rounded-lg p-2 hover:bg-muted transition-colors"
+              aria-label="Conta"
+              aria-expanded={userMenuOpen}
             >
-              Entrar
-            </Link>
-          )}
+              <User className="size-5" />
+            </button>
+
+            {userMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-border bg-background shadow-lg z-50 overflow-hidden">
+                {user ? (
+                  <>
+                    <div className="border-b border-border px-4 py-3">
+                      <p className="text-[11px] text-muted-foreground">Olá,</p>
+                      <p className="truncate text-sm font-semibold">{user.name ?? user.email}</p>
+                    </div>
+                    <Link
+                      href="/cliente"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2.5 text-sm transition-colors hover:bg-muted"
+                    >
+                      Minha Conta
+                    </Link>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setUserMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-muted"
+                    >
+                      Sair
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="border-b border-border px-4 py-3">
+                      <p className="text-sm text-muted-foreground">Faça login para continuar</p>
+                    </div>
+                    <Link
+                      href="/login"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
+                    >
+                      Entrar
+                    </Link>
+                    <Link
+                      href="/registro"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
+                    >
+                      Criar conta
+                    </Link>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Mobile menu toggle */}
           <button
@@ -170,7 +211,7 @@ export function Header() {
                       logout();
                       setMobileOpen(false);
                     }}
-                    className="w-full text-left rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                    className="w-full rounded-md px-3 py-2.5 text-left text-sm font-medium text-red-500 hover:bg-muted"
                   >
                     Sair
                   </button>
