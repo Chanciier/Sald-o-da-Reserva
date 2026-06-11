@@ -110,6 +110,12 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(150)
+  buyerName?: string;
+
+  @IsOptional()
+  @IsString()
   @Matches(/^\d{11}$/, { message: 'CPF deve conter 11 dígitos numéricos.' })
   cpf?: string;
 }

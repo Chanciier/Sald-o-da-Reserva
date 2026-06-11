@@ -132,6 +132,7 @@ export class CheckoutService {
             : (dto.shippingAddress as unknown as Prisma.InputJsonValue),
           shippingMethod: isPickup ? 'PICKUP' : (dto.shippingMethod ?? 'N/A'),
           notes: dto.notes,
+          buyerName: dto.buyerName ?? null,
           items: {
             create: cart.items.map((item) => {
               const unitPrice = item.salePrice ?? item.price;

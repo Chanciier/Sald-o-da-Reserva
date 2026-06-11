@@ -106,6 +106,7 @@ export default function CheckoutPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [returnsAccepted, setReturnsAccepted] = useState(false);
   const [cpf, setCpf] = useState('');
+  const [buyerName, setBuyerName] = useState(user?.name ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const lastQuotedCep = useRef('');
@@ -179,6 +180,7 @@ export default function CheckoutPage() {
       const order = await createOrder(token, {
         deliveryMethod,
         cpf: cleanCpf,
+        buyerName: buyerName.trim() || undefined,
         ...(isPickup
           ? {}
           : {
@@ -291,9 +293,20 @@ export default function CheckoutPage() {
               )}
             </section>
 
-            {/* CPF — required for NF-e and shipping label */}
+            {/* CPF + Nome — required for NF-e */}
             <section className="rounded-xl border border-border p-5 space-y-3">
               <h2 className="font-semibold">Dados do comprador</h2>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Nome completo</label>
+                <input
+                  required
+                  value={buyerName}
+                  onChange={(e) => setBuyerName(e.target.value)}
+                  placeholder="Nome como deve constar na nota fiscal"
+                  maxLength={150}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">CPF do titular da compra</label>
                 <input

@@ -281,6 +281,7 @@ model Order {
   shippingAddress Json?          @map("shipping_address")
   shippingMethod  String         @map("shipping_method")
   notes           String?
+  buyerName       String?  @map("buyer_name")
   pickupCode      String?  @unique @map("pickup_code")
   separatedItems  Json?    @map("separated_items")
   createdAt       DateTime    @default(now()) @map("created_at")

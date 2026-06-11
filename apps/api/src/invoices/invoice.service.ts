@@ -85,7 +85,7 @@ export class InvoiceService {
       const result = await this.focus.issueInvoice({
         reference,
         customer: {
-          name: order.user.name ?? order.user.email,
+          name: order.buyerName ?? order.user.name ?? order.user.email,
           email: order.user.email,
           cpf: order.user.cpf ?? undefined,
           address: address?.cep
