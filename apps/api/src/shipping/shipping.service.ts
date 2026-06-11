@@ -126,18 +126,24 @@ export class ShippingService {
       }
 
       const services: MeService[] = await res.json();
-      return services
-        .filter((s) => !s.error && s.price && s.id > 0)
-        .map((s) => ({
-          serviceId: s.id,
-          method: s.name.toUpperCase().replace(/\s+/g, '_'),
-          name: s.name,
-          carrier: s.company.name,
-          description: `${s.delivery_range.min}–${s.delivery_range.max} dias úteis`,
-          price: parseFloat(s.price),
-          deliveryMin: s.delivery_range.min,
-          deliveryMax: s.delivery_range.max,
-        }));
+      this.logger.log(
+        `ME quote raw: ${services.length} serviços. ` +
+          services
+            .map((s) => `[id=${s.id} name="${s.name}" price=${s.price} error="${s.error}"]`)
+            .join(', '),
+      );
+      const filtered = services.filter((s) => !s.error && s.price && s.id > 0);
+      this.logger.log(`ME quote filtered: ${filtered.length} serviços disponíveis`);
+      return filtered.map((s) => ({
+        serviceId: s.id,
+        method: s.name.toUpperCase().replace(/\s+/g, '_'),
+        name: s.name,
+        carrier: s.company.name,
+        description: `${s.delivery_range.min}–${s.delivery_range.max} dias úteis`,
+        price: parseFloat(s.price),
+        deliveryMin: s.delivery_range.min,
+        deliveryMax: s.delivery_range.max,
+      }));
     } catch (err) {
       this.logger.error('ME quote error', err);
       return [];
