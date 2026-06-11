@@ -448,7 +448,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                     </button>
                     {shipment.status === 'PENDING' && (
                       <button
-                        onClick={openCarrierModal}
+                        onClick={() => openCarrierModal()}
                         className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
                       >
                         <Truck className="h-3 w-3" /> Trocar
