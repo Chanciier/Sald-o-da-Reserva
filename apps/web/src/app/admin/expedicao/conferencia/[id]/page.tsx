@@ -191,6 +191,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           serviceId: selectedCarrier.serviceId,
+          serviceCode: selectedCarrier.serviceCode,
           carrier: selectedCarrier.carrier,
           service: selectedCarrier.name,
           price: selectedCarrier.price,

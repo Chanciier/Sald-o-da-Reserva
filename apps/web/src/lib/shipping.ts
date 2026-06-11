@@ -27,6 +27,8 @@ export const getTracking = (orderId: string, token: string) =>
   apiFetch<Shipment>(`/shipping/${orderId}/tracking`, token);
 
 export const purchaseLabel = (orderId: string, token: string) =>
-  apiFetch<{ meOrderId: string; labelUrl: string | null }>(`/shipping/label/${orderId}`, token, {
-    method: 'POST',
-  });
+  apiFetch<{ meOrderId?: string; frenetTicket?: string; labelUrl: string | null }>(
+    `/shipping/label/${orderId}`,
+    token,
+    { method: 'POST' },
+  );

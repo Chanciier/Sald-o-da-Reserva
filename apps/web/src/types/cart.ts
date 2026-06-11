@@ -30,6 +30,7 @@ export interface Cart {
 
 export interface ShippingOption {
   serviceId: number;
+  serviceCode?: string;
   method: string;
   name: string;
   carrier: string;

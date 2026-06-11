@@ -18,10 +18,10 @@ const INTEGRATIONS = [
     envKey: 'MERCADO_PAGO_ACCESS_TOKEN',
   },
   {
-    name: 'Melhor Envio',
+    name: 'Frenet',
     desc: 'Cálculo de frete e emissão de etiquetas',
     status: true,
-    envKey: 'MELHOR_ENVIO_TOKEN',
+    envKey: 'FRENET_TOKEN',
   },
   {
     name: 'eNotas',

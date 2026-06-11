@@ -351,9 +351,11 @@ model Shipment {
   id           String         @id @default(cuid())
   orderId      String         @unique @map("order_id")
   meOrderId    String?        @unique @map("me_order_id")
+  frenetTicket String?        @unique @map("frenet_ticket")
   carrier      String
   service      String
   serviceId    Int            @map("service_id")
+  serviceCode  String?        @map("service_code")
   trackingCode String?        @map("tracking_code")
   status       ShipmentStatus @default(PENDING)
   labelUrl     String?        @map("label_url") @db.Text

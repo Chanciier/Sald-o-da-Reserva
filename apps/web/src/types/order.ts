@@ -58,6 +58,7 @@ export interface Shipment {
   carrier: string;
   service: string;
   serviceId: number;
+  serviceCode?: string | null;
   trackingCode: string | null;
   status: ShipmentStatus;
   labelUrl: string | null;
