@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -31,6 +32,24 @@ export class ShippingController {
   @Get(':orderId/tracking')
   getTracking(@CurrentUser('id') userId: string, @Param('orderId') orderId: string) {
     return this.shipping.getTracking(orderId, userId);
+  }
+
+  @Patch(':orderId/carrier')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  updateCarrier(
+    @Param('orderId') orderId: string,
+    @Body()
+    body: {
+      serviceId: number;
+      carrier: string;
+      service: string;
+      price: number;
+      deliveryMin?: number | null;
+      deliveryMax?: number | null;
+    },
+  ) {
+    return this.shipping.updateCarrier(orderId, body);
   }
 
   @Post('label/:orderId')

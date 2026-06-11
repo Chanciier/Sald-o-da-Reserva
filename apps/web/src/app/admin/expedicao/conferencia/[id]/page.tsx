@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileText, Tag, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Tag, CheckCircle2, Loader2, AlertCircle, Truck } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
 import { fetchInvoices, emitInvoice, reemitInvoice } from '@/actions/invoices';
@@ -12,6 +12,7 @@ import { purchaseLabel } from '@/lib/shipping';
 import { marcarPronto, confirmarRetirada, cancelarPedido } from '@/actions/expedicao';
 import type { Order } from '@/types/order';
 import type { Invoice } from '@/actions/invoices';
+import type { ShippingOption } from '@/types/cart';
 
 const API = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
@@ -61,6 +62,11 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelError, setCancelError] = useState('');
   const [refundWarning, setRefundWarning] = useState('');
+  const [carrierModal, setCarrierModal] = useState(false);
+  const [carrierOptions, setCarrierOptions] = useState<ShippingOption[]>([]);
+  const [carrierLoading, setCarrierLoading] = useState(false);
+  const [selectedCarrier, setSelectedCarrier] = useState<ShippingOption | null>(null);
+  const [carrierError, setCarrierError] = useState('');
 
   const { data: order, isLoading: orderLoading } = useQuery<Order>({
     queryKey: ['order', params.id],
@@ -151,6 +157,56 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     mutationFn: () => purchaseLabel(params.id, token!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['order', params.id] }),
     onError: (e: Error) => setLabelError(e.message),
+  });
+
+  async function openCarrierModal() {
+    setCarrierError('');
+    setCarrierOptions([]);
+    setSelectedCarrier(null);
+    setCarrierModal(true);
+    setCarrierLoading(true);
+    try {
+      const cep = order?.shippingAddress?.cep?.replace(/\D/g, '');
+      if (!cep) throw new Error('CEP não disponível para cotação.');
+      const res = await fetch(`${API}/shipping/quote?cep=${cep}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { message?: string }).message ?? `Erro ${res.status}`);
+      const opts = data as ShippingOption[];
+      setCarrierOptions(opts);
+      if (opts.length) setSelectedCarrier(opts[0]);
+    } catch (e) {
+      setCarrierError(e instanceof Error ? e.message : 'Erro ao buscar cotações.');
+    } finally {
+      setCarrierLoading(false);
+    }
+  }
+
+  const updateCarrierMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCarrier) throw new Error('Selecione uma transportadora.');
+      const res = await fetch(`${API}/shipping/${params.id}/carrier`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          serviceId: selectedCarrier.serviceId,
+          carrier: selectedCarrier.carrier,
+          service: selectedCarrier.name,
+          price: selectedCarrier.price,
+          deliveryMin: selectedCarrier.deliveryMin,
+          deliveryMax: selectedCarrier.deliveryMax,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { message?: string }).message ?? `Erro ${res.status}`);
+      return data;
+    },
+    onSuccess: () => {
+      setCarrierModal(false);
+      qc.invalidateQueries({ queryKey: ['order', params.id] });
+    },
+    onError: (e: Error) => setCarrierError(e.message),
   });
 
   const marcarMutation = useMutation({
@@ -383,6 +439,14 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                     >
                       {labelMutation.isPending ? 'Gerando...' : 'Gerar Etiqueta'}
                     </button>
+                    {shipment.status === 'PENDING' && (
+                      <button
+                        onClick={openCarrierModal}
+                        className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+                      >
+                        <Truck className="h-3 w-3" /> Trocar
+                      </button>
+                    )}
                     {labelError && <span className="text-xs text-red-500">{labelError}</span>}
                   </>
                 ) : shipment?.service === 'FREE' || order.shipping === 0 ? (
@@ -390,10 +454,18 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                     Frete grátis — sem etiqueta necessária.
                   </span>
                 ) : shipment ? (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    Pedido sem integração ME — gere a etiqueta manualmente no site da
-                    transportadora.
-                  </span>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      Pedido sem integração ME — gere a etiqueta manualmente no site da
+                      transportadora.
+                    </span>
+                    <button
+                      onClick={openCarrierModal}
+                      className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+                    >
+                      <Truck className="h-3 w-3" /> Trocar Transportadora
+                    </button>
+                  </div>
                 ) : null}
               </div>
             ) : (
@@ -551,6 +623,66 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
           )}
         </div>
       </section>
+      {carrierModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border bg-background p-6 shadow-xl">
+            <h2 className="text-base font-semibold mb-4">Trocar Transportadora</h2>
+            {carrierLoading ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Buscando cotações...
+              </div>
+            ) : carrierError ? (
+              <p className="text-sm text-destructive py-2">{carrierError}</p>
+            ) : carrierOptions.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">
+                Nenhuma transportadora disponível para este CEP.
+              </p>
+            ) : (
+              <div className="space-y-2 mb-4">
+                {carrierOptions.map((opt) => (
+                  <label
+                    key={opt.serviceId}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                  >
+                    <input
+                      type="radio"
+                      name="carrier"
+                      checked={selectedCarrier?.serviceId === opt.serviceId}
+                      onChange={() => setSelectedCarrier(opt)}
+                      className="accent-primary"
+                    />
+                    <div className="flex-1 text-sm">
+                      <span className="font-medium">{opt.carrier}</span>
+                      <span className="text-muted-foreground ml-1">— {opt.name}</span>
+                    </div>
+                    <div className="text-right text-xs">
+                      <div className="font-medium">
+                        {opt.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </div>
+                      <div className="text-muted-foreground">{opt.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setCarrierModal(false)}
+                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => updateCarrierMutation.mutate()}
+                disabled={!selectedCarrier || updateCarrierMutation.isPending || carrierLoading}
+                className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {updateCarrierMutation.isPending ? 'Salvando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

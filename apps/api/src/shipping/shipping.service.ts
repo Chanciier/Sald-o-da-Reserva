@@ -162,6 +162,39 @@ export class ShippingService {
     });
   }
 
+  // ── Update carrier (admin only) ──────────────────────────────────────────
+
+  async updateCarrier(
+    orderId: string,
+    body: {
+      serviceId: number;
+      carrier: string;
+      service: string;
+      price: number;
+      deliveryMin?: number | null;
+      deliveryMax?: number | null;
+    },
+  ) {
+    const shipment = await this.prisma.shipment.findUnique({ where: { orderId } });
+    if (!shipment) throw new NotFoundException('Remessa não encontrada.');
+    if (shipment.status !== 'PENDING') {
+      throw new BadRequestException(
+        'Não é possível trocar a transportadora após a etiqueta ser gerada.',
+      );
+    }
+    return this.prisma.shipment.update({
+      where: { orderId },
+      data: {
+        serviceId: body.serviceId,
+        carrier: body.carrier,
+        service: body.service,
+        price: body.price,
+        deliveryMin: body.deliveryMin ?? null,
+        deliveryMax: body.deliveryMax ?? null,
+      },
+    });
+  }
+
   // ── Get shipment for order ────────────────────────────────────────────────
 
   async getShipmentByOrder(orderId: string, userId: string) {
