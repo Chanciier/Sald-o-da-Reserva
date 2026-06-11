@@ -147,6 +147,16 @@ export default function OrderDetailPage() {
   const status = STATUS_LABEL[order.status] ?? STATUS_LABEL.PENDING;
   const address = order.shippingAddress;
   const shipment = order.shipment as Shipment | null | undefined;
+  const isPickup = order.deliveryMethod === 'PICKUP' || !!order.pickupCode;
+
+  const pickupSteps = [
+    { key: 'PAID', label: 'Pagamento confirmado' },
+    { key: 'SEPARATING', label: 'Em separação' },
+    { key: 'SEPARATED', label: 'Separado' },
+    { key: 'READY_TO_SHIP', label: 'Pronto para retirada' },
+    { key: 'DELIVERED', label: 'Retirado' },
+  ];
+  const pickupStepIndex = pickupSteps.findIndex((s) => s.key === order.status);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -419,6 +429,77 @@ export default function OrderDetailPage() {
               <p className="mt-2 text-sm text-muted-foreground">
                 Nenhuma nota emitida para este pedido.
               </p>
+            )}
+          </section>
+        )}
+
+        {/* Pickup card */}
+        {isPickup && (
+          <section className="rounded-xl border-2 border-primary bg-primary/5 p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <svg
+                className="h-5 w-5 text-primary"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 3h18l-2 13H5L3 3zM3 3L2 1M8 21a1 1 0 100-2 1 1 0 000 2zm10 0a1 1 0 100-2 1 1 0 000 2z"
+                />
+              </svg>
+              <h2 className="font-semibold">Retirada na Loja</h2>
+            </div>
+
+            {order.pickupCode ? (
+              <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-dashed border-primary/40 bg-background py-5">
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">
+                  Código de Retirada
+                </p>
+                <p className="font-mono text-4xl font-extrabold tracking-widest text-primary">
+                  {order.pickupCode}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Apresente este código ao retirar seu pedido
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Seu código de retirada será gerado em breve.
+              </p>
+            )}
+
+            {/* Progress */}
+            <div className="space-y-2">
+              {pickupSteps.map((step, i) => {
+                const done = pickupStepIndex >= i;
+                const current = pickupStepIndex === i;
+                return (
+                  <div key={step.key} className="flex items-center gap-3">
+                    <div
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${done ? 'bg-primary text-primary-foreground' : 'border-2 border-muted text-muted-foreground'}`}
+                    >
+                      {done && pickupStepIndex > i ? '✓' : i + 1}
+                    </div>
+                    <span
+                      className={`text-sm ${current ? 'font-semibold text-foreground' : done ? 'text-foreground' : 'text-muted-foreground'}`}
+                    >
+                      {step.label}
+                      {current && (
+                        <span className="ml-2 text-xs text-primary font-normal">← agora</span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {order.status === 'READY_TO_SHIP' && (
+              <div className="rounded-lg bg-primary/10 px-4 py-3 text-sm font-medium text-primary">
+                Seu pedido está pronto! Venha retirar na loja com o código acima.
+              </div>
             )}
           </section>
         )}

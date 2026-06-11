@@ -39,6 +39,20 @@ export class CheckoutService {
     return this.shippingService.quote(cep);
   }
 
+  private async generatePickupCode(tx: typeof this.prisma): Promise<string> {
+    const last = await (tx as typeof this.prisma).order.findFirst({
+      where: { pickupCode: { startsWith: 'A-' } },
+      orderBy: { createdAt: 'desc' },
+      select: { pickupCode: true },
+    });
+    let num = 1;
+    if (last?.pickupCode) {
+      const match = last.pickupCode.match(/^A-(\d+)$/);
+      if (match) num = parseInt(match[1], 10) + 1;
+    }
+    return `A-${String(num).padStart(4, '0')}`;
+  }
+
   async createOrder(userId: string, dto: CreateOrderDto) {
     const isPickup = dto.deliveryMethod === DeliveryMethod.PICKUP;
 
@@ -99,11 +113,16 @@ export class CheckoutService {
     const total = round2(Math.max(0, cart.subtotal - discount + shippingCost));
 
     const order = await this.prisma.$transaction(async (tx) => {
+      const pickupCode = isPickup
+        ? await this.generatePickupCode(tx as typeof this.prisma)
+        : undefined;
+
       const newOrder = await tx.order.create({
         data: {
           userId,
           couponId,
           deliveryMethod: dto.deliveryMethod ?? DeliveryMethod.SHIPPING,
+          pickupCode,
           subtotal: cart.subtotal,
           discount: round2(discount),
           shipping: shippingCost,

@@ -76,11 +76,13 @@ export interface Order {
   userId: string;
   couponId: string | null;
   status: OrderStatus;
+  deliveryMethod?: string | null;
+  pickupCode?: string | null;
   subtotal: number;
   discount: number;
   shipping: number;
   total: number;
-  shippingAddress: ShippingAddress;
+  shippingAddress: ShippingAddress | null;
   shippingMethod: string;
   notes: string | null;
   coupon: { code: string; type?: string; value?: number } | null;

@@ -20,13 +20,18 @@ function serializeOrder(order: Record<string, unknown>) {
   };
 }
 
-function generatePickupCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = 'RET-';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+async function generatePickupCode(prisma: PrismaService): Promise<string> {
+  const last = await prisma.order.findFirst({
+    where: { pickupCode: { startsWith: 'A-' } },
+    orderBy: { createdAt: 'desc' },
+    select: { pickupCode: true },
+  });
+  let num = 1;
+  if (last?.pickupCode) {
+    const match = last.pickupCode.match(/^A-(\d+)$/);
+    if (match) num = parseInt(match[1], 10) + 1;
   }
-  return code;
+  return `A-${String(num).padStart(4, '0')}`;
 }
 
 const ORDER_INCLUDE_BASE = {
@@ -310,7 +315,7 @@ export class ExpedicaoService {
 
     const data: Record<string, unknown> = { status: OrderStatus.SEPARATING };
     if (order.deliveryMethod === DeliveryMethod.PICKUP && !order.pickupCode) {
-      data.pickupCode = generatePickupCode();
+      data.pickupCode = await generatePickupCode(this.prisma);
     }
 
     return this.prisma.order.update({ where: { id: orderId }, data });
