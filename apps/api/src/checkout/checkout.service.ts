@@ -60,8 +60,10 @@ export class CheckoutService {
       throw new BadRequestException('Endereço de entrega obrigatório para envio.');
     }
 
-    if (!isPickup && !dto.frenetServiceCode && (!dto.meServiceId || dto.meServiceId <= 0)) {
-      throw new BadRequestException('Selecione uma transportadora para prosseguir.');
+    if (!isPickup && (!dto.meServiceId || dto.meServiceId <= 0)) {
+      throw new BadRequestException(
+        'Selecione uma transportadora com integração Melhor Envio para prosseguir.',
+      );
     }
 
     const cart = await this.cartService.getCart(userId);
@@ -185,8 +187,7 @@ export class CheckoutService {
         await tx.shipment.create({
           data: {
             orderId: newOrder.id,
-            serviceId: dto.frenetServiceCode ? 1 : (dto.meServiceId ?? 0),
-            serviceCode: dto.frenetServiceCode ?? null,
+            serviceId: dto.meServiceId ?? 0,
             carrier: dto.meCarrier ?? 'N/A',
             service: dto.shippingMethod ?? 'N/A',
             price: shippingCost,
@@ -299,7 +300,6 @@ export class CheckoutService {
             id: true,
             status: true,
             serviceId: true,
-            serviceCode: true,
             carrier: true,
             service: true,
             trackingCode: true,

@@ -79,14 +79,9 @@ export class CreateOrderDto {
   shippingPrice?: number;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  frenetServiceCode?: string;
-
-  @IsOptional()
   @IsInt()
   @Min(0)
-  meServiceId?: number; // legado
+  meServiceId?: number;
 
   @IsOptional()
   @IsString()

@@ -138,11 +138,8 @@ export class ReturnsService {
 
     if (dto.status === 'APPROVED' && request.status !== 'APPROVED' && !request.meOrderId) {
       try {
-        const { frenetTicket, trackingCode, labelUrl } = await this.shipping.generateReverseLabel(
-          request.orderId,
-        );
-        updates.meOrderId = frenetTicket;
-        if (trackingCode) updates.trackingCode = trackingCode;
+        const { meOrderId, labelUrl } = await this.shipping.generateReverseLabel(request.orderId);
+        updates.meOrderId = meOrderId;
         updates.labelUrl = labelUrl;
       } catch (err) {
         this.logger.warn(
@@ -172,11 +169,25 @@ export class ReturnsService {
       throw new ForbiddenException('Acesso negado.');
     }
 
-    if (!request.trackingCode) return request;
+    if (!request.meOrderId) return request;
 
-    // Frenet tracking sync for returns uses postal trackingCode
-    // Full sync is handled by ShippingService.getTracking on the main shipment
+    const tracking = await this.shipping.fetchMeTrackingRaw(request.meOrderId);
+    if (!tracking) return request;
+
     const updates: PrismaAny = {};
+
+    if (tracking.tracking && tracking.tracking !== request.trackingCode) {
+      updates.trackingCode = tracking.tracking;
+    }
+    if (tracking.posted_at && !request.postedAt) {
+      updates.postedAt = new Date(tracking.posted_at);
+    }
+    if (tracking.delivered_at && !request.returnDeliveredAt) {
+      updates.returnDeliveredAt = new Date(tracking.delivered_at);
+      if (request.status === 'APPROVED') {
+        updates.status = 'COMPLETED';
+      }
+    }
 
     if (Object.keys(updates).length > 0) {
       await this.db.returnRequest.update({ where: { id }, data: updates });

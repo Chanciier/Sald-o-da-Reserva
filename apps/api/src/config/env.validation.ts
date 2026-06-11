@@ -61,69 +61,61 @@ class EnvironmentVariables {
   @IsOptional()
   API_PUBLIC_URL: string = 'http://localhost:3001';
 
-  // legado - removido
-  // MELHOR_ENVIO_TOKEN
-  // MELHOR_ENVIO_SANDBOX
-  // MELHOR_ENVIO_WEBHOOK_TOKEN
-  // MELHOR_ENVIO_FROM_NAME
-  // MELHOR_ENVIO_FROM_EMAIL
-  // MELHOR_ENVIO_FROM_DOCUMENT
-  // MELHOR_ENVIO_FROM_PHONE
-  // MELHOR_ENVIO_FROM_CEP
-  // MELHOR_ENVIO_FROM_ADDRESS
-  // MELHOR_ENVIO_FROM_NUMBER
-  // MELHOR_ENVIO_FROM_COMPLEMENT
-  // MELHOR_ENVIO_FROM_DISTRICT
-  // MELHOR_ENVIO_FROM_CITY
-  // MELHOR_ENVIO_FROM_STATE
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_TOKEN: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_TOKEN: string = '';
+  MELHOR_ENVIO_SANDBOX: string = 'true';
 
   @IsString()
   @IsOptional()
-  FRENET_SELLER_CEP: string = '';
+  MELHOR_ENVIO_WEBHOOK_TOKEN: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_NAME: string = '';
+  MELHOR_ENVIO_FROM_NAME: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_CPF_CNPJ: string = '';
+  MELHOR_ENVIO_FROM_EMAIL: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_EMAIL: string = '';
+  MELHOR_ENVIO_FROM_DOCUMENT: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_PHONE: string = '';
+  MELHOR_ENVIO_FROM_PHONE: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_ADDRESS: string = '';
+  MELHOR_ENVIO_FROM_CEP: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_NUMBER: string = '';
+  MELHOR_ENVIO_FROM_ADDRESS: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_COMPLEMENT: string = '';
+  MELHOR_ENVIO_FROM_NUMBER: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_DISTRICT: string = '';
+  MELHOR_ENVIO_FROM_COMPLEMENT: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_CITY: string = '';
+  MELHOR_ENVIO_FROM_DISTRICT: string = '';
 
   @IsString()
   @IsOptional()
-  FRENET_SENDER_STATE: string = '';
+  MELHOR_ENVIO_FROM_CITY: string = '';
+
+  @IsString()
+  @IsOptional()
+  MELHOR_ENVIO_FROM_STATE: string = '';
 
   @IsString()
   @IsOptional()

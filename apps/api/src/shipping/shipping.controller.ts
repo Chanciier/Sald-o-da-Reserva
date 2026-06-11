@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -41,7 +42,6 @@ export class ShippingController {
     @Body()
     body: {
       serviceId: number;
-      serviceCode?: string;
       carrier: string;
       service: string;
       price: number;
@@ -62,7 +62,7 @@ export class ShippingController {
   @Post('webhook')
   @Public()
   @HttpCode(HttpStatus.OK)
-  webhook(@Body() body: Record<string, unknown>) {
-    return this.shipping.handleWebhook(body);
+  webhook(@Body() body: Record<string, unknown>, @Headers('authorization') auth?: string) {
+    return this.shipping.handleWebhook(body, auth);
   }
 }

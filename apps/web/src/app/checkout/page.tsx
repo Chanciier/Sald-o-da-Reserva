@@ -198,7 +198,6 @@ export default function CheckoutPage() {
               shippingPrice: selectedShipping!.price,
               meServiceId: selectedShipping!.serviceId || undefined,
               meCarrier: selectedShipping!.carrier || undefined,
-              frenetServiceCode: selectedShipping!.serviceCode || undefined,
               deliveryMin: selectedShipping!.deliveryMin,
               deliveryMax: selectedShipping!.deliveryMax,
             }),
