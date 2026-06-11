@@ -145,17 +145,21 @@ export class ShippingService {
       const filtered = services.filter((s) => !s.Error && s.ShippingPrice > 0 && s.ServiceCode);
       this.logger.log(`Frenet quote filtered: ${filtered.length} serviços disponíveis`);
 
-      return filtered.map((s) => ({
-        serviceId: 1,
-        serviceCode: s.ServiceCode,
-        method: s.ServiceCode.toUpperCase().replace(/\s+/g, '_'),
-        name: s.ServiceDescription,
-        carrier: s.Carrier,
-        description: `${s.DeliveryTime} dias úteis`,
-        price: s.ShippingPrice,
-        deliveryMin: s.DeliveryTime,
-        deliveryMax: s.DeliveryTime,
-      }));
+      return filtered.map((s) => {
+        const price = parseFloat(String(s.ShippingPrice));
+        const days = parseInt(String(s.DeliveryTime), 10);
+        return {
+          serviceId: 1,
+          serviceCode: s.ServiceCode,
+          method: s.ServiceCode.toUpperCase().replace(/\s+/g, '_'),
+          name: s.ServiceDescription,
+          carrier: s.Carrier,
+          description: `${days} dias úteis`,
+          price: isNaN(price) ? 0 : price,
+          deliveryMin: isNaN(days) ? 1 : days,
+          deliveryMax: isNaN(days) ? 1 : days,
+        };
+      });
     } catch (err) {
       this.logger.error('Frenet quote error', err);
       return [];
