@@ -226,13 +226,15 @@ export default function InvoiceDetailPage() {
           Sincronizar Status
         </button>
 
-        <Link
-          href={`/admin/financeiro/notas-fiscais/${id}/imprimir`}
-          target="_blank"
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted transition-colors"
-        >
-          <Printer className="h-3.5 w-3.5" /> Imprimir DANFE
-        </Link>
+        {invoice.status === 'AUTHORIZED' && (
+          <Link
+            href={`/admin/financeiro/notas-fiscais/${id}/imprimir`}
+            target="_blank"
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted transition-colors"
+          >
+            <Printer className="h-3.5 w-3.5" /> Imprimir DANFE
+          </Link>
+        )}
 
         {invoice.xmlUrl && (
           <button
