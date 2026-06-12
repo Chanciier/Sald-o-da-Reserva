@@ -315,10 +315,6 @@ export class PaymentsService {
       })
       .then(async (p) => {
         if (p.status === 'APPROVED') {
-          this.invoiceService
-            .emitForOrder(orderId)
-            .catch((e) => this.logger.error('Invoice emission failed', e));
-
           this.prisma.order
             .findUnique({ where: { id: orderId }, include: { user: true } })
             .then((o) => {
@@ -395,10 +391,6 @@ export class PaymentsService {
     });
 
     if (newStatus === 'APPROVED') {
-      this.invoiceService
-        .emitForOrder(payment.orderId)
-        .catch((e) => this.logger.error('Invoice emission failed', e));
-
       this.prisma.order
         .findUnique({ where: { id: payment.orderId }, include: { user: true } })
         .then((o) => {

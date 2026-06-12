@@ -200,10 +200,6 @@ export class WebhooksService {
     }
 
     if (newStatus === PaymentStatus.APPROVED) {
-      this.invoiceService
-        .emitForOrder(payment.orderId)
-        .catch((e) => this.logger.error('Webhook MP: invoice emission failed', e));
-
       this.shippingService
         .purchaseLabel(payment.orderId)
         .catch((e) =>

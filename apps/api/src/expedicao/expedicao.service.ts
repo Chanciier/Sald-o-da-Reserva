@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { DeliveryMethod, OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
+import { InvoiceService } from '../invoices/invoice.service';
 
 const CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.PAID,
@@ -57,6 +58,7 @@ export class ExpedicaoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mp: MercadoPagoService,
+    private readonly invoiceService: InvoiceService,
   ) {}
 
   async getStats(userId: string | null) {
@@ -360,10 +362,16 @@ export class ExpedicaoService {
       );
     }
 
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.READY_TO_SHIP },
     });
+
+    this.invoiceService
+      .emitForOrder(orderId)
+      .catch((e) => this.logger.warn(`NF-e emission failed for order ${orderId}`, e));
+
+    return updated;
   }
 
   async confirmarRetirada(orderId: string) {
@@ -380,10 +388,17 @@ export class ExpedicaoService {
       );
     }
 
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.DELIVERED },
     });
+
+    // Emit NF-e now if not already emitted (handles PICKUP orders that skipped marcarPronto)
+    this.invoiceService
+      .emitForOrder(orderId)
+      .catch((e) => this.logger.warn(`NF-e emission failed for order ${orderId}`, e));
+
+    return updated;
   }
 
   async cancelarPedido(orderId: string): Promise<{ ok: true; refundError?: string }> {
