@@ -350,8 +350,10 @@ export class InvoiceService {
       invoiceNumber: (body.numero as string) ?? invoice.invoiceNumber ?? null,
       accessKey: (body.chave_nfe as string) ?? invoice.accessKey ?? null,
       protocol: (body.protocolo as string) ?? invoice.protocol ?? null,
-      xmlUrl: (body.url as string) ?? invoice.xmlUrl ?? null,
-      danfeUrl: (body.danfe_url as string) ?? invoice.danfeUrl ?? null,
+      xmlUrl:
+        (body.caminho_xml_nota_fiscal as string) ?? (body.url as string) ?? invoice.xmlUrl ?? null,
+      danfeUrl:
+        (body.caminho_danfe as string) ?? (body.danfe_url as string) ?? invoice.danfeUrl ?? null,
       issueDate: body.data_emissao
         ? new Date(body.data_emissao as string)
         : (invoice.issueDate ?? null),
