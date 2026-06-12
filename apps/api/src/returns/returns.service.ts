@@ -117,7 +117,15 @@ export class ReturnsService {
         where,
         include: {
           user: { select: { id: true, name: true, email: true } },
-          order: { select: { id: true, total: true, items: { take: 1, select: { name: true } } } },
+          order: {
+            select: {
+              id: true,
+              total: true,
+              deliveryMethod: true,
+              pickupCode: true,
+              items: { take: 1, select: { name: true } },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,

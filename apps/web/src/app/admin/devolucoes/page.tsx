@@ -80,7 +80,13 @@ interface ReturnRequest {
   refundedAt: string | null;
   createdAt: string;
   user: { id: string; name: string | null; email: string };
-  order: { id: string; total: number; items: { name: string }[] };
+  order: {
+    id: string;
+    total: number;
+    deliveryMethod: string;
+    pickupCode: string | null;
+    items: { name: string }[];
+  };
 }
 
 interface ReturnsResponse {
@@ -162,6 +168,7 @@ function ManageModal({
   const next = NEXT_STATUSES[request.status] ?? [];
   const notesChanged = adminNotes !== (request.adminNotes ?? '');
   const canSave = !!newStatus || notesChanged;
+  const isPickup = request.order.deliveryMethod === 'PICKUP' || !!request.order.pickupCode;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -271,7 +278,25 @@ function ManageModal({
           </div>
 
           {/* Reverse shipping info */}
-          {(request.meOrderId || request.status === 'APPROVED') && (
+          {isPickup ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20 p-3 space-y-1">
+              <div className="flex items-center gap-2">
+                <Package className="h-3.5 w-3.5 text-amber-600" />
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                  Devolução presencial
+                </p>
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Pedido de retirada — o cliente deve trazer o item à loja.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Rua Andorra, 500 — Shopping Jardim Oriente, São José dos Campos/SP
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Marque como <strong>Concluída</strong> ao receber o item para liberar o reembolso.
+              </p>
+            </div>
+          ) : request.meOrderId || request.status === 'APPROVED' ? (
             <div className="rounded-lg border p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Package className="h-3.5 w-3.5 text-muted-foreground" />
@@ -328,7 +353,7 @@ function ManageModal({
                 </p>
               )}
             </div>
-          )}
+          ) : null}
 
           {/* Refund panel */}
           {request.status === 'COMPLETED' && (
@@ -447,7 +472,9 @@ function ManageModal({
                 </div>
                 {newStatus === 'APPROVED' && !request.meOrderId && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    A etiqueta reversa será gerada automaticamente via Melhor Envio.
+                    {isPickup
+                      ? 'O cliente será notificado para trazer o item à loja.'
+                      : 'A etiqueta reversa será gerada automaticamente via Melhor Envio.'}
                   </p>
                 )}
               </div>

@@ -10,6 +10,8 @@ import { getShippingQuote } from '@/lib/shipping';
 import type { ShippingOption } from '@/types/cart';
 import type { PaymentMethod } from '@/types/payment';
 
+import { STORE } from '@/lib/store';
+
 type DeliveryMethod = 'SHIPPING' | 'PICKUP';
 
 function formatBRL(n: number) {
@@ -287,8 +289,16 @@ export default function CheckoutPage() {
               </div>
 
               {isPickup && (
-                <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 text-sm text-muted-foreground">
-                  Você receberá uma notificação quando seu pedido estiver pronto para retirada.
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1.5">
+                  <p className="text-sm font-medium text-foreground">Local de retirada</p>
+                  <p className="text-sm font-semibold">{STORE.mall}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {STORE.address} — {STORE.neighborhood}, {STORE.city}/{STORE.state}
+                  </p>
+                  <p className="text-xs text-muted-foreground">CEP {STORE.cep}</p>
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Você receberá uma notificação quando seu pedido estiver pronto para retirada.
+                  </p>
                 </div>
               )}
             </section>

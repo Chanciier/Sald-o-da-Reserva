@@ -16,6 +16,7 @@ import {
   type ReturnRequest,
 } from '@/actions/returns';
 import type { Order, Shipment } from '@/types/order';
+import { STORE } from '@/lib/store';
 
 function formatBRL(n: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
@@ -278,12 +279,17 @@ export default function OrderDetailPage() {
                   </p>
                 )}
                 {activeReturn.status === 'APPROVED' && isPickup && !activeReturn.labelUrl && (
-                  <div className="mt-3 border-t border-border pt-3">
+                  <div className="mt-3 border-t border-border pt-3 space-y-0.5">
                     <p className="text-xs font-medium mb-1">Devolução na loja</p>
                     <p className="text-xs text-muted-foreground">
                       Traga o item à nossa loja. O reembolso será processado após recebermos o
                       produto.
                     </p>
+                    <p className="text-xs font-medium text-foreground">{STORE.mall}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {STORE.address} — {STORE.neighborhood}, {STORE.city}/{STORE.state}
+                    </p>
+                    <p className="text-xs text-muted-foreground">CEP {STORE.cep}</p>
                   </div>
                 )}
 
@@ -511,14 +517,35 @@ export default function OrderDetailPage() {
                 Seu pedido está pronto! Venha retirar na loja com o código acima.
               </div>
             )}
+
+            <div className="rounded-lg border border-border px-4 py-3 space-y-0.5">
+              <p className="text-xs font-semibold">{STORE.mall}</p>
+              <p className="text-xs text-muted-foreground">
+                {STORE.address} — {STORE.neighborhood}, {STORE.city}/{STORE.state}
+              </p>
+              <p className="text-xs text-muted-foreground">CEP {STORE.cep}</p>
+            </div>
           </section>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Address */}
           <section className="rounded-xl border border-border p-5">
-            <h2 className="mb-3 font-semibold">Endereço de entrega</h2>
-            {address ? (
+            <h2 className="mb-3 font-semibold">
+              {isPickup ? 'Local de retirada' : 'Endereço de entrega'}
+            </h2>
+            {isPickup ? (
+              <div className="space-y-0.5 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">{STORE.mall}</p>
+                <p>
+                  {STORE.address} — {STORE.neighborhood}
+                </p>
+                <p>
+                  {STORE.city}/{STORE.state}
+                </p>
+                <p>CEP: {STORE.cep}</p>
+              </div>
+            ) : address ? (
               <div className="space-y-0.5 text-sm text-muted-foreground">
                 <p className="font-medium text-foreground">{address.name}</p>
                 <p>
@@ -531,9 +558,7 @@ export default function OrderDetailPage() {
                 <p>CEP: {address.cep.replace(/(\d{5})(\d{3})/, '$1-$2')}</p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Retirada na loja — sem endereço de entrega.
-              </p>
+              <p className="text-sm text-muted-foreground">Endereço não disponível.</p>
             )}
           </section>
 

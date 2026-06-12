@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import type { ReturnReason } from '@/actions/returns';
+import { STORE } from '@/lib/store';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -94,18 +95,24 @@ export function ReturnModal({ orderId, token, isPickup, onClose, onSuccess }: Re
             />
           </div>
 
-          <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+          <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
             {isPickup ? (
               <>
-                Como seu pedido foi retirado na loja, a devolução também deve ser feita
-                presencialmente. Traga o item à nossa loja e o reembolso será processado após o
-                recebimento.
+                <p>
+                  Como seu pedido foi retirado na loja, a devolução também deve ser feita
+                  presencialmente. Traga o item e o reembolso será processado após o recebimento.
+                </p>
+                <p className="font-medium text-foreground">{STORE.mall}</p>
+                <p>
+                  {STORE.address} — {STORE.neighborhood}, {STORE.city}/{STORE.state}
+                </p>
+                <p>CEP {STORE.cep}</p>
               </>
             ) : (
-              <>
+              <p>
                 Sua solicitação será analisada em até 3 dias úteis. Você receberá as instruções de
                 devolução por e-mail.
-              </>
+              </p>
             )}
           </div>
 
