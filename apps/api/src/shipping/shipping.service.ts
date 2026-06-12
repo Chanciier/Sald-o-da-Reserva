@@ -329,8 +329,9 @@ export class ShippingService {
       throw new BadRequestException(`Erro ao adicionar ao carrinho ME: ${body}`);
     }
 
-    const cartData = (await cartRes.json()) as { id: string };
+    const cartData = (await cartRes.json()) as { id: string; company?: { name?: string } };
     const meOrderId = cartData.id;
+    const meCarrierName = cartData.company?.name;
 
     // Purchase
     const checkRes = await fetch(`${this.baseUrl}/me/shipment/checkout`, {
@@ -370,6 +371,7 @@ export class ShippingService {
           status: 'LABEL_PURCHASED',
           labelUrl,
           rawData: cartData as unknown as Prisma.InputJsonValue,
+          ...(meCarrierName ? { carrier: meCarrierName } : {}),
         },
       });
 
