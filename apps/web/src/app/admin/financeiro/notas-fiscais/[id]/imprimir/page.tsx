@@ -28,14 +28,22 @@ export default function ImprimirDanfePage() {
   }, [token, id]);
 
   useEffect(() => {
-    if (!loading && invoice) {
-      if (invoice.danfeUrl) {
-        window.location.href = invoice.danfeUrl;
-      } else {
+    if (loading || !invoice || !token) return;
+    const apiBase = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
+    fetch(`${apiBase}/invoices/${id}/danfe`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        window.location.href = url;
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      })
+      .catch(() => {
         setTimeout(() => window.print(), 300);
-      }
-    }
-  }, [loading, invoice]);
+      });
+  }, [loading, invoice, token, id]);
 
   if (loading) {
     return (
@@ -49,14 +57,6 @@ export default function ImprimirDanfePage() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-sm text-destructive">Nota não encontrada.</p>
-      </div>
-    );
-  }
-
-  if (invoice.danfeUrl) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-muted-foreground">Redirecionando para DANFE...</p>
       </div>
     );
   }
