@@ -1,6 +1,4 @@
-'use server';
-
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3001';
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export type ReturnReason = 'REGRET' | 'DEFECT' | 'WRONG_ITEM' | 'OTHER';
 export type ReturnStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
