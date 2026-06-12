@@ -12,9 +12,10 @@ export class TokenService {
   ) {}
 
   generateAccessToken(payload: JwtPayload): string {
+    const expiresIn = payload.role === 'ADMIN' || payload.role === 'VENDEDOR' ? '12h' : '15m';
     return this.jwtService.sign(payload, {
       secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-      expiresIn: '15m',
+      expiresIn,
     });
   }
 
