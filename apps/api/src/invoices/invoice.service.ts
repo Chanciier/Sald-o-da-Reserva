@@ -54,6 +54,7 @@ export class InvoiceService {
         user: true,
         items: { include: { product: true } },
         payment: true,
+        shipment: { select: { carrier: true, service: true } },
       },
     });
 
@@ -120,6 +121,8 @@ export class InvoiceService {
         freight: Number(order.shipping),
         discount: Number(order.discount),
         additionalInfo: `Pedido #${order.id.slice(-8).toUpperCase()}`,
+        carrierName:
+          (order as { shipment?: { carrier?: string } | null }).shipment?.carrier ?? undefined,
       });
 
       await this.repo.update(invoice.id, {

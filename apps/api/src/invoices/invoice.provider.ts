@@ -57,6 +57,7 @@ export interface InvoicePayload {
   additionalInfo?: string;
   isPickup?: boolean;
   customerState?: string;
+  carrierName?: string;
 }
 
 export interface InvoiceProvider {

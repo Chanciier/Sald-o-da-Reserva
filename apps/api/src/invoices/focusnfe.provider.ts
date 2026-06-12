@@ -439,6 +439,7 @@ export class FocusNfeProvider implements InvoiceProvider {
       valor_desconto: discount,
       valor_total: total,
       modalidade_frete: freight > 0 ? 0 : 9,
+      ...(payload.carrierName ? { transportador_nome: payload.carrierName } : {}),
 
       // Payment
       formas_pagamento: [
