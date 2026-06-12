@@ -26,8 +26,10 @@ export default function LoginPage() {
   const [captchaInput, setCaptchaInput] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
 
   const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   useEffect(() => {
     if (mode === 'register') {
@@ -35,6 +37,19 @@ export default function LoginPage() {
       setCaptchaInput('');
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (!turnstileSiteKey) return;
+    (window as unknown as Record<string, unknown>).__tsCallback = (token: string) =>
+      setTurnstileToken(token);
+    (window as unknown as Record<string, unknown>).__tsExpired = () => setTurnstileToken('');
+    if (document.getElementById('cf-ts-script')) return;
+    const script = document.createElement('script');
+    script.id = 'cf-ts-script';
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    document.head.appendChild(script);
+  }, [turnstileSiteKey]);
 
   const passwordMismatch =
     mode === 'register' && confirmPassword.length > 0 && password !== confirmPassword;
@@ -59,9 +74,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (mode === 'login') {
-        await login(email, password);
+        await login(email, password, turnstileToken || undefined);
       } else {
-        await register(name, email, password);
+        await register(name, email, password, turnstileToken || undefined);
         const accessToken = localStorage.getItem('saldao:access');
         if (accessToken) {
           fetch(`${API}/api/v1/content/consent`, {
@@ -208,6 +223,16 @@ export default function LoginPage() {
               <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
               </p>
+            )}
+
+            {turnstileSiteKey && (
+              <div
+                className="cf-turnstile"
+                data-sitekey={turnstileSiteKey}
+                data-callback="__tsCallback"
+                data-expired-callback="__tsExpired"
+                data-theme="auto"
+              />
             )}
 
             <button

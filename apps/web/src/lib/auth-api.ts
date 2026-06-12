@@ -17,16 +17,30 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-export async function loginApi(email: string, password: string): Promise<AuthTokens> {
-  return post<AuthTokens>('/auth/login', { email, password });
+export async function loginApi(
+  email: string,
+  password: string,
+  turnstileToken?: string,
+): Promise<AuthTokens> {
+  return post<AuthTokens>('/auth/login', {
+    email,
+    password,
+    ...(turnstileToken && { turnstileToken }),
+  });
 }
 
 export async function registerApi(
   name: string,
   email: string,
   password: string,
+  turnstileToken?: string,
 ): Promise<AuthTokens> {
-  return post<AuthTokens>('/auth/register', { name, email, password });
+  return post<AuthTokens>('/auth/register', {
+    name,
+    email,
+    password,
+    ...(turnstileToken && { turnstileToken }),
+  });
 }
 
 export async function refreshApi(refreshToken: string): Promise<AuthTokens> {

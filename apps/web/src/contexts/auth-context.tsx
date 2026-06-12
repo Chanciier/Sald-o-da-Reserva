@@ -14,8 +14,13 @@ interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, turnstileToken?: string) => Promise<void>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    turnstileToken?: string,
+  ) => Promise<void>;
   logout: () => void;
 }
 
@@ -119,16 +124,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [token, scheduleRefresh]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const data = await loginApi(email, password);
+    async (email: string, password: string, turnstileToken?: string) => {
+      const data = await loginApi(email, password, turnstileToken);
       persist(data);
     },
     [persist],
   );
 
   const register = useCallback(
-    async (name: string, email: string, password: string) => {
-      const data = await registerApi(name, email, password);
+    async (name: string, email: string, password: string, turnstileToken?: string) => {
+      const data = await registerApi(name, email, password, turnstileToken);
       persist(data);
     },
     [persist],
