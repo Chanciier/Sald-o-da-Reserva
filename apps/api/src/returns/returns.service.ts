@@ -180,6 +180,7 @@ export class ReturnsService {
     return this.db.returnRequest.findUnique({
       where: { id },
       include: {
+        user: { select: { id: true, name: true, email: true } },
         order: {
           select: {
             id: true,

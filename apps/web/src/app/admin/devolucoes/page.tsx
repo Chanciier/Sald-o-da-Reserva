@@ -231,7 +231,7 @@ function ManageModal({
           <div>
             <h2 className="font-semibold">Gerenciar Devolução</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              #{request.id.slice(-8).toUpperCase()} · {request.user.name ?? request.user.email}
+              #{request.id.slice(-8).toUpperCase()} · {request.user?.name ?? request.user?.email}
             </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 hover:bg-muted transition-colors">
