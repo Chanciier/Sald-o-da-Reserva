@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { createReturnRequest, type ReturnReason } from '@/actions/returns';
+import type { ReturnReason } from '@/actions/returns';
+
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 const REASONS: { value: ReturnReason; label: string }[] = [
   { value: 'REGRET', label: 'Arrependimento' },
@@ -30,7 +32,13 @@ export function ReturnModal({ orderId, token, isPickup, onClose, onSuccess }: Re
     setError('');
     setLoading(true);
     try {
-      await createReturnRequest(token, orderId, reason, notes || undefined);
+      const res = await fetch(`${BASE}/api/v1/returns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId, reason, notes: notes || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { message?: string }).message ?? `Erro ${res.status}`);
       onSuccess();
     } catch (err) {
       setError((err as Error).message);
