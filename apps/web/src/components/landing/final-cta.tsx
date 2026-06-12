@@ -1,12 +1,25 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Zap } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { useCountdown, pad } from '@/hooks/use-countdown';
 
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
 export function FinalCta() {
   const { hours, minutes, seconds } = useCountdown(5);
+  const [maxDiscount, setMaxDiscount] = useState<number>(80);
+
+  useEffect(() => {
+    fetch(`${API}/api/v1/products/offers-discount`)
+      .then((r) => r.json())
+      .then((d: { discountPct: number }) => {
+        if (d.discountPct > 0) setMaxDiscount(d.discountPct);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <section className="bg-secondary">
@@ -22,7 +35,7 @@ export function FinalCta() {
             Última chamada
           </div>
           <h2 className="mt-5 text-balance font-heading text-3xl font-extrabold tracking-tight text-secondary-foreground sm:text-5xl">
-            Não deixe a economia de até <span className="text-primary">80%</span> passar
+            Não deixe a economia de até <span className="text-primary">{maxDiscount}%</span> passar
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-secondary-foreground/70 sm:text-lg">
             Os estoques são limitados e cada produto é único. Quando acabar, acabou. Garanta o seu
