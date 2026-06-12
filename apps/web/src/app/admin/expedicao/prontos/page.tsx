@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchProntos, cancelarPedido } from '@/actions/expedicao';
-import { emitInvoice } from '@/actions/invoices';
 import type { OrderSummary } from '@/actions/expedicao';
 
 const DELIVERY_OPTIONS = [
@@ -54,7 +53,6 @@ export default function ProntosPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [deliveryMethod, setDeliveryMethod] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
@@ -72,49 +70,11 @@ export default function ProntosPage() {
     },
   });
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['expedicao-prontos', page, deliveryMethod],
     queryFn: () => fetchProntos(token!, { page, deliveryMethod }),
     enabled: !!token,
   });
-
-  const batchNfeMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await Promise.all(ids.map((id) => emitInvoice(token!, id)));
-    },
-    onSuccess: () => {
-      refetch();
-      setSelected(new Set());
-    },
-  });
-
-  function toggleAll() {
-    if (!data?.data.length) return;
-    if (selected.size === data.data.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(data.data.map((o: OrderSummary) => o.id)));
-    }
-  }
-
-  function toggleOne(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function printSelectedLabels() {
-    if (!data?.data) return;
-    data.data
-      .filter((o: OrderSummary) => selected.has(o.id) && o.shipment)
-      .forEach((o: OrderSummary) => {
-        const url = (o.shipment as { labelUrl?: string }).labelUrl;
-        if (url) window.open(url, '_blank');
-      });
-  }
 
   return (
     <div className="space-y-5">
@@ -123,25 +83,6 @@ export default function ProntosPage() {
           <Package className="h-5 w-5 text-primary" />
           <h1 className="text-xl font-bold">Prontos para Envio</h1>
         </div>
-        {selected.size > 0 && (
-          <div className="flex gap-2">
-            <button
-              onClick={printSelectedLabels}
-              className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
-            >
-              Imprimir Etiquetas ({selected.size})
-            </button>
-            <button
-              onClick={() => batchNfeMutation.mutate(Array.from(selected))}
-              disabled={batchNfeMutation.isPending}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {batchNfeMutation.isPending
-                ? 'Emitindo...'
-                : `Emitir NF-e em lote (${selected.size})`}
-            </button>
-          </div>
-        )}
       </div>
 
       {cancelError && (
@@ -203,14 +144,6 @@ export default function ProntosPage() {
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
                 <tr className="text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.size === data.data.length}
-                      onChange={toggleAll}
-                      className="rounded"
-                    />
-                  </th>
                   <th className="px-4 py-3 font-medium">Pedido</th>
                   <th className="px-4 py-3 font-medium">Cliente</th>
                   <th className="px-4 py-3 font-medium">Tipo</th>
@@ -222,14 +155,6 @@ export default function ProntosPage() {
               <tbody className="divide-y">
                 {data.data.map((o: OrderSummary) => (
                   <tr key={o.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(o.id)}
-                        onChange={() => toggleOne(o.id)}
-                        className="rounded"
-                      />
-                    </td>
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs text-primary">{shortId(o.id)}</span>
                     </td>
