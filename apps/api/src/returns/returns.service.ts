@@ -177,7 +177,20 @@ export class ReturnsService {
       await this.executeRefundSilently(id, request.orderId, user);
     }
 
-    return this.db.returnRequest.findUnique({ where: { id } });
+    return this.db.returnRequest.findUnique({
+      where: { id },
+      include: {
+        order: {
+          select: {
+            id: true,
+            total: true,
+            deliveryMethod: true,
+            pickupCode: true,
+            items: { take: 1, select: { name: true } },
+          },
+        },
+      },
+    });
   }
 
   async syncTracking(id: string, user: AuthenticatedUser) {

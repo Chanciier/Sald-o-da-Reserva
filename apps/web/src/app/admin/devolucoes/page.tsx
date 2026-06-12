@@ -168,7 +168,7 @@ function ManageModal({
   const next = NEXT_STATUSES[request.status] ?? [];
   const notesChanged = adminNotes !== (request.adminNotes ?? '');
   const canSave = !!newStatus || notesChanged;
-  const isPickup = request.order.deliveryMethod === 'PICKUP' || !!request.order.pickupCode;
+  const isPickup = request.order?.deliveryMethod === 'PICKUP' || !!request.order?.pickupCode;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
