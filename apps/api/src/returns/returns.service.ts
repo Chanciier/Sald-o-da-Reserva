@@ -130,13 +130,24 @@ export class ReturnsService {
   }
 
   async updateStatus(id: string, dto: UpdateReturnStatusDto, user: AuthenticatedUser) {
-    const request = await this.db.returnRequest.findUnique({ where: { id } });
+    const request = await this.db.returnRequest.findUnique({
+      where: { id },
+      include: { order: { select: { deliveryMethod: true, pickupCode: true } } },
+    });
     if (!request) throw new NotFoundException('Solicitação não encontrada.');
+
+    const isPickup = request.order?.deliveryMethod === 'PICKUP' || !!request.order?.pickupCode;
 
     const updates: PrismaAny = { status: dto.status };
     if (dto.adminNotes !== undefined) updates.adminNotes = dto.adminNotes;
 
-    if (dto.status === 'APPROVED' && request.status !== 'APPROVED' && !request.meOrderId) {
+    // Gera etiqueta de devolução Melhor Envio apenas para pedidos com envio (não retirada)
+    if (
+      dto.status === 'APPROVED' &&
+      request.status !== 'APPROVED' &&
+      !request.meOrderId &&
+      !isPickup
+    ) {
       try {
         const { meOrderId, labelUrl } = await this.shipping.generateReverseLabel(request.orderId);
         updates.meOrderId = meOrderId;

@@ -277,6 +277,16 @@ export default function OrderDetailPage() {
                     {activeReturn.adminNotes}
                   </p>
                 )}
+                {activeReturn.status === 'APPROVED' && isPickup && !activeReturn.labelUrl && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <p className="text-xs font-medium mb-1">Devolução na loja</p>
+                    <p className="text-xs text-muted-foreground">
+                      Traga o item à nossa loja. O reembolso será processado após recebermos o
+                      produto.
+                    </p>
+                  </div>
+                )}
+
                 {activeReturn.status === 'APPROVED' && activeReturn.labelUrl && (
                   <div className="mt-3 border-t border-border pt-3 space-y-2">
                     <p className="text-xs font-medium">Envio de devolução</p>
@@ -564,6 +574,7 @@ export default function OrderDetailPage() {
         <ReturnModal
           orderId={order.id}
           token={token}
+          isPickup={isPickup}
           onClose={() => setShowReturnModal(false)}
           onSuccess={() => {
             setShowReturnModal(false);

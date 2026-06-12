@@ -14,11 +14,12 @@ const REASONS: { value: ReturnReason; label: string }[] = [
 interface ReturnModalProps {
   orderId: string;
   token: string;
+  isPickup?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ReturnModal({ orderId, token, onClose, onSuccess }: ReturnModalProps) {
+export function ReturnModal({ orderId, token, isPickup, onClose, onSuccess }: ReturnModalProps) {
   const [reason, setReason] = useState<ReturnReason>('REGRET');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -86,8 +87,18 @@ export function ReturnModal({ orderId, token, onClose, onSuccess }: ReturnModalP
           </div>
 
           <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-            Sua solicitação será analisada em até 3 dias úteis. Você receberá as instruções de
-            devolução por e-mail.
+            {isPickup ? (
+              <>
+                Como seu pedido foi retirado na loja, a devolução também deve ser feita
+                presencialmente. Traga o item à nossa loja e o reembolso será processado após o
+                recebimento.
+              </>
+            ) : (
+              <>
+                Sua solicitação será analisada em até 3 dias úteis. Você receberá as instruções de
+                devolução por e-mail.
+              </>
+            )}
           </div>
 
           {error && <p className="text-xs text-destructive">{error}</p>}
