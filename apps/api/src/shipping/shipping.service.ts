@@ -80,7 +80,7 @@ export class ShippingService {
     this.baseUrl = sandbox
       ? 'https://sandbox.melhorenvio.com.br/api/v2'
       : 'https://melhorenvio.com.br/api/v2';
-    this.userAgent = 'Saldão da Reversa (adriansanluz@gmail.com)';
+    this.userAgent = 'Saldão da Reserva (saldaodareserva.com.br)';
     // ME exige CPF em "document" e CNPJ em "company_document"
     const fromDocument = this.config
       .get<string>('MELHOR_ENVIO_FROM_DOCUMENT', '')

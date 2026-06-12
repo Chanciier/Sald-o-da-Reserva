@@ -19,7 +19,7 @@ interface FocusNfeResponse {
   url?: string;
   danfe_url?: string;
   caminho_danfe?: string;
-  caminho_xml_note_fiscal?: string;
+  caminho_xml_nota_fiscal?: string;
   data_emissao?: string;
   data_cancelamento?: string;
   erros?: Array<{ codigo: string; mensagem: string; campo?: string }>;
@@ -228,7 +228,7 @@ export class FocusNfeProvider implements InvoiceProvider {
 
     const rawBase = this.baseUrl.replace(/\/v2$/, '');
     const xmlUrl =
-      nfe.url ?? (nfe.caminho_xml_note_fiscal ? `${rawBase}${nfe.caminho_xml_note_fiscal}` : null);
+      nfe.url ?? (nfe.caminho_xml_nota_fiscal ? `${rawBase}${nfe.caminho_xml_nota_fiscal}` : null);
 
     if (!xmlUrl) {
       throw new Error('XML não disponível para esta NF-e no Focus NFe.');
