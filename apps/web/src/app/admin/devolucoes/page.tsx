@@ -253,7 +253,7 @@ function ManageModal({
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Valor do pedido</p>
-              <p className="text-xs font-medium">{fmt(request.order.total)}</p>
+              <p className="text-xs font-medium">{fmt(request.order?.total ?? 0)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Motivo</p>
@@ -387,7 +387,7 @@ function ManageModal({
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Valor do pedido: <strong>{fmt(request.order.total)}</strong>
+                    Valor do pedido: <strong>{fmt(request.order?.total ?? 0)}</strong>
                   </p>
 
                   <div className="flex gap-2">
@@ -424,7 +424,7 @@ function ManageModal({
                         type="number"
                         step="0.01"
                         min="0.01"
-                        max={request.order.total}
+                        max={request.order?.total ?? 0}
                         value={refundValue}
                         onChange={(e) => setRefundValue(e.target.value)}
                         placeholder="0,00"
@@ -615,7 +615,9 @@ export default function AdminDevolucoes() {
                       >
                         #{r.orderId.slice(-8).toUpperCase()}
                       </Link>
-                      <p className="text-xs text-muted-foreground mt-0.5">{fmt(r.order.total)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {fmt(r.order?.total ?? 0)}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-xs">{REASON_LABEL[r.reason] ?? r.reason}</td>
                     <td className="px-4 py-3">

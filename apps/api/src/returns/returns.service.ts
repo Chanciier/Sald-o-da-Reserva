@@ -314,7 +314,21 @@ export class ReturnsService {
       this.logger.warn(`Failed to send refund email: ${(err as Error).message}`);
     }
 
-    return this.db.returnRequest.findUnique({ where: { id } });
+    return this.db.returnRequest.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        order: {
+          select: {
+            id: true,
+            total: true,
+            deliveryMethod: true,
+            pickupCode: true,
+            items: { take: 1, select: { name: true } },
+          },
+        },
+      },
+    });
   }
 
   private async executeRefundSilently(
