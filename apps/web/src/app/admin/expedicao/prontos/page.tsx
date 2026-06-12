@@ -118,7 +118,6 @@ export default function ProntosPage() {
           onChange={(e) => {
             setDeliveryMethod(e.target.value);
             setPage(1);
-            setSelected(new Set());
           }}
           className="h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >

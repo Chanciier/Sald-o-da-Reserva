@@ -414,7 +414,14 @@ export class ExpedicaoService {
         await this.mp.createRefund(payment!.gatewayPaymentId!);
         this.logger.log(`Refund issued for order ${orderId}, payment ${payment!.gatewayPaymentId}`);
       } catch (err) {
-        refundError = err instanceof Error ? err.message : String(err);
+        if (err instanceof Error) {
+          refundError = err.message;
+        } else if (typeof err === 'object' && err !== null) {
+          const e = err as Record<string, unknown>;
+          refundError = typeof e.message === 'string' ? e.message : JSON.stringify(e).slice(0, 200);
+        } else {
+          refundError = String(err);
+        }
         this.logger.warn(`Refund failed for order ${orderId}: ${refundError}`);
       }
     }
