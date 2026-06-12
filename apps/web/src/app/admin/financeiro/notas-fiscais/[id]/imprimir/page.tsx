@@ -29,7 +29,11 @@ export default function ImprimirDanfePage() {
 
   useEffect(() => {
     if (!loading && invoice) {
-      setTimeout(() => window.print(), 300);
+      if (invoice.danfeUrl) {
+        window.location.href = invoice.danfeUrl;
+      } else {
+        setTimeout(() => window.print(), 300);
+      }
     }
   }, [loading, invoice]);
 
@@ -45,6 +49,14 @@ export default function ImprimirDanfePage() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-sm text-destructive">Nota não encontrada.</p>
+      </div>
+    );
+  }
+
+  if (invoice.danfeUrl) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-muted-foreground">Redirecionando para DANFE...</p>
       </div>
     );
   }
