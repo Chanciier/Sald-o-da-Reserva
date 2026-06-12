@@ -20,7 +20,7 @@ function TimeUnit({ value, label }: { value: number; label: string }) {
 }
 
 export function UrgencyBanner() {
-  const { hours, minutes, seconds } = useCountdown(3);
+  const { hours, minutes, seconds } = useCountdown(5);
   const [viewers, setViewers] = useState(284);
 
   useEffect(() => {
