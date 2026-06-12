@@ -235,7 +235,7 @@ export function Hero() {
                 opacity: { duration: 0.5, delay: card.delay },
                 y: { duration: 4, repeat: Infinity, ease: 'easeInOut', delay: card.delay },
               }}
-              className={`absolute ${card.className} w-44 rounded-2xl border border-border bg-card p-3 shadow-xl`}
+              className={`absolute ${card.className} w-44 rounded-2xl border border-border bg-card/85 p-3 shadow-xl backdrop-blur-sm`}
             >
               <div className="relative">
                 <span className="absolute left-0 top-0 z-10 rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">
