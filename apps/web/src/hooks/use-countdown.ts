@@ -18,6 +18,26 @@ function getTimeLeft(target: number): TimeLeft {
   };
 }
 
+function getOrCreateDeadline(durationHours: number): number {
+  const key = `promo_deadline_${durationHours}h`;
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const d = parseInt(stored, 10);
+      if (d > Date.now()) return d;
+    }
+  } catch {
+    // localStorage indisponível (SSR ou privado)
+  }
+  const d = Date.now() + durationHours * 3600 * 1000;
+  try {
+    localStorage.setItem(key, String(d));
+  } catch {
+    // ignore
+  }
+  return d;
+}
+
 export function useCountdown(durationHours = 5) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({
     hours: durationHours,
@@ -26,15 +46,22 @@ export function useCountdown(durationHours = 5) {
   });
 
   useEffect(() => {
-    let target = Date.now() + durationHours * 3600 * 1000;
-    setTimeLeft(getTimeLeft(target));
+    const key = `promo_deadline_${durationHours}h`;
+    let deadline = getOrCreateDeadline(durationHours);
+    setTimeLeft(getTimeLeft(deadline));
 
     const interval = setInterval(() => {
-      if (target - Date.now() <= 0) {
-        target = Date.now() + durationHours * 3600 * 1000;
+      if (Date.now() >= deadline) {
+        deadline = Date.now() + durationHours * 3600 * 1000;
+        try {
+          localStorage.setItem(key, String(deadline));
+        } catch {
+          // ignore
+        }
       }
-      setTimeLeft(getTimeLeft(target));
+      setTimeLeft(getTimeLeft(deadline));
     }, 1000);
+
     return () => clearInterval(interval);
   }, [durationHours]);
 
