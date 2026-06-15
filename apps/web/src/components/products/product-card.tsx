@@ -35,7 +35,7 @@ function AddToCartBtn({ productId, stock }: { productId: string; stock: number }
     return (
       <button
         disabled
-        className="mt-4 w-full rounded-xl bg-muted py-2.5 text-sm font-bold text-muted-foreground cursor-not-allowed"
+        className="w-full rounded-xl bg-muted py-2.5 text-sm font-bold text-muted-foreground cursor-not-allowed"
       >
         Sem estoque
       </button>
@@ -43,7 +43,7 @@ function AddToCartBtn({ productId, stock }: { productId: string; stock: number }
   }
 
   return (
-    <div className="mt-4">
+    <div>
       <button
         onClick={handleAdd}
         disabled={loading}
@@ -77,7 +77,7 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <Link
       href={`/produtos/${product.slug}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-1 hover:shadow-xl"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-1 hover:shadow-xl"
     >
       <div className="relative aspect-square overflow-hidden bg-muted/40 p-4">
         {off > 0 && (
@@ -135,7 +135,9 @@ export function ProductCard({ product }: { product: Product }) {
           </span>
         </div>
 
-        <AddToCartBtn productId={product.id} stock={product.stock} />
+        <div className="mt-auto pt-4">
+          <AddToCartBtn productId={product.id} stock={product.stock} />
+        </div>
       </div>
     </Link>
   );
