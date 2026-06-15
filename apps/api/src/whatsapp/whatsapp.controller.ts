@@ -13,6 +13,7 @@ import {
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { BaileysService } from './baileys.service';
 import { WhatsappMarketingService } from './whatsapp-marketing.service';
 import { AIContentService } from './ai-content.service';
 import { CreateGroupDto } from './dto/create-group.dto';
@@ -23,10 +24,22 @@ import { GenerateContentDto, UpdateContentDto } from './dto/generate-content.dto
 @Roles(Role.ADMIN)
 export class WhatsappController {
   constructor(
+    private readonly baileys: BaileysService,
     private readonly marketing: WhatsappMarketingService,
     private readonly ai: AIContentService,
     private readonly prisma: PrismaService,
   ) {}
+
+  @Get('status')
+  getStatus() {
+    return { connected: this.baileys.isReady(), qr: this.baileys.getQr() };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout() {
+    await this.baileys.clearSession();
+  }
 
   @Get('groups')
   findGroups() {
