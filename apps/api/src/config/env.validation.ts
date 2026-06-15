@@ -140,6 +140,18 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   RESEND_FROM_EMAIL: string = 'noreply@saldaodareserva.com.br';
+
+  @IsString()
+  @IsOptional()
+  EVOLUTION_API_URL: string = '';
+
+  @IsString()
+  @IsOptional()
+  EVOLUTION_API_KEY: string = '';
+
+  @IsString()
+  @IsOptional()
+  EVOLUTION_INSTANCE: string = '';
 }
 
 export function envValidation(config: Record<string, unknown>) {

@@ -25,6 +25,7 @@ import {
   Menu,
   X,
   FileText,
+  MessageCircle,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -134,6 +135,11 @@ const NAV: NavItem[] = [
       { href: '/admin/conteudo/paginas', label: 'Páginas Jurídicas' },
       { href: '/admin/conteudo/faq', label: 'FAQ' },
     ],
+  },
+  {
+    label: 'Marketing',
+    icon: MessageCircle,
+    children: [{ href: '/admin/whatsapp', label: 'Grupos WhatsApp' }],
   },
   {
     label: 'Logs',

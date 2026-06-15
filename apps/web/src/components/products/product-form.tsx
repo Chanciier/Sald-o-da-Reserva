@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Camera,
   Search,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import type { Product, ProductImage, CategoryItem } from '@/actions/products';
@@ -99,6 +100,40 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
   const [ncmSearching, setNcmSearching] = useState(false);
   const ncmDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ncmNameDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [autoPublishWhatsapp, setAutoPublishWhatsapp] = useState(
+    initialData?.autoPublishWhatsapp ?? false,
+  );
+  const [whatsappGroupIds, setWhatsappGroupIds] = useState<string[]>(
+    initialData?.whatsappGroupIds ?? [],
+  );
+  const [resending, setResending] = useState(false);
+
+  const { data: whatsappGroups = [] } = useQuery<{ id: string; name: string; active: boolean }[]>({
+    queryKey: ['whatsapp-groups'],
+    queryFn: async () => {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${BASE}/api/v1/whatsapp/groups`, { headers });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!token,
+    staleTime: 60 * 1000,
+  });
+
+  async function handleResend() {
+    if (!initialData || !token) return;
+    setResending(true);
+    try {
+      await fetch(`${BASE}/api/v1/whatsapp/resend/${initialData.id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } finally {
+      setResending(false);
+    }
+  }
 
   const {
     data: categoriesData,
@@ -302,6 +337,8 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       origem: data.origem ?? 0,
       cstCsosn: data.cstCsosn || undefined,
       imageIds: images.map((i) => i.id),
+      autoPublishWhatsapp,
+      whatsappGroupIds,
     };
     await onSubmit(payload);
   }
@@ -323,6 +360,22 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {initialData && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resending}
+              title="Reenviar para WhatsApp"
+              className="flex items-center gap-1.5 rounded-lg border border-green-600/40 bg-green-600/10 px-3 py-2 text-sm text-green-700 hover:bg-green-600/20 disabled:opacity-60 transition-colors dark:text-green-400"
+            >
+              {resending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              WhatsApp
+            </button>
+          )}
           <button
             type="button"
             onClick={() => router.push(basePath)}
@@ -869,6 +922,57 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               />
               <p className="mt-0.5 text-xs text-muted-foreground">Máx. 500 caracteres</p>
             </div>
+          </div>
+
+          {/* WhatsApp Marketing */}
+          <div className={cardCls}>
+            <h2 className="text-sm font-semibold">Marketing WhatsApp</h2>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={autoPublishWhatsapp}
+                onChange={(e) => setAutoPublishWhatsapp(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div>
+                <p className="text-sm font-medium leading-tight">Publicar automaticamente</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Envia para os grupos quando o produto for ativado.
+                </p>
+              </div>
+            </label>
+
+            {autoPublishWhatsapp && (
+              <div className="mt-1 space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Grupos</p>
+                {whatsappGroups.filter((g) => g.active).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Nenhum grupo ativo.{' '}
+                    <a href="/admin/whatsapp" className="underline hover:text-foreground">
+                      Cadastrar grupo
+                    </a>
+                  </p>
+                ) : (
+                  whatsappGroups
+                    .filter((g) => g.active)
+                    .map((g) => (
+                      <label key={g.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={whatsappGroupIds.includes(g.id)}
+                          onChange={(e) =>
+                            setWhatsappGroupIds((prev) =>
+                              e.target.checked ? [...prev, g.id] : prev.filter((id) => id !== g.id),
+                            )
+                          }
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span className="text-sm">{g.name}</span>
+                      </label>
+                    ))
+                )}
+              </div>
+            )}
           </div>
 
           {/* Salvar (secondary) */}

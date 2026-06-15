@@ -140,4 +140,13 @@ export class UpdateProductDto {
   @IsArray()
   @IsString({ each: true })
   imageIds?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  autoPublishWhatsapp?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  whatsappGroupIds?: string[];
 }

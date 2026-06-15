@@ -13,6 +13,7 @@ import { AuthenticatedUser } from '../auth/types/auth.types';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
+import { WhatsappMarketingService } from '../whatsapp/whatsapp-marketing.service';
 
 const CACHE_TTL = 300;
 const keyItem = (slug: string) => `products:item:${slug}`;
@@ -44,6 +45,7 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly storage: StorageService,
+    private readonly whatsappMarketing: WhatsappMarketingService,
   ) {}
 
   private generateSku(name: string): string {
@@ -121,6 +123,8 @@ export class ProductsService {
         pickupAvailable: dto.pickupAvailable ?? false,
         featuredOffer: dto.featuredOffer ?? false,
         status: dto.status,
+        autoPublishWhatsapp: dto.autoPublishWhatsapp ?? false,
+        whatsappGroupIds: dto.whatsappGroupIds ?? [],
         categoryId: dto.categoryId,
         metaTitle: dto.metaTitle,
         metaDescription: dto.metaDescription,
@@ -139,6 +143,11 @@ export class ProductsService {
 
     await this.redis.delPattern('products:*');
     await this.auditLog('PRODUCT_CREATED', userId, { productId: product.id, name: product.name });
+
+    if (product.status === 'ACTIVE') {
+      this.whatsappMarketing.publishProduct(product, product.whatsappGroupIds).catch(() => {});
+    }
+
     return serializeProduct(product);
   }
 
@@ -279,6 +288,13 @@ export class ProductsService {
     await this.auditLog('PRODUCT_UPDATED', user.id, { productId: id, changes: Object.keys(rest) });
 
     const updated = await this.prisma.product.findUnique({ where: { id }, include: INCLUDE_FULL });
+
+    const statusChangedToActive =
+      dto.status === 'ACTIVE' && existing.status !== 'ACTIVE' && updated?.autoPublishWhatsapp;
+    if (statusChangedToActive && updated) {
+      this.whatsappMarketing.publishProduct(updated, updated.whatsappGroupIds).catch(() => {});
+    }
+
     return serializeProduct(updated!);
   }
 

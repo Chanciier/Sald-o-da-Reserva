@@ -166,44 +166,75 @@ model Category {
 }
 
 model Product {
-  id               String        @id @default(cuid())
-  name             String
-  slug             String        @unique
-  sku              String        @unique
-  internalCode     String?       @map("internal_code") @db.VarChar(100)
-  brand            String?
-  shortDescription String?       @map("short_description") @db.Text
-  description      String?
-  price            Decimal       @db.Decimal(10, 2)
-  salePrice        Decimal?      @map("sale_price") @db.Decimal(10, 2)
-  weight           Decimal?      @db.Decimal(8, 3)
-  dimensions       Json?
-  stock            Int           @default(0)
-  minimumStock     Int           @default(0) @map("minimum_stock")
-  ncm              String?
-  origem           Int?          @default(0)
-  cfop             String?       @db.VarChar(10)
-  cstCsosn         String?       @map("cst_csosn") @db.VarChar(10)
-  pickupAvailable  Boolean       @default(false) @map("pickup_available")
-  featuredOffer    Boolean       @default(false) @map("featured_offer")
-  status           ProductStatus @default(ACTIVE)
-  metaTitle        String?       @map("meta_title") @db.VarChar(200)
-  metaDescription  String?       @map("meta_description") @db.VarChar(500)
-  categoryId       String?       @map("category_id")
-  createdById      String?       @map("created_by")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id                  String        @id @default(cuid())
+  name                String
+  slug                String        @unique
+  sku                 String        @unique
+  internalCode        String?       @map("internal_code") @db.VarChar(100)
+  brand               String?
+  shortDescription    String?       @map("short_description") @db.Text
+  description         String?
+  price               Decimal       @db.Decimal(10, 2)
+  salePrice           Decimal?      @map("sale_price") @db.Decimal(10, 2)
+  weight              Decimal?      @db.Decimal(8, 3)
+  dimensions          Json?
+  stock               Int           @default(0)
+  minimumStock        Int           @default(0) @map("minimum_stock")
+  ncm                 String?
+  origem              Int?          @default(0)
+  cfop                String?       @db.VarChar(10)
+  cstCsosn            String?       @map("cst_csosn") @db.VarChar(10)
+  pickupAvailable     Boolean       @default(false) @map("pickup_available")
+  featuredOffer       Boolean       @default(false) @map("featured_offer")
+  status              ProductStatus @default(ACTIVE)
+  metaTitle           String?       @map("meta_title") @db.VarChar(200)
+  metaDescription     String?       @map("meta_description") @db.VarChar(500)
+  autoPublishWhatsapp Boolean       @default(false) @map("auto_publish_whatsapp")
+  whatsappGroupIds    String[]      @default([]) @map("whatsapp_group_ids")
+  categoryId          String?       @map("category_id")
+  createdById         String?       @map("created_by")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
 
-  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdBy  User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  images     Image[]
-  orderItems OrderItem[]
-  reviews    Review[]
+  category     Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy    User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  images       Image[]
+  orderItems   OrderItem[]
+  reviews      Review[]
+  whatsappLogs WhatsappMessageLog[]
 
   @@index([categoryId])
   @@index([status])
   @@index([createdById])
   @@map("products")
+}
+
+model WhatsappGroup {
+  id        String   @id @default(cuid())
+  name      String
+  groupId   String   @unique @map("group_id")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  logs WhatsappMessageLog[]
+
+  @@map("whatsapp_groups")
+}
+
+model WhatsappMessageLog {
+  id        String        @id @default(cuid())
+  productId String        @map("product_id")
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  groupId   String        @map("group_id")
+  group     WhatsappGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  success   Boolean
+  error     String?
+  sentAt    DateTime      @default(now()) @map("sent_at")
+
+  @@index([productId])
+  @@index([groupId])
+  @@map("whatsapp_message_logs")
 }
 
 model Image {

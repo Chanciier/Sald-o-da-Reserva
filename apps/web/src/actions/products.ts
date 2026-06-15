@@ -45,6 +45,8 @@ export interface Product {
   origem: number | null;
   cfop: string | null;
   cstCsosn: string | null;
+  autoPublishWhatsapp: boolean;
+  whatsappGroupIds: string[];
   categoryId: string | null;
   createdById: string | null;
   createdAt: string;
