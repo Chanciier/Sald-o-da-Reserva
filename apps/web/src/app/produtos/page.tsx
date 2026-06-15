@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { getProducts, getCategories } from '@/lib/api';
 import { ProductCard } from '@/components/products/product-card';
 import { ProductFilters } from '@/components/products/product-filters';
+import { FilterableProductLayout } from '@/components/products/filterable-product-layout';
 import { Pagination } from '@/components/ui/pagination';
 import type { ProductQuery } from '@/types/product';
 
@@ -37,40 +38,38 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
     <main className="mx-auto max-w-7xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-bold tracking-tight">Produtos</h1>
 
-      <div className="flex gap-8">
-        <div className="w-56 shrink-0">
+      <FilterableProductLayout
+        sidebar={
           <Suspense>
             <ProductFilters categories={categoriesResult.data} />
           </Suspense>
+        }
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {productsResult.total} produto{productsResult.total !== 1 ? 's' : ''} encontrado
+            {productsResult.total !== 1 ? 's' : ''}
+          </p>
         </div>
 
-        <div className="flex-1">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {productsResult.total} produto{productsResult.total !== 1 ? 's' : ''} encontrado
-              {productsResult.total !== 1 ? 's' : ''}
-            </p>
+        {productsResult.data.length === 0 ? (
+          <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border">
+            <p className="text-muted-foreground">Nenhum produto encontrado.</p>
           </div>
-
-          {productsResult.data.length === 0 ? (
-            <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border">
-              <p className="text-muted-foreground">Nenhum produto encontrado.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {productsResult.data.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          )}
-
-          <div className="mt-8">
-            <Suspense>
-              <Pagination page={productsResult.page} totalPages={productsResult.totalPages} />
-            </Suspense>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {productsResult.data.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
           </div>
+        )}
+
+        <div className="mt-8">
+          <Suspense>
+            <Pagination page={productsResult.page} totalPages={productsResult.totalPages} />
+          </Suspense>
         </div>
-      </div>
+      </FilterableProductLayout>
     </main>
   );
 }
