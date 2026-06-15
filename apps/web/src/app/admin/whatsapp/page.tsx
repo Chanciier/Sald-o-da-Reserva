@@ -49,7 +49,7 @@ function WhatsappStatusBanner({ token }: { token: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: async () => {
-      const r = await fetch(`${BASE}/api/whatsapp/status`, {
+      const r = await fetch(`${BASE}/api/v1/whatsapp/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return r.json() as Promise<{ connected: boolean; qr: string | null }>;
@@ -59,7 +59,7 @@ function WhatsappStatusBanner({ token }: { token: string }) {
 
   const logout = useMutation({
     mutationFn: async () => {
-      await fetch(`${BASE}/api/whatsapp/logout`, {
+      await fetch(`${BASE}/api/v1/whatsapp/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
