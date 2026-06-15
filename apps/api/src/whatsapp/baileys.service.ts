@@ -15,8 +15,18 @@ const KEY_PREFIX = 'wa:k:';
 
 function serialize(v: unknown): string {
   return JSON.stringify(v, (_k, val) => {
+    // Uint8Array puro (não tem toJSON) chega como instância
     if (val instanceof Uint8Array || Buffer.isBuffer(val)) {
       return { _t: 'buf', d: Buffer.from(val).toString('base64') };
+    }
+    // Buffer nativo já passou pelo toJSON antes do replacer → {type:'Buffer',data:[...]}
+    if (
+      val &&
+      typeof val === 'object' &&
+      (val as { type?: string }).type === 'Buffer' &&
+      Array.isArray((val as { data?: unknown }).data)
+    ) {
+      return { _t: 'buf', d: Buffer.from((val as { data: number[] }).data).toString('base64') };
     }
     return val;
   });
@@ -24,8 +34,18 @@ function serialize(v: unknown): string {
 
 function deserialize<T>(s: string): T {
   return JSON.parse(s, (_k, val) => {
-    if (val && typeof val === 'object' && val._t === 'buf') {
-      return Buffer.from(val.d, 'base64');
+    if (val && typeof val === 'object') {
+      // Formato próprio
+      if ((val as { _t?: string })._t === 'buf') {
+        return Buffer.from((val as { d: string }).d, 'base64');
+      }
+      // Formato nativo do Buffer.toJSON (compatibilidade com dados antigos no Redis)
+      if (
+        (val as { type?: string }).type === 'Buffer' &&
+        Array.isArray((val as { data?: unknown }).data)
+      ) {
+        return Buffer.from((val as { data: number[] }).data);
+      }
     }
     return val;
   }) as T;
