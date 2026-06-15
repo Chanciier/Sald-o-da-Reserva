@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
-import { ShoppingCart, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+const MotionLink = motion(Link);
 
 interface ApiProduct {
   id: string;
@@ -45,7 +47,8 @@ function ProductCard({ product, index = 0 }: { product: ApiProduct; index?: numb
   const installment = price / 12;
 
   return (
-    <motion.article
+    <MotionLink
+      href={`/produtos/${product.slug}`}
       initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
@@ -101,15 +104,8 @@ function ProductCard({ product, index = 0 }: { product: ApiProduct; index?: numb
             {lowStock ? `Últimas ${product.stock} unidades!` : `${product.stock} em estoque`}
           </span>
         </div>
-
-        <Link href={`/produtos/${product.slug}`} className="mt-4">
-          <Button className="w-full font-bold" aria-label={`Comprar ${product.name}`}>
-            <ShoppingCart className="size-4" />
-            Comprar agora
-          </Button>
-        </Link>
       </div>
-    </motion.article>
+    </MotionLink>
   );
 }
 
