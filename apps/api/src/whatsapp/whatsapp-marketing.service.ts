@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappProvider } from './whatsapp.provider';
+import { AIContentService } from './ai-content.service';
 
 interface ProductLike {
   id: string;
@@ -14,6 +15,9 @@ interface ProductLike {
   autoPublishWhatsapp: boolean;
   whatsappGroupIds: string[];
   images: { url: string }[];
+  description?: string | null;
+  brand?: string | null;
+  category?: { name: string } | null;
 }
 
 @Injectable()
@@ -24,6 +28,7 @@ export class WhatsappMarketingService {
     private readonly prisma: PrismaService,
     private readonly whatsapp: WhatsappProvider,
     private readonly config: ConfigService,
+    private readonly ai: AIContentService,
   ) {}
 
   async publishProduct(product: ProductLike, groupIds: string[]): Promise<void> {
@@ -37,7 +42,36 @@ export class WhatsappMarketingService {
 
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
     const productUrl = `${frontendUrl}/produtos/${product.slug}`;
-    const message = this.buildMessage(product, productUrl);
+
+    // Usa conteúdo editado manualmente se houver; senão gera via IA
+    const existingContent = await this.prisma.whatsappContentHistory.findFirst({
+      where: { productId: product.id, edited: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    let message: string;
+    if (existingContent) {
+      message = existingContent.content;
+      await this.prisma.whatsappContentHistory.update({
+        where: { id: existingContent.id },
+        data: { sent: true },
+      });
+    } else {
+      message = await this.ai.generateAdCopy({
+        name: product.name,
+        category: product.category?.name,
+        brand: product.brand ?? undefined,
+        price: product.price.toNumber(),
+        salePrice: product.salePrice?.toNumber(),
+        stock: product.stock,
+        description: product.description ?? undefined,
+        productUrl,
+      });
+      await this.prisma.whatsappContentHistory.create({
+        data: { productId: product.id, content: message, sent: true },
+      });
+    }
+
     const imageUrl = product.images?.[0]?.url;
 
     for (const group of groups) {
@@ -65,33 +99,12 @@ export class WhatsappMarketingService {
   async resendProduct(productId: string): Promise<void> {
     const product = await this.prisma.product.findUniqueOrThrow({
       where: { id: productId },
-      include: { images: { orderBy: { position: 'asc' } } },
+      include: {
+        images: { orderBy: { position: 'asc' } },
+        category: { select: { name: true } },
+      },
     });
 
     await this.publishProduct(product, product.whatsappGroupIds);
-  }
-
-  private buildMessage(product: ProductLike, url: string): string {
-    const price = product.price.toNumber();
-    const salePrice = product.salePrice?.toNumber() ?? null;
-    const displayPrice = salePrice ?? price;
-    const fmt = (n: number) =>
-      new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
-
-    const lines: string[] = [`🔥 *${product.name}*`, ''];
-
-    if (salePrice && salePrice < price) {
-      const pct = Math.round(((price - salePrice) / price) * 100);
-      lines.push(`De: ~R$ ${fmt(price)}~`, `*Por: ${fmt(displayPrice)}* (-${pct}%)`);
-    } else {
-      lines.push(`*${fmt(displayPrice)}*`);
-    }
-
-    if (product.stock > 0 && product.stock <= 5) {
-      lines.push('', `⚡ Últimas ${product.stock} unidades!`);
-    }
-
-    lines.push('', `👉 ${url}`);
-    return lines.join('\n');
   }
 }

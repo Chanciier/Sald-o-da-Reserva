@@ -201,7 +201,8 @@ model Product {
   images       Image[]
   orderItems   OrderItem[]
   reviews      Review[]
-  whatsappLogs WhatsappMessageLog[]
+  whatsappLogs    WhatsappMessageLog[]
+  whatsappContent WhatsappContentHistory[]
 
   @@index([categoryId])
   @@index([status])
@@ -235,6 +236,20 @@ model WhatsappMessageLog {
   @@index([productId])
   @@index([groupId])
   @@map("whatsapp_message_logs")
+}
+
+model WhatsappContentHistory {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  content   String
+  edited    Boolean  @default(false)
+  sent      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@map("whatsapp_content_history")
 }
 
 model Image {

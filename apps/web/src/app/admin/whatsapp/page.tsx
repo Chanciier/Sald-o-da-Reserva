@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Check, X, Sparkles, RefreshCw, Clock } from 'lucide-react';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -21,21 +21,51 @@ interface GroupForm {
   active: boolean;
 }
 
+interface ContentHistory {
+  id: string;
+  productId: string;
+  content: string;
+  edited: boolean;
+  sent: boolean;
+  createdAt: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  salePrice?: number;
+  stock: number;
+  description?: string;
+  brand?: string;
+  category?: { name: string };
+}
+
 const emptyForm: GroupForm = { name: '', groupId: '', active: true };
 
 export default function AdminWhatsappPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
+  const [tab, setTab] = useState<'grupos' | 'conteudo'>('grupos');
+
+  // --- Grupos state ---
   const [form, setForm] = useState<GroupForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const [groupError, setGroupError] = useState('');
+
+  // --- Conteúdo state ---
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [editingContentId, setEditingContentId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
 
   const headers = () => ({
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
   });
 
-  const { data: groups = [], isLoading } = useQuery<WhatsappGroup[]>({
+  // Grupos
+  const { data: groups = [], isLoading: groupsLoading } = useQuery<WhatsappGroup[]>({
     queryKey: ['whatsapp-groups-admin'],
     queryFn: async () => {
       const res = await fetch(`${BASE}/api/v1/whatsapp/groups`, { headers: headers() });
@@ -45,7 +75,7 @@ export default function AdminWhatsappPage() {
     enabled: !!token,
   });
 
-  const save = useMutation({
+  const saveGroup = useMutation({
     mutationFn: async () => {
       const url = editingId
         ? `${BASE}/api/v1/whatsapp/groups/${editingId}`
@@ -65,12 +95,12 @@ export default function AdminWhatsappPage() {
       qc.invalidateQueries({ queryKey: ['whatsapp-groups'] });
       setForm(emptyForm);
       setEditingId(null);
-      setError('');
+      setGroupError('');
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => setGroupError(e.message),
   });
 
-  const remove = useMutation({
+  const removeGroup = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`${BASE}/api/v1/whatsapp/groups/${id}`, {
         method: 'DELETE',
@@ -84,17 +114,87 @@ export default function AdminWhatsappPage() {
     },
   });
 
-  function startEdit(g: WhatsappGroup) {
-    setEditingId(g.id);
-    setForm({ name: g.name, groupId: g.groupId, active: g.active });
-    setError('');
-  }
+  // Produtos para seleção
+  const { data: products = [] } = useQuery<Product[]>({
+    queryKey: ['products-simple'],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/v1/products?limit=200&status=ACTIVE`, {
+        headers: headers(),
+      });
+      if (!res.ok) throw new Error('Erro ao carregar produtos');
+      const data = await res.json();
+      return data.data ?? data;
+    },
+    enabled: !!token && tab === 'conteudo',
+  });
 
-  function cancelEdit() {
-    setEditingId(null);
-    setForm(emptyForm);
-    setError('');
-  }
+  // Histórico do produto selecionado
+  const { data: history = [], isLoading: historyLoading } = useQuery<ContentHistory[]>({
+    queryKey: ['whatsapp-content', selectedProductId],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/v1/whatsapp/content/${selectedProductId}`, {
+        headers: headers(),
+      });
+      if (!res.ok) throw new Error('Erro ao carregar histórico');
+      return res.json();
+    },
+    enabled: !!token && !!selectedProductId,
+  });
+
+  const generateContent = useMutation({
+    mutationFn: async () => {
+      const product = products.find((p) => p.id === selectedProductId);
+      if (!product) throw new Error('Produto não encontrado');
+      const res = await fetch(`${BASE}/api/v1/whatsapp/content/generate`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({
+          productId: product.id,
+          name: product.name,
+          category: product.category?.name,
+          brand: product.brand,
+          price: product.price,
+          salePrice: product.salePrice,
+          stock: product.stock,
+          description: product.description,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? 'Erro ao gerar conteúdo');
+      }
+      return res.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['whatsapp-content', selectedProductId] }),
+  });
+
+  const saveContent = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const res = await fetch(`${BASE}/api/v1/whatsapp/content/${id}`, {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error('Erro ao salvar');
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['whatsapp-content', selectedProductId] });
+      setEditingContentId(null);
+      setEditingText('');
+    },
+  });
+
+  const deleteContent = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${BASE}/api/v1/whatsapp/content/${id}`, {
+        method: 'DELETE',
+        headers: headers(),
+      });
+      if (!res.ok) throw new Error('Erro ao remover');
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['whatsapp-content', selectedProductId] }),
+  });
 
   const inputCls =
     'w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
@@ -102,165 +202,343 @@ export default function AdminWhatsappPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold">Grupos WhatsApp</h1>
+        <h1 className="text-xl font-bold">WhatsApp Marketing</h1>
         <p className="text-sm text-muted-foreground">
-          Gerencie os grupos para publicação automática de produtos.
+          Gerencie grupos e conteúdo gerado por IA para publicações.
         </p>
       </div>
 
-      {/* Form */}
-      <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">
-        <h2 className="text-sm font-semibold">{editingId ? 'Editar Grupo' : 'Adicionar Grupo'}</h2>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Nome do Grupo *
-            </label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              className={inputCls}
-              placeholder="Ex: Principal, VIP, Promoções"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Group ID (JID) *
-            </label>
-            <input
-              value={form.groupId}
-              onChange={(e) => setForm((p) => ({ ...p, groupId: e.target.value }))}
-              className={inputCls}
-              placeholder="120363XXXXXXXXX@g.us"
-            />
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Obtido via Evolution API: <code className="font-mono">GET /group/fetchAllGroups</code>
-            </p>
-          </div>
-        </div>
-
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={form.active}
-            onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
-            className="h-4 w-4 accent-primary"
-          />
-          <span className="text-sm">Grupo ativo</span>
-        </label>
-
-        {error && <p className="text-xs text-destructive">{error}</p>}
-
-        <div className="flex gap-2">
+      {/* Tabs */}
+      <div className="flex gap-1 border-b">
+        {(['grupos', 'conteudo'] as const).map((t) => (
           <button
-            onClick={() => save.mutate()}
-            disabled={save.isPending || !form.name || !form.groupId}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-60 transition-colors"
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+              tab === t
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
           >
-            {save.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            {editingId ? 'Salvar' : 'Adicionar'}
+            {t === 'grupos' ? 'Grupos' : 'Conteúdo IA'}
           </button>
-          {editingId && (
-            <button
-              onClick={cancelEdit}
-              className="rounded-lg border px-4 py-2 text-sm hover:bg-muted transition-colors"
-            >
-              Cancelar
-            </button>
+        ))}
+      </div>
+
+      {/* === TAB GRUPOS === */}
+      {tab === 'grupos' && (
+        <>
+          <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">
+            <h2 className="text-sm font-semibold">
+              {editingId ? 'Editar Grupo' : 'Adicionar Grupo'}
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Nome do Grupo *
+                </label>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  className={inputCls}
+                  placeholder="Ex: Principal, VIP, Promoções"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Group ID (JID) *
+                </label>
+                <input
+                  value={form.groupId}
+                  onChange={(e) => setForm((p) => ({ ...p, groupId: e.target.value }))}
+                  className={inputCls}
+                  placeholder="120363XXXXXXXXX@g.us"
+                />
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Obtido via Evolution API:{' '}
+                  <code className="font-mono">GET /group/fetchAllGroups</code>
+                </p>
+              </div>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="text-sm">Grupo ativo</span>
+            </label>
+            {groupError && <p className="text-xs text-destructive">{groupError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => saveGroup.mutate()}
+                disabled={saveGroup.isPending || !form.name || !form.groupId}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-60 transition-colors"
+              >
+                {saveGroup.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                {editingId ? 'Salvar' : 'Adicionar'}
+              </button>
+              {editingId && (
+                <button
+                  onClick={() => {
+                    setEditingId(null);
+                    setForm(emptyForm);
+                    setGroupError('');
+                  }}
+                  className="rounded-lg border px-4 py-2 text-sm hover:bg-muted transition-colors"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+            {groupsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : groups.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                Nenhum grupo cadastrado.
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Nome</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">
+                      Group ID
+                    </th>
+                    <th className="px-4 py-3 text-center font-medium text-muted-foreground">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((g) => (
+                    <tr key={g.id} className="border-b last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{g.name}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden sm:table-cell">
+                        {g.groupId}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {g.active ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            <Check className="h-3 w-3" /> Ativo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            <X className="h-3 w-3" /> Inativo
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingId(g.id);
+                              setForm({ name: g.name, groupId: g.groupId, active: g.active });
+                              setGroupError('');
+                            }}
+                            className="rounded-md p-1.5 hover:bg-muted transition-colors"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Remover este grupo?')) removeGroup.mutate(g.id);
+                            }}
+                            className="rounded-md p-1.5 text-destructive hover:bg-destructive/10 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <h3 className="text-sm font-semibold mb-2">Como obter o Group ID</h3>
+            <ol className="list-decimal list-inside space-y-1 text-xs text-muted-foreground">
+              <li>Acesse a Evolution API com sua instância configurada</li>
+              <li>
+                Execute{' '}
+                <code className="font-mono bg-muted px-1 rounded">
+                  GET /group/fetchAllGroups/{'{instance}'}
+                </code>
+              </li>
+              <li>
+                Copie o campo <code className="font-mono bg-muted px-1 rounded">id</code> do grupo
+                (formato: <code className="font-mono bg-muted px-1 rounded">120363XXX@g.us</code>)
+              </li>
+              <li>Cole no campo &quot;Group ID&quot; acima</li>
+            </ol>
+          </div>
+        </>
+      )}
+
+      {/* === TAB CONTEÚDO IA === */}
+      {tab === 'conteudo' && (
+        <div className="space-y-4">
+          {/* Seleção de produto */}
+          <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Gerador de Anúncio com IA
+            </h2>
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Produto
+                </label>
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">Selecione um produto...</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={() => generateContent.mutate()}
+                disabled={!selectedProductId || generateContent.isPending}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-60 transition-colors whitespace-nowrap"
+              >
+                {generateContent.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Gerar Anúncio
+              </button>
+            </div>
+            {generateContent.isPending && (
+              <p className="text-xs text-muted-foreground">
+                IA gerando anúncio variado... aguarde alguns segundos.
+              </p>
+            )}
+          </div>
+
+          {/* Histórico de conteúdos */}
+          {selectedProductId && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground">Histórico de anúncios</h3>
+
+              {historyLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : history.length === 0 ? (
+                <div className="rounded-xl border bg-card py-10 text-center text-sm text-muted-foreground">
+                  Nenhum anúncio gerado ainda. Clique em &quot;Gerar Anúncio&quot; acima.
+                </div>
+              ) : (
+                history.map((h) => (
+                  <div key={h.id} className="rounded-xl border bg-card shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {new Date(h.createdAt).toLocaleString('pt-BR')}
+                        {h.edited && (
+                          <span className="rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 font-medium">
+                            Editado
+                          </span>
+                        )}
+                        {h.sent && (
+                          <span className="rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 font-medium">
+                            Enviado
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {editingContentId === h.id ? (
+                          <>
+                            <button
+                              onClick={() => saveContent.mutate({ id: h.id, content: editingText })}
+                              disabled={saveContent.isPending}
+                              className="rounded-md px-3 py-1 text-xs bg-primary text-primary-foreground hover:opacity-90 transition-colors"
+                            >
+                              {saveContent.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                'Salvar'
+                              )}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingContentId(null);
+                                setEditingText('');
+                              }}
+                              className="rounded-md px-3 py-1 text-xs border hover:bg-muted transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingContentId(h.id);
+                                setEditingText(h.content);
+                              }}
+                              className="rounded-md p-1.5 hover:bg-muted transition-colors"
+                              title="Editar"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm('Remover este anúncio?')) deleteContent.mutate(h.id);
+                              }}
+                              className="rounded-md p-1.5 text-destructive hover:bg-destructive/10 transition-colors"
+                              title="Remover"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-4">
+                      {editingContentId === h.id ? (
+                        <textarea
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          rows={10}
+                          className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+                        />
+                      ) : (
+                        <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">
+                          {h.content}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           )}
         </div>
-      </div>
-
-      {/* List */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">
-            Nenhum grupo cadastrado.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/40">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Nome</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">
-                  Group ID
-                </th>
-                <th className="px-4 py-3 text-center font-medium text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map((g) => (
-                <tr key={g.id} className="border-b last:border-0 hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium">{g.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden sm:table-cell">
-                    {g.groupId}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {g.active ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                        <Check className="h-3 w-3" /> Ativo
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        <X className="h-3 w-3" /> Inativo
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => startEdit(g)}
-                        className="rounded-md p-1.5 hover:bg-muted transition-colors"
-                        title="Editar"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm('Remover este grupo?')) remove.mutate(g.id);
-                        }}
-                        className="rounded-md p-1.5 text-destructive hover:bg-destructive/10 transition-colors"
-                        title="Remover"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <h3 className="text-sm font-semibold mb-2">Como obter o Group ID</h3>
-        <ol className="list-decimal list-inside space-y-1 text-xs text-muted-foreground">
-          <li>Acesse a Evolution API com sua instância configurada</li>
-          <li>
-            Execute{' '}
-            <code className="font-mono bg-muted px-1 rounded">
-              GET /group/fetchAllGroups/{'{instance}'}
-            </code>
-          </li>
-          <li>
-            Copie o campo <code className="font-mono bg-muted px-1 rounded">id</code> do grupo
-            desejado (formato:{' '}
-            <code className="font-mono bg-muted px-1 rounded">120363XXX@g.us</code>)
-          </li>
-          <li>Cole no campo &quot;Group ID&quot; acima</li>
-        </ol>
-      </div>
+      )}
     </div>
   );
 }
