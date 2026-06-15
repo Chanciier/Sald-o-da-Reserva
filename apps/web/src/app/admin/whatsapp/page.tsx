@@ -44,6 +44,61 @@ interface Product {
 
 const emptyForm: GroupForm = { name: '', groupId: '', active: true };
 
+function WhatsappStatusBanner({ token }: { token: string }) {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ['whatsapp-status'],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/whatsapp/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return r.json() as Promise<{ connected: boolean; qr: string | null }>;
+    },
+    refetchInterval: 5000,
+  });
+
+  const logout = useMutation({
+    mutationFn: async () => {
+      await fetch(`${BASE}/api/whatsapp/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['whatsapp-status'] }),
+  });
+
+  if (isLoading) return null;
+
+  return (
+    <div className="mb-6 rounded-xl border p-4 bg-white">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-3 h-3 rounded-full ${data?.connected ? 'bg-green-500' : 'bg-red-400'}`}
+          />
+          <span className="font-medium text-sm">
+            {data?.connected ? 'WhatsApp Conectado' : 'WhatsApp Desconectado'}
+          </span>
+        </div>
+        {data?.connected && (
+          <button onClick={() => logout.mutate()} className="text-xs text-red-500 hover:underline">
+            Deslogar
+          </button>
+        )}
+      </div>
+      {!data?.connected && data?.qr && (
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-sm text-gray-500">Escaneie o QR com o WhatsApp do celular:</p>
+          <img src={data.qr} alt="QR Code WhatsApp" className="w-48 h-48" />
+        </div>
+      )}
+      {!data?.connected && !data?.qr && (
+        <p className="text-sm text-gray-400">Aguardando QR code... (atualiza automaticamente)</p>
+      )}
+    </div>
+  );
+}
+
 export default function AdminWhatsappPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
@@ -207,6 +262,7 @@ export default function AdminWhatsappPage() {
           Gerencie grupos e conteúdo gerado por IA para publicações.
         </p>
       </div>
+      <WhatsappStatusBanner token={token ?? ''} />
 
       {/* Tabs */}
       <div className="flex gap-1 border-b">
