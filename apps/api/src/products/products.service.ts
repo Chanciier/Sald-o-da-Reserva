@@ -289,9 +289,12 @@ export class ProductsService {
 
     const updated = await this.prisma.product.findUnique({ where: { id }, include: INCLUDE_FULL });
 
-    const statusChangedToActive =
-      dto.status === 'ACTIVE' && existing.status !== 'ACTIVE' && updated?.autoPublishWhatsapp;
-    if (statusChangedToActive && updated) {
+    const isActive = (updated?.status ?? existing.status) === 'ACTIVE';
+    const justActivated = dto.status === 'ACTIVE' && existing.status !== 'ACTIVE';
+    const justEnabledWhatsapp = dto.autoPublishWhatsapp === true && !existing.autoPublishWhatsapp;
+    const shouldPublish =
+      isActive && updated?.autoPublishWhatsapp && (justActivated || justEnabledWhatsapp);
+    if (shouldPublish && updated) {
       this.whatsappMarketing.publishProduct(updated, updated.whatsappGroupIds).catch(() => {});
     }
 
