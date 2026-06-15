@@ -19,36 +19,36 @@ export class AIContentService {
   constructor(private readonly config: ConfigService) {}
 
   async generateAdCopy(product: ProductInput): Promise<string> {
-    const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
+    const apiKey = this.config.get<string>('GROQ_API_KEY');
     if (!apiKey) {
-      this.logger.warn('ANTHROPIC_API_KEY não configurada — usando template padrão');
+      this.logger.warn('GROQ_API_KEY não configurada — usando template padrão');
       return this.fallbackTemplate(product);
     }
 
     const prompt = this.buildPrompt(product);
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'llama-3.3-70b-versatile',
           max_tokens: 512,
+          temperature: 0.9,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
 
       if (!res.ok) {
         const body = await res.text().catch(() => '');
-        throw new Error(`Anthropic API ${res.status}: ${body}`);
+        throw new Error(`Groq API ${res.status}: ${body}`);
       }
 
-      const data = (await res.json()) as { content: { text: string }[] };
-      return data.content[0]?.text?.trim() ?? this.fallbackTemplate(product);
+      const data = (await res.json()) as { choices: { message: { content: string } }[] };
+      return data.choices[0]?.message?.content?.trim() ?? this.fallbackTemplate(product);
     } catch (e) {
       this.logger.error(`Erro ao gerar conteúdo: ${(e as Error).message}`);
       return this.fallbackTemplate(product);
