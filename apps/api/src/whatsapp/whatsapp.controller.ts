@@ -41,6 +41,11 @@ export class WhatsappController {
     await this.baileys.clearSession();
   }
 
+  @Get('wa-groups')
+  listWaGroups() {
+    return this.baileys.listGroups();
+  }
+
   @Get('groups')
   findGroups() {
     return this.prisma.whatsappGroup.findMany({ orderBy: { name: 'asc' } });

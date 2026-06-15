@@ -204,6 +204,14 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     return this.connected;
   }
 
+  async listGroups(): Promise<{ id: string; subject: string }[]> {
+    if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
+    const groups = await this.socket.groupFetchAllParticipating();
+    return Object.values(groups)
+      .map((g) => ({ id: g.id, subject: g.subject || '(sem nome)' }))
+      .sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
+  }
+
   async sendMessage(jid: string, text: string): Promise<void> {
     if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
     await this.socket.sendMessage(jid, { text });

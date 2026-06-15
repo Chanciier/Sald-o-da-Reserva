@@ -108,6 +108,7 @@ export default function AdminWhatsappPage() {
   const [form, setForm] = useState<GroupForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [groupError, setGroupError] = useState('');
+  const [showWaGroups, setShowWaGroups] = useState(false);
 
   // --- Conteúdo state ---
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -128,6 +129,26 @@ export default function AdminWhatsappPage() {
       return res.json();
     },
     enabled: !!token,
+  });
+
+  // Grupos reais do WhatsApp (via Baileys no número conectado)
+  const {
+    data: waGroups = [],
+    isLoading: waGroupsLoading,
+    error: waGroupsError,
+    refetch: refetchWaGroups,
+  } = useQuery<{ id: string; subject: string }[]>({
+    queryKey: ['whatsapp-wa-groups'],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/v1/whatsapp/wa-groups`, { headers: headers() });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? 'Erro ao buscar grupos do WhatsApp');
+      }
+      return res.json();
+    },
+    enabled: !!token && showWaGroups,
+    retry: false,
   });
 
   const saveGroup = useMutation({
@@ -311,10 +332,69 @@ export default function AdminWhatsappPage() {
                   placeholder="120363XXXXXXXXX@g.us"
                 />
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Obtido via Evolution API:{' '}
-                  <code className="font-mono">GET /group/fetchAllGroups</code>
+                  Use o botão abaixo para listar os grupos do WhatsApp conectado.
                 </p>
               </div>
+            </div>
+
+            {/* Buscar grupos do WhatsApp */}
+            <div className="rounded-lg border border-dashed bg-muted/20 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Grupos do número conectado
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (showWaGroups) refetchWaGroups();
+                    else setShowWaGroups(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors cursor-pointer"
+                >
+                  {waGroupsLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  Buscar grupos do WhatsApp
+                </button>
+              </div>
+
+              {showWaGroups && waGroupsError && (
+                <p className="text-xs text-destructive">
+                  {(waGroupsError as Error).message}. Confira se o WhatsApp está conectado acima.
+                </p>
+              )}
+
+              {showWaGroups && !waGroupsLoading && !waGroupsError && waGroups.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum grupo encontrado neste número.
+                </p>
+              )}
+
+              {showWaGroups && waGroups.length > 0 && (
+                <div className="max-h-64 overflow-y-auto rounded-md border bg-card divide-y">
+                  {waGroups.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() =>
+                        setForm((p) => ({
+                          ...p,
+                          name: p.name || g.subject,
+                          groupId: g.id,
+                        }))
+                      }
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted/50 transition-colors cursor-pointer"
+                    >
+                      <span className="font-medium truncate">{g.subject}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                        {g.id}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <label className="flex cursor-pointer items-center gap-2">
               <input
