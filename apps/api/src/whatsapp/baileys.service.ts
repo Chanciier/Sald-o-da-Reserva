@@ -38,6 +38,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
   private qrBase64: string | null = null;
   private connected = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private connectTimeoutTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly redis: RedisService) {}
 
@@ -98,7 +99,13 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
   }
 
   async connect(): Promise<void> {
+    if (this.connectTimeoutTimer) {
+      clearTimeout(this.connectTimeoutTimer);
+      this.connectTimeoutTimer = null;
+    }
+
     const { state, saveCreds } = await this.loadState();
+    const hasSavedCreds = !!(await this.redis.get(CREDS_KEY));
 
     this.socket = makeWASocket({
       auth: state,
@@ -115,11 +122,13 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
+        if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
         this.qrBase64 = await QRCode.toDataURL(qr).catch(() => null);
         this.logger.log('QR code gerado');
       }
 
       if (connection === 'open') {
+        if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
         this.connected = true;
         this.qrBase64 = null;
         this.logger.log('WhatsApp conectado');
@@ -139,6 +148,16 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
         }
       }
     });
+
+    // Se tinha credenciais salvas mas em 30s não conectou nem gerou QR → limpa e recomeça
+    if (hasSavedCreds) {
+      this.connectTimeoutTimer = setTimeout(async () => {
+        if (!this.connected && !this.qrBase64) {
+          this.logger.warn('Timeout aguardando reconexão com credenciais salvas — limpando sessão');
+          await this.clearSession();
+        }
+      }, 30_000);
+    }
   }
 
   async clearSession(): Promise<void> {
@@ -149,6 +168,10 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    if (this.connectTimeoutTimer) {
+      clearTimeout(this.connectTimeoutTimer);
+      this.connectTimeoutTimer = null;
     }
     await this.connect();
   }

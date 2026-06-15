@@ -20,6 +20,7 @@ export class ShippingController {
   constructor(private readonly shipping: ShippingService) {}
 
   @Get('quote')
+  @Public()
   quote(@Query('cep') cep: string) {
     return this.shipping.quote(cep ?? '');
   }

@@ -146,16 +146,16 @@ export default function CheckoutPage() {
 
   async function fetchShippingQuotes(cep: string) {
     const cleaned = cep.replace(/\D/g, '');
-    if (cleaned.length !== 8 || !token || cleaned === lastQuotedCep.current) return;
+    if (cleaned.length !== 8 || cleaned === lastQuotedCep.current) return;
     lastQuotedCep.current = cleaned;
     setShippingLoading(true);
     setSelectedShipping(null);
     try {
-      const options = await getShippingQuote(cleaned, token);
+      const options = await getShippingQuote(cleaned, token ?? '');
       setShippingOptions(options);
       if (options.length) setSelectedShipping(options[0]);
     } catch {
-      // ignore
+      setShippingOptions([]);
     } finally {
       setShippingLoading(false);
     }
@@ -456,7 +456,9 @@ export default function CheckoutPage() {
 
                 {shippingOptions.length === 0 && !shippingLoading ? (
                   <p className="text-sm text-muted-foreground">
-                    Informe o CEP para ver as opções de frete.
+                    {address.cep.replace(/\D/g, '').length === 8
+                      ? 'Nenhuma opção de frete disponível para este CEP. Verifique o CEP ou tente novamente em instantes.'
+                      : 'Informe o CEP para ver as opções de frete.'}
                   </p>
                 ) : (
                   <div className="space-y-2">
