@@ -152,7 +152,8 @@ export function Hero() {
               href="#produtos"
               className={buttonVariants({
                 size: 'lg',
-                className: 'h-13 flex-1 text-base font-extrabold shadow-lg shadow-primary/30',
+                className:
+                  'h-13 w-full text-base font-extrabold shadow-lg shadow-primary/30 sm:flex-1',
               })}
             >
               QUERO ECONOMIZAR AGORA
@@ -164,7 +165,7 @@ export function Hero() {
                 size: 'lg',
                 variant: 'outline',
                 className:
-                  'h-13 flex-1 border-secondary text-base font-bold text-foreground sm:flex-none',
+                  'hidden h-13 flex-1 border-secondary text-base font-bold text-foreground sm:flex sm:flex-none',
               })}
             >
               Como funciona
