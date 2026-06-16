@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -66,9 +67,11 @@ export default function CartPage() {
           {cart.items.map((item) => (
             <div key={item.productId} className="flex gap-4 rounded-xl border border-border p-4">
               {item.image ? (
-                <img
+                <Image
                   src={item.image}
                   alt={item.name}
+                  width={80}
+                  height={80}
                   className="h-20 w-20 shrink-0 rounded-lg object-cover"
                 />
               ) : (

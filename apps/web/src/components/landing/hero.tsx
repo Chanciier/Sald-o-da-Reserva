@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { ShieldCheck, Truck, Star, Zap, ArrowRight, Flame } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
@@ -242,10 +243,12 @@ export function Hero() {
                 <span className="absolute left-0 top-0 z-10 rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">
                   -{card.off}%
                 </span>
-                <img
+                <Image
                   src={card.image}
                   alt={card.name}
-                  className="mx-auto h-24 w-auto object-contain"
+                  width={120}
+                  height={96}
+                  className="mx-auto object-contain"
                 />
               </div>
               <p className="mt-1 truncate text-xs font-semibold text-foreground">{card.name}</p>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/contexts/cart-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -101,9 +102,11 @@ export function CartDrawer() {
                   className="flex gap-3 rounded-lg border border-border p-3"
                 >
                   {item.image ? (
-                    <img
+                    <Image
                       src={item.image}
                       alt={item.name}
+                      width={64}
+                      height={64}
                       className="h-16 w-16 shrink-0 rounded-md object-cover"
                     />
                   ) : (

@@ -57,6 +57,7 @@ export default function AdminFaqPage() {
       .finally(() => setLoading(false));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(loadItems, [token]);
 
   async function createItem() {

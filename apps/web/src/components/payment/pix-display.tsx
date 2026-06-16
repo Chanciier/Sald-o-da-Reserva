@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import type { Payment } from '@/types/payment';
 
 interface PixDisplayProps {
@@ -43,11 +44,12 @@ export function PixDisplay({ payment }: PixDisplayProps) {
 
       {payment.pixQrCodeBase64 && (
         <div className="rounded-2xl border-4 border-border p-2 bg-white shadow-sm">
-          <img
+          <Image
             src={payment.pixQrCodeBase64}
             alt="QR Code PIX"
             width={200}
             height={200}
+            unoptimized
             className="block"
           />
         </div>

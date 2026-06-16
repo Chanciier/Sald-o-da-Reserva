@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import type { ProductImage } from '@/types/product';
 
 interface Props {
@@ -24,11 +25,13 @@ export function ProductImages({ images, name }: Props) {
   return (
     <div className="space-y-3">
       <div className="relative overflow-hidden rounded-xl border border-border bg-muted">
-        <div className="aspect-square w-full">
-          <img
+        <div className="relative aspect-square w-full">
+          <Image
             src={main.url}
             alt={name}
-            className="h-full w-full object-contain"
+            fill
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className="object-contain"
             style={{ maxHeight: '480px' }}
           />
         </div>
@@ -48,7 +51,7 @@ export function ProductImages({ images, name }: Props) {
               }`}
               style={{ width: 72, height: 72 }}
             >
-              <img src={img.url} alt="" className="h-full w-full object-cover" />
+              <Image src={img.url} alt="" fill className="object-cover" />
             </button>
           ))}
         </div>

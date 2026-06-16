@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   X,
@@ -152,7 +153,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
     staleTime: 5 * 60 * 1000,
     retry: 2,
   });
-  const categories = categoriesData?.data ?? [];
+  const categories = useMemo(() => categoriesData?.data ?? [], [categoriesData]);
 
   const dims = initialData?.dimensions as
     | { width?: number; height?: number; depth?: number }
@@ -487,7 +488,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                   key={img.id}
                   className="group relative rounded-lg border overflow-hidden bg-muted aspect-square"
                 >
-                  <img src={img.url} alt="" className="h-full w-full object-cover" />
+                  <Image src={img.url} alt="" fill className="object-cover" />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
                     <button
                       type="button"

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
@@ -373,9 +374,11 @@ export default function OrderDetailPage() {
               return (
                 <div key={item.id} className="flex gap-3">
                   {img ? (
-                    <img
+                    <Image
                       src={img}
                       alt={item.name}
+                      width={56}
+                      height={56}
                       className="h-14 w-14 shrink-0 rounded-lg object-cover"
                     />
                   ) : (

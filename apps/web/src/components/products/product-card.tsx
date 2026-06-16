@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { ShoppingCart, Zap } from 'lucide-react';
 import { useCart } from '@/contexts/cart-context';
@@ -90,11 +91,12 @@ export function ProductCard({ product }: { product: Product }) {
             {product.brand}
           </span>
         )}
-        <img
+        <Image
           src={image}
           alt={product.name}
-          loading="lazy"
-          className="size-full object-contain transition-transform duration-300 group-hover:scale-105"
+          fill
+          sizes="(max-width: 768px) 50vw, 25vw"
+          className="object-contain transition-transform duration-300 group-hover:scale-105"
         />
       </div>
 

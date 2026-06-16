@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
@@ -194,9 +195,11 @@ export default function VendedorProdutos() {
                   <tr key={p.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
                       {p.images[0] ? (
-                        <img
+                        <Image
                           src={p.images[0].url}
                           alt={p.name}
+                          width={40}
+                          height={40}
                           className="h-10 w-10 rounded-lg object-cover border"
                         />
                       ) : (

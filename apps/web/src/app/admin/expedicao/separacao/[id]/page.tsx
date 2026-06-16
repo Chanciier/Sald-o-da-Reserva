@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -64,9 +65,11 @@ function ItemRow({ item, checked, onToggle }: ItemRowProps) {
       </div>
 
       {imageUrl ? (
-        <img
+        <Image
           src={imageUrl}
           alt={item.name}
+          width={56}
+          height={56}
           className="h-14 w-14 rounded-lg object-cover shrink-0 border"
         />
       ) : (

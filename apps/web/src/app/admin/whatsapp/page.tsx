@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Plus, Pencil, Trash2, Check, X, Sparkles, RefreshCw, Clock } from 'lucide-react';
@@ -89,7 +90,14 @@ function WhatsappStatusBanner({ token }: { token: string }) {
       {!data?.connected && data?.qr && (
         <div className="flex flex-col items-center gap-2">
           <p className="text-sm text-gray-500">Escaneie o QR com o WhatsApp do celular:</p>
-          <img src={data.qr} alt="QR Code WhatsApp" className="w-48 h-48" />
+          <Image
+            src={data.qr}
+            alt="QR Code WhatsApp"
+            width={192}
+            height={192}
+            unoptimized
+            className="w-48 h-48"
+          />
         </div>
       )}
       {!data?.connected && !data?.qr && (

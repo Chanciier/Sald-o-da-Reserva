@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Zap } from 'lucide-react';
@@ -66,11 +67,12 @@ function ProductCard({ product, index = 0 }: { product: ApiProduct; index?: numb
             {product.brand}
           </span>
         )}
-        <img
+        <Image
           src={image}
           alt={product.name}
-          loading="lazy"
-          className="size-full object-contain transition-transform duration-300 group-hover:scale-105"
+          fill
+          sizes="(max-width: 768px) 50vw, 25vw"
+          className="object-contain transition-transform duration-300 group-hover:scale-105"
         />
       </div>
 

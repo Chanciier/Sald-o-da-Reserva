@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import Image from 'next/image';
 import type { ImageData } from '@/types/image';
 import { deleteImage, type UploadFolder, uploadImages } from '@/lib/upload';
 
@@ -171,7 +172,7 @@ export function ImageUpload({
               key={img.id}
               className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
             >
-              <img src={img.url} alt="" className="h-full w-full object-cover" />
+              <Image src={img.url} alt="" fill className="object-cover" />
               <button
                 type="button"
                 onClick={() => handleRemove(img)}

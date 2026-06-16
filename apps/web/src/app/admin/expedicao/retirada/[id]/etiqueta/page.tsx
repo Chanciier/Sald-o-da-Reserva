@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
@@ -79,11 +80,12 @@ export default function EtiquetaRetiradaPage({ params }: { params: { id: string 
 
         {/* QR Code */}
         <div className="flex justify-center border-b-2 border-black py-5">
-          <img
+          <Image
             src={qrUrl}
             alt={`QR Code: ${pickupCode}`}
             width={150}
             height={150}
+            unoptimized
             className="block"
           />
         </div>

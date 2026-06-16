@@ -1,0 +1,440 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_FLOW_V3_ENABLED": "true",
+    "CLAUDE_FLOW_HOOKS_ENABLED": "true"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(node -e \"const { PrismaClient } = require\\('.prisma/client'\\); const p = new PrismaClient\\(\\); console.log\\('image model exists:', typeof p.image\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(git commit -m ' *)",
+      "Read(//c/Users/Adrian/Desktop/**)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\" -Recurse -Force | Where-Object { $_.PSIsContainer } | Sort-Object FullName | ForEach-Object { $_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\\"\\), \"\" })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\\\\src\\\\app\" -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\\"\\), \"\" })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\\\\src\\\\components\" -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\\"\\), \"\" })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\src\\\\auth\" -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\\"\\), \"\" })",
+      "Read(//c/Users/Adrian/.claude/projects/c--Users-Adrian-Desktop-Sald-o-da-Reserva/memory/**)",
+      "Bash(netstat -ano)",
+      "Bash(npm run *)",
+      "Bash(echo \"API iniciando PID $!\")",
+      "Bash(echo \"Web iniciando PID $!\")",
+      "Bash(taskkill //PID 12668 //F)",
+      "Bash(tasklist)",
+      "Bash(taskkill //PID 14752 //F)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/api/v1/products?limit=1)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3002)",
+      "Bash(wmic process *)",
+      "Bash(taskkill //PID 6164 //F)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(npm install *)",
+      "Bash(net start *)",
+      "Bash(sc query *)",
+      "Bash(docker compose *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\src\\\\checkout\" -Recurse | Select-Object Name, FullName | ForEach-Object { $_.FullName })",
+      "Bash(node -e \"require\\('./apps/web/node_modules/@vercel/analytics'\\)\")",
+      "Bash(dir apps\\\\api\\\\prisma\\\\migrations /b)",
+      "Bash(npx ts-node *)",
+      "Bash(ls /mnt/)",
+      "Bash(ls /media/)",
+      "Bash(cmd.exe /c \"wmic logicaldisk get caption,description,drivetype 2>nul\")",
+      "Bash(powershell.exe -Command \"Get-PSDrive -PSProvider FileSystem | Select-Object Name, Root, Description\")",
+      "Bash(powershell -Command 'Get-PSDrive -PSProvider FileSystem | Select-Object Name, Root, @{N='\\\\''Free'\\\\'';E={[math]::Round\\($_.Free/1GB,1\\)}}, @{N='\\\\''Used'\\\\'';E={[math]::Round\\(\\($_.Used\\)/1GB,1\\)}}')",
+      "Read(//e//**)",
+      "Bash(powershell -Command ' *)",
+      "Bash(curl -s -X POST http://localhost:3001/api/v1/payments/order/cmq1249dr00092cr32zlyng1q -H \"Content-Type: application/json\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test\" -d '{\"method\":\"PIX\"}')",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(p.dependencies['@nestjs/core'], p.dependencies['stripe'], p.dependencies['mercadopago']\\)\")",
+      "Bash(npm uninstall *)",
+      "Bash(node -e \"const s = require\\('stripe'\\); console.log\\(s.LATEST_API_VERSION || 'not found'\\)\")",
+      "Bash(node -e \"const Stripe = require\\('c:/Users/Adrian/Desktop/Saldão da Reserva/node_modules/stripe'\\); console.log\\(Stripe.LATEST_API_VERSION\\)\")",
+      "Bash(Get-ChildItem \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\\\\node_modules\\\\@stripe\")",
+      "Bash(Get-ChildItem \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\node_modules\\\\stripe\")",
+      "Bash(Select-Object -First 3)",
+      "Bash(xargs grep -l \"stripe\\\\|Stripe\")",
+      "Bash(Remove-Item \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\src\\\\payments\\\\interfaces\\\\stripe.interfaces.ts\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\src\\\\payments\\\\payments.service.spec.ts\" -Force)",
+      "Bash(Write-Host \"Deleted\")",
+      "Bash(Get-ChildItem -Path \".\" -Directory)",
+      "PowerShell(Set-Location \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\"; $env:PRISMA_FORCE_COLOR=\"false\"; npx prisma db push --accept-data-loss 2>&1)",
+      "Bash(npx dotenv *)",
+      "Bash(npx @claude-flow*)",
+      "Bash(npx claude-flow*)",
+      "Bash(node .claude/*)",
+      "Bash(dir /s /b \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\")",
+      "Bash(findstr -i \"dashboard\\\\|account\\\\|perfil\\\\|painel\\\\|client\\\\|auth\\\\|login\")",
+      "Bash(xargs grep -l \"Minha Conta\\\\|minha-conta\\\\|/cliente\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(Head -100)",
+      "Bash(mkdir \"c:/Users/Adrian/Desktop/Saldão da Reserva/apps/web/src/app/admin/financeiro/notas-fiscais/[id]/imprimir\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\\\\src\\\\app\\\\admin\" -Recurse -Directory)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\front\")",
+      "Bash(claude mcp *)",
+      "Bash(dir \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\front\\\\components\" /B)",
+      "Bash(cp -r \"C:/Users/Adrian/Desktop/front/public/products\" \"C:/Users/Adrian/Desktop/Saldão da Reserva/apps/web/public/products\")",
+      "Bash(cp \"C:/Users/Adrian/Desktop/front/public/placeholder.svg\" \"C:/Users/Adrian/Desktop/Saldão da Reserva/apps/web/public/placeholder.svg\")",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(p.dependencies\\).filter\\(k => k.includes\\('resend'\\) || k.includes\\('nodemailer'\\) || k.includes\\('mail'\\)\\)\\)\\)\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(git commit *)",
+      "Bash(git mv *)",
+      "Bash(git rm *)",
+      "Bash(vercel --version)",
+      "Bash(New-Item -ItemType Directory -Path \"apps/api/prisma/migrations/20260609160000_add_separated_items\" -Force)",
+      "Bash(npm audit *)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); const vulns=j.vulnerabilities||{}; const keys=Object.keys\\(vulns\\); if\\(!keys.length\\){console.log\\('Nenhuma vulnerabilidade encontrada'\\)}else{keys.forEach\\(k=>{const v=vulns[k];console.log\\(v.severity.toUpperCase\\(\\)+' | '+k+' | '+v.title+\\(v.fixAvailable?' [FIX DISPONIVEL]':''\\)\\)}\\)}\")",
+      "Bash(npm list *)",
+      "Bash(npx nest *)",
+      "Bash(mkdir -p \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\\\\src\\\\app\\\\admin\\\\conteudo\\\\paginas\\\\[slug]\" \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\\\\src\\\\app\\\\admin\\\\conteudo\\\\faq\")",
+      "Bash(npx --prefix apps/api prisma validate)",
+      "Bash(node -e \"const b = require\\('./dist/main'\\); console.log\\('OK'\\)\")",
+      "Bash(cat apps/api/railway.toml)",
+      "Bash(cat railway.toml)",
+      "Bash(ls \"C:/Users/Adrian/Downloads/\" | grep -i \"logo\\\\|saldao\\\\|reversa\" 2>/dev/null; ls \"C:/Users/Adrian/Desktop/\" | grep -i \"logo\\\\|saldao\\\\|reversa\\\\|png\\\\|jpg\" 2>/dev/null; ls \"C:/Users/Adrian/Pictures/\" | grep -i \"logo\\\\|saldao\\\\|reversa\" 2>/dev/null)",
+      "Read(//c/Users/Adrian/Downloads/**)",
+      "Read(//c/Users/Adrian/Pictures/**)",
+      "Bash(cp \"C:/Users/Adrian/Downloads/logo.png\" \"C:/Users/Adrian/Desktop/Saldão da Reserva/apps/web/public/logo.png\")",
+      "Bash(cp \"C:/Users/Adrian/Downloads/logo.ico\" \"C:/Users/Adrian/Desktop/Saldão da Reserva/apps/web/public/favicon.ico\")",
+      "Bash(cp \"C:/Users/Adrian/Downloads/logo.png\" \"C:/Users/Adrian/Desktop/Saldão da Reserva/apps/web/src/app/icon.png\")",
+      "Bash(xargs grep -l \"shippingAddress\\\\|checkout\\\\|endereco\\\\|nome.*titular\\\\|recipientName\")",
+      "Bash(xargs grep -l \"createOrder\\\\|CreateOrder\\\\|shipping\")",
+      "WebSearch",
+      "WebFetch(domain:focusnfe.com.br)",
+      "WebFetch(domain:groups.google.com)",
+      "WebFetch(domain:doc.focusnfe.com.br)",
+      "WebFetch(domain:forum.focusnfe.com.br)",
+      "WebFetch(domain:www.postman.com)",
+      "WebFetch(domain:cosmos.bluesoft.com.br)",
+      "WebFetch(domain:gainholder.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:campos.focusnfe.com.br)",
+      "WebFetch(domain:atendimento.tecnospeed.com.br)",
+      "WebFetch(domain:ncm.fazcomex.com.br)",
+      "Bash(xargs grep -l \"findOrder\\\\|getOrder\\\\|/orders\\\\|orders.controller\\\\|OrderController\")",
+      "Bash(findstr /i \"database\\\\|postgresql\\\\|postgres\")",
+      "Bash(powershell -Command \"Get-Content .env | Select-String 'DATABASE|POSTGRES'\")",
+      "Bash(powershell -Command \"Get-ChildItem 'c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api' -Name -Depth 0\")",
+      "Bash(powershell -Command \"Get-ChildItem 'c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva' -Name -Depth 0\")",
+      "Bash(powershell -Command \"Get-ChildItem 'c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\prisma' -Recurse -Name\")",
+      "Bash(powershell -Command \"New-Item -ItemType Directory -Path 'c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\prisma\\\\migrations\\\\20260611000000_add_buyer_name_to_order' -Force | Out-Null; Write-Host 'done'\")",
+      "Read(//c/Users/Admin/Desktop/Saldão da Reserva/apps/api/src/shipping/**)",
+      "Bash(npx turbo *)",
+      "Bash(python -c ' *)",
+      "WebFetch(domain:frenetapi.docs.apiary.io)",
+      "WebFetch(domain:docs.frenet.com.br)",
+      "WebFetch(domain:ajuda.frenet.com.br)",
+      "Bash(git checkout *)",
+      "Bash(npx railway *)",
+      "PowerShell(npx playwright install chromium --with-deps 2>&1)",
+      "PowerShell(New-Item -ItemType Directory -Force \"tests\\\\e2e\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"tests\\\\fixtures\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"tests\\\\pages\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"tests\\\\data\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"tests\\\\utils\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"tests\\\\reports\")",
+      "PowerShell(npx playwright --version 2>&1)",
+      "PowerShell(npx playwright test --list 2>&1)",
+      "PowerShell($web = \\(Test-NetConnection -ComputerName localhost -Port 3000 -WarningAction SilentlyContinue\\).TcpTestSucceeded; $api = \\(Test-NetConnection -ComputerName localhost -Port 3001 -WarningAction SilentlyContinue\\).TcpTestSucceeded; Write-Host \"Web \\(3000\\): $web\"; Write-Host \"API \\(3001\\): $api\")",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName localhost -Port 3000 -WarningAction SilentlyContinue | Select-Object TcpTestSucceeded\")",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName localhost -Port 3001 -WarningAction SilentlyContinue | Select-Object TcpTestSucceeded\")",
+      "Read(//c/Users/Adrian/AppData/Local/Temp/claude/c--Users-Adrian-Desktop-Saldão da Reserva/6441b0cf-daad-4ed2-a18a-e265f3567db4/tasks/**)",
+      "PowerShell(npm run dev 2>&1)",
+      "PowerShell($timeout = 120; $elapsed = 0; $ready = $false; while \\($elapsed -lt $timeout\\) { Start-Sleep -Seconds 5; $elapsed += 5; $api = \\(Test-NetConnection localhost -Port 3001 -WarningAction SilentlyContinue\\).TcpTestSucceeded; $web = \\(Test-NetConnection localhost -Port 3000 -WarningAction SilentlyContinue\\).TcpTestSucceeded; Write-Host \"${elapsed}s — API: $api | Web: $web\"; if \\($api -and $web\\) { $ready = $true; break } }; Write-Host \"Pronto: $ready\")",
+      "PowerShell(Start-Sleep -Seconds 20; $api = \\(Test-NetConnection localhost -Port 3001 -WarningAction SilentlyContinue\\).TcpTestSucceeded; $web = \\(Test-NetConnection localhost -Port 3000 -WarningAction SilentlyContinue\\).TcpTestSucceeded; Write-Host \"API\\(3001\\): $api | Web\\(3000\\): $web\")",
+      "PowerShell(\\(Test-NetConnection localhost -Port 3001 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/api/v1/products)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\"; Write-Host \\(Get-Location\\))",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\"; npx nest build 2>&1 | Select-Object -Last 5; Write-Host \"Build exit: $LASTEXITCODE\")",
+      "PowerShell(Start-Sleep -Seconds 8; \\(Test-NetConnection localhost -Port 3001 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\"; Start-Sleep -Seconds 12; \\(Test-NetConnection localhost -Port 3001 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\Adrian\\\\AppData\\\\Local\\\\Temp\\\\apilog\" | Out-Null; Set-Location \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\"; $proc = Start-Process node -ArgumentList \"-r\", \"dotenv/config\", \"dist/src/main.js\" -NoNewWindow -PassThru -RedirectStandardOutput \"C:\\\\Users\\\\Adrian\\\\AppData\\\\Local\\\\Temp\\\\apilog\\\\out.txt\" -RedirectStandardError \"C:\\\\Users\\\\Adrian\\\\AppData\\\\Local\\\\Temp\\\\apilog\\\\err.txt\"; Start-Sleep -Seconds 18; Get-Content \"C:\\\\Users\\\\Adrian\\\\AppData\\\\Local\\\\Temp\\\\apilog\\\\out.txt\" -Tail 10 -ErrorAction SilentlyContinue; Write-Host \"---STDERR---\"; Get-Content \"C:\\\\Users\\\\Adrian\\\\AppData\\\\Local\\\\Temp\\\\apilog\\\\err.txt\" -Tail 10 -ErrorAction SilentlyContinue; Write-Host \"PID: $\\($proc.Id\\) Exited: $\\($proc.HasExited\\)\")",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\.env\"; $db = $content | Where-Object { $_ -match \"DATABASE_URL\" }; if \\($db\\) { $url = \\($db -split \"=\",2\\)[1]; if \\($url -match \"^postgresql://\\([^:]+\\):\"\\) { Write-Host \"DB host/type found: postgresql\" } elseif \\($url -match \"localhost\"\\) { Write-Host \"DB: localhost\" } else { Write-Host \"DB: remote host\" } } else { Write-Host \"DATABASE_URL not found\" })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\\\\.env\"; $db = \\($content | Where-Object { $_ -match \"DATABASE_URL\" } | Select-Object -First 1\\) -split \"=\",2; $url = $db[1]; if \\($url -match \"@\\(.+?\\)\\(:|/\\)\"\\) { Write-Host \"Host: $\\($Matches[1]\\)\" })",
+      "PowerShell(\\(Test-NetConnection localhost -Port 5432 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\\\\.env.local\"; $api = $content | Where-Object { $_ -match \"NEXT_PUBLIC_API_URL\" }; Write-Host $api)",
+      "PowerShell(git -C \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Sald�o da Reserva\" remote -v)",
+      "PowerShell(git -C \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Sald�o da Reserva\" log --oneline -3)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\"; Start-Sleep -Seconds 5; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.CPU -gt 0 } | Select-Object Id, CPU, WorkingSet)",
+      "Read(//c/Users/Adrian/AppData/Local/Temp/**)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq \"\" -and $_.CPU -gt 5 } | Stop-Process -Force -ErrorAction SilentlyContinue; Write-Host \"Processes killed\")",
+      "mcp__claude-flow__hooks_route",
+      "Bash(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" status)",
+      "Bash(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" diff --stat)",
+      "Bash(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" add apps/web/src/components/landing/featured-products.tsx apps/web/src/components/products/product-card.tsx)",
+      "Bash(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" commit -m \"feat: ofertas sem botão \\(box clicável\\), produtos com estilo rico e botão colocar no carrinho\")",
+      "Bash(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" push)",
+      "Bash(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" add apps/web/src/components/products/filterable-product-layout.tsx)",
+      "Bash(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\" commit -m \"fix: sidebar de filtros recolhida por padrão ao carregar a página\")",
+      "Bash(python apps/web/.claude/skills/ui-ux-pro-max/scripts/search.py \"ecommerce deals clearance mobile persuasive urgency\" --design-system -p \"Saldao da Reserva\")",
+      "Bash(python3 apps/web/.claude/skills/ui-ux-pro-max/scripts/search.py \"ecommerce deals clearance mobile persuasive urgency\" --design-system -p \"Saldao da Reserva\")",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"ecommerce deals clearance mobile persuasive urgency\" --design-system -p \"Saldao\")",
+      "Bash(git reset *)",
+      "Bash(agent-browser open *)",
+      "Bash(agent-browser screenshot *)",
+      "Bash(where agent-browser *)",
+      "Bash(npx agent-browser *)",
+      "WebFetch(domain:preview--reverse-deal-hub.lovable.app)",
+      "Bash(git fetch *)",
+      "Bash(xargs grep -l \"EventEmitter\\\\|emit\\\\|on\\(\")",
+      "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\" ; npm run build 2>&1 | Where-Object { $_ -match 'error|Error|warn|success|compiled|✓|✗|SyntaxError|TS' } | Select-Object -Last 30)",
+      "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\api\" ; npm run build 2>&1; Write-Host \"Exit: $LASTEXITCODE\")",
+      "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\" ; npm run build 2>&1; Write-Host \"Exit: $LASTEXITCODE\")",
+      "PowerShell(-join \\(\\(65..90\\) + \\(97..122\\) + \\(48..57\\) | Get-Random -Count 32 | % {[char]$_}\\))",
+      "Bash(railway logs *)",
+      "Bash(railway link *)",
+      "Bash(railway variables *)",
+      "Bash(railway service *)",
+      "Bash(curl -s -X DELETE __TRACKED_VAR__/instance/delete/saldao -H 'apikey: __TRACKED_VAR__')",
+      "Bash(curl -s -X POST __TRACKED_VAR__/instance/create -H 'apikey: __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"instanceName\":\"saldao\",\"qrcode\":true,\"integration\":\"WHATSAPP-BAILEYS\"}')",
+      "Bash(curl -s \"https://web.whatsapp.com/check-update?version=1&platform=web\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/WhiskeySockets/Baileys/master/src/Defaults/baileys-version.json\")",
+      "Bash(curl -s -X POST __TRACKED_VAR__/instance/create -H 'apikey: __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"instanceName\":\"saldao\",\"qrcode\":true,\"integration\":\"WHATSAPP-BAILEYS\"}' -o /tmp/create.json)",
+      "Read(//tmp/**)",
+      "Bash(curl -s __TRACKED_VAR__/instance/connect/saldao -H 'apikey: __TRACKED_VAR__' -o ./qr.json)",
+      "Bash(node -e \"const fs=require\\('fs'\\);const j=JSON.parse\\(fs.readFileSync\\('./qr.json','utf8'\\)\\);const b=j.base64||\\(j.qrcode&&j.qrcode.base64\\)||'';if\\(!b\\){console.log\\('SEM QR:',JSON.stringify\\(j\\).slice\\(0,200\\)\\);process.exit\\(1\\)}const d=b.replace\\(/^data:image\\\\/png;base64,/,''\\);const out='C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\Adrian\\\\\\\\\\\\\\\\Desktop\\\\\\\\\\\\\\\\qrcode-whatsapp.png';fs.writeFileSync\\(out,Buffer.from\\(d,'base64'\\)\\);console.log\\('QR salvo em:',out\\)\")",
+      "Bash(rm -f \"C:UsersAdrianDesktopqrcode-whatsapp.png\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const j=JSON.parse\\(fs.readFileSync\\('./qr.json','utf8'\\)\\);const b=j.base64||\\(j.qrcode&&j.qrcode.base64\\)||'';if\\(!b\\){console.log\\('SEM QR:',JSON.stringify\\(j\\).slice\\(0,200\\)\\);process.exit\\(1\\)}const d=b.replace\\(/^data:image.png;base64,/,''\\);const out='C:/Users/Adrian/Desktop/qrcode-whatsapp.png';fs.writeFileSync\\(out,Buffer.from\\(d,'base64'\\)\\);console.log\\('QR salvo, bytes:',Buffer.from\\(d,'base64'\\).length\\)\")",
+      "Bash(curl -s __TRACKED_VAR__/instance/connectionState/saldao -H 'apikey: __TRACKED_VAR__')",
+      "Bash(curl -s __TRACKED_VAR__/group/fetchAllGroups/saldao?getParticipants=false -H 'apikey: __TRACKED_VAR__' -o ./groups.json)",
+      "Bash(node -e \"const fs=require\\('fs'\\);let j;try{j=JSON.parse\\(fs.readFileSync\\('./groups.json','utf8'\\)\\)}catch\\(e\\){console.log\\('RAW:',fs.readFileSync\\('./groups.json','utf8'\\).slice\\(0,300\\)\\);process.exit\\(0\\)}const a=Array.isArray\\(j\\)?j:\\(j.groups||[]\\);if\\(!a.length\\){console.log\\('Resposta:',JSON.stringify\\(j\\).slice\\(0,300\\)\\);process.exit\\(0\\)}console.log\\('Total grupos:',a.length\\);a.forEach\\(g=>console.log\\('-',\\(g.subject||g.name||'?'\\),'=>',g.id\\)\\)\")",
+      "Bash(ls apps/api/node_modules/pg/package.json)",
+      "Bash(ls node_modules/pg/package.json)",
+      "Bash(ls apps/api/node_modules/.prisma)",
+      "Bash(ls node_modules/@prisma/client/package.json)",
+      "Bash(node -e \"console.log\\('node ok'\\)\")",
+      "Bash(rm -f ./qr.json ./groups.json)",
+      "Bash(curl -s __TRACKED_VAR__/group/fetchAllGroups/saldao?getParticipants=false -H 'apikey: __TRACKED_VAR__')",
+      "Bash(node -e \"const p=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\);const j=JSON.parse\\(p\\);console.log\\(Object.keys\\({...j.dependencies,...j.devDependencies}\\).filter\\(k=>k.includes\\('anthropic'\\)||k.includes\\('openai'\\)||k.includes\\('claude'\\)\\)\\)\")",
+      "Bash(node -pe \"Object.keys\\(JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/Adrian/Desktop/Saldão da Reserva/apps/api/package.json','utf8'\\)\\).dependencies\\).filter\\(k=>k.includes\\('anthropic'\\)||k.includes\\('openai'\\)\\)\")",
+      "Bash(curl -s https://evolution-api-production-ae3c.up.railway.app/instance/connectionState/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(curl -s 'https://caring-purpose-production-8734.up.railway.app/api/v1/products?limit=5&status=ACTIVE' -H 'Content-Type: application/json')",
+      "Bash(curl -s https://evolution-api-production-ae3c.up.railway.app/group/fetchAllGroups/saldao?getParticipants=false -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"120363154661527374@g.us\",\"text\":\"teste\"}')",
+      "Bash(curl -s -X DELETE https://evolution-api-production-ae3c.up.railway.app/instance/delete/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/instance/create -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"instanceName\":\"saldao\",\"qrcode\":true,\"integration\":\"WHATSAPP-BAILEYS\"}')",
+      "Bash(curl -s https://evolution-api-production-ae3c.up.railway.app/instance/connect/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -o C:/Users/Adrian/Desktop/qrcode-whatsapp.png --output-dir '')",
+      "Bash(curl -s __TRACKED_VAR__/instance/connect/saldao -H 'apikey: __TRACKED_VAR__')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"120363410917955898@g.us\",\"text\":\"🔥 teste de envio automático — Saldão da Reserva\"}')",
+      "Bash(ping -n 4 127.0.0.1)",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"5512996120280\",\"text\":\"teste Evolution API — se recebeu, esta funcionando!\"}')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"120363410917955898@g.us\",\"text\":\"🔥 Teste Evolution API no grupo!\"}')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"120363410917955898@g.us\",\"text\":\"🔥 Saldão da Reserva — bot funcionando!\"}')",
+      "Bash(curl -s -X GET https://evolution-api-production-ae3c.up.railway.app/group/fetchAllGroups/saldao?getParticipants=false -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(curl -s -X GET https://evolution-api-production-ae3c.up.railway.app/group/findGroupInfos/saldao?groupJid=120363410917955898@g.us -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(curl -s -X GET https://evolution-api-production-ae3c.up.railway.app/group/findGroupInfos/saldao?groupJid=120363408329028070@g.us -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"120363410917955898@g.us\",\"text\":\"teste bot saldao\"}')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"120363410917955898@g.us\",\"text\":\"teste bot saldao 2\"}')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/instance/create -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s https://evolution-api-production-ae3c.up.railway.app/instance/connect/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('QR disponivel:', bool\\(d.get\\('base64'\\) or d.get\\('code'\\)\\)\\)\")",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"120363420711086055@g.us\",\"text\":\"teste bot\"}')",
+      "Bash(railway redeploy *)",
+      "Bash(curl -sf https://evolution-api-production-ae3c.up.railway.app/instance/connectionState/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"120363420711086055@g.us\",\"text\":\"teste bot saldao\"}')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/instance/connect/saldao?number=5512996120280 -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt')",
+      "Bash(curl -s https://evolution-api-production-ae3c.up.railway.app/instance/pairingCode/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -X POST -d '{\"phoneNumber\":\"5512996120280\"}')",
+      "Bash(awk -F'│' '{print $2\": \"$3}')",
+      "Bash(railway status *)",
+      "Bash(railway whoami *)",
+      "Read(//c/Users/Adrian/.railway/**)",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/group/create/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/message/sendText/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"number\":\"5512996120280\",\"text\":\"bot ainda online\"}')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/instance/create -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{\"instanceName\":\"saldao\",\"integration\":\"WHATSAPP-BAILEYS\",\"qrcode\":true}')",
+      "Bash(curl -s -X POST https://evolution-api-production-ae3c.up.railway.app/settings/set/saldao -H 'apikey: 1imkSrTYC6FN4q7acDzVBP5lXfUR29wt' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(openssl rand *)",
+      "Bash(python -c 'import secrets; print\\(secrets.token_hex\\(8\\)\\)')",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(curl -s https://wppconnect-server-production-c451.up.railway.app/api/saldao-wpp-e6986c231c12c59f/saldao/status-session)",
+      "Bash(curl -s https://wppconnect-server-production-c451.up.railway.app/)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); deps=d.get\\('dependencies',{}\\); print\\('\\\\n'.join\\([f'{k}: {v}' for k,v in deps.items\\(\\) if 'bail' in k.lower\\(\\) or 'qr' in k.lower\\(\\) or 'whats' in k.lower\\(\\)]\\)\\)\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); deps=d.get\\('dependencies',{}\\); bail=[f'{k}: {v}' for k,v in deps.items\\(\\) if 'bail' in k.lower\\(\\) or 'qr' in k.lower\\(\\)]; print\\('\\\\n'.join\\(bail\\) if bail else 'NAO INSTALADO'\\)\")",
+      "Bash(npm show *)",
+      "Bash(node -e \"require\\('@whiskeysockets/baileys'\\)\")",
+      "Bash(gh run *)",
+      "Bash(curl -s \"https://caring-purpose-production-8734.up.railway.app/api/v1/shipping/quote?cep=12345678\" -H \"Authorization: Bearer test\")",
+      "Bash(curl -s \"https://caring-purpose-production-8734.up.railway.app/api/v1/whatsapp/status\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test\")",
+      "Bash(curl -s \"https://caring-purpose-production-8734.up.railway.app/api/v1/health\")",
+      "Bash(curl -s \"https://caring-purpose-production-8734.up.railway.app/health\")",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const p=JSON.parse\\(d\\); console.log\\('version:', p.version, 'main:', p.main, 'type:', p.type\\)\")",
+      "Bash(curl -s \"https://caring-purpose-production-8734.up.railway.app/api/v1/shipping/quote?cep=01001000\")",
+      "Bash(curl -s \"https://caring-purpose-production-8734.up.railway.app/api/v1/shipping/quote?cep=20040002\")",
+      "Bash(railway --version)",
+      "PowerShell($r = Get-Command railway -ErrorAction SilentlyContinue; if \\($r\\) { $r.Source } else { \"railway CLI not found\" })",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{try{console.log\\('aud:',JSON.parse\\(s\\).aud\\)}catch\\(e\\){}}\\)\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Adrian\\.claude\\projects\\c--Users-Adrian-Desktop-Sald-o-da-Reserva\\memory",
+      "c:\\Users\\Adrian\\Desktop\\Saldão da Reserva\\apps\\web\\src\\app\\admin\\financeiro\\notas-fiscais\\[id]",
+      "c:\\Users\\Adrian\\Desktop\\Saldão da Reserva\\apps\\web\\src\\app\\admin\\conteudo\\paginas",
+      "C:\\Users\\Adrian\\Desktop\\Sald�o da Reserva"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" pre-bash) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" pre-bash)\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" pre-edit) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" pre-edit)\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" post-edit) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" post-edit)\"",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" post-bash) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" post-bash)\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" route) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" route)\"",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" session-restore) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" session-restore)\"",
+            "timeout": 15000
+          },
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\auto-memory-hook.mjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\auto-memory-hook.mjs\" import) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\auto-memory-hook.mjs\" import)\"",
+            "timeout": 8000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" session-end) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" session-end)\"",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\auto-memory-hook.mjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\auto-memory-hook.mjs\" sync) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\auto-memory-hook.mjs\" sync)\"",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" compact-manual) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" compact-manual)\""
+          },
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" session-end) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" session-end)\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" compact-auto) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" compact-auto)\""
+          },
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" session-end) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" session-end)\"",
+            "timeout": 6000
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" status) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" status)\"",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" post-task) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" post-task)\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /c \"IF EXIST \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" (node \"%CLAUDE_PROJECT_DIR%\\.claude\\helpers\\hook-handler.cjs\" notify) ELSE (node \"%USERPROFILE%\\.claude\\helpers\\hook-handler.cjs\" notify)\"",
+            "timeout": 3000
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "mercadopago@claude-plugins-official": true
+  }
+}
