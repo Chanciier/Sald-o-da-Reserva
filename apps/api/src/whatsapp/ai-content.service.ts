@@ -61,7 +61,7 @@ export class AIContentService {
 
     const displayPrice = p.salePrice && p.salePrice < p.price ? fmt(p.salePrice) : fmt(p.price);
 
-    return `Crie uma copy de venda do produto abaixo para divulgar no grupo de vendas do meu ecommerce.
+    return `Crie uma copy de venda curta e direta para divulgar no grupo de vendas do meu ecommerce. Use bastante emoji. Máximo 6 linhas.
 
 Produto: ${p.name}
 Preço: ${displayPrice}
