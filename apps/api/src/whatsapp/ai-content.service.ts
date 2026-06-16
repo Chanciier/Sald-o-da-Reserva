@@ -59,39 +59,38 @@ export class AIContentService {
     const fmt = (n: number) =>
       new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
-    const precoInfo =
-      p.salePrice && p.salePrice < p.price
-        ? `Preço original: ${fmt(p.price)}, preço promocional: ${fmt(p.salePrice)}`
-        : `Preço: ${fmt(p.price)}`;
+    const displayPrice = p.salePrice && p.salePrice < p.price ? fmt(p.salePrice) : fmt(p.price);
 
-    const estoqueInfo =
-      p.stock <= 5 ? `Apenas ${p.stock} unidades restantes` : `${p.stock} unidades em estoque`;
+    return `Você é um especialista em marketing e copywriting para e-commerce.
 
-    return `Você é um especialista em marketing digital para WhatsApp. Crie um anúncio atrativo para o produto abaixo.
+Com base apenas no nome e no preço do produto fornecidos, crie uma mensagem promocional para WhatsApp com o seguinte formato:
 
-PRODUTO:
-- Nome: ${p.name}
-${p.brand ? `- Marca: ${p.brand}` : ''}
-${p.category ? `- Categoria: ${p.category}` : ''}
-- ${precoInfo}
-- Estoque: ${estoqueInfo}
-${p.description ? `- Descrição: ${p.description}` : ''}
-- Link: ${p.productUrl}
+* Emoji chamativo no início
+* Título de oferta em destaque
+* Nome do produto
+* Breve descrição destacando os principais benefícios e utilidades do produto
+* Lista com 3 a 5 vantagens usando emojis
+* Preço em destaque
+* Chamada para ação incentivando a compra
+* Link do produto ao final
 
-REGRAS OBRIGATÓRIAS:
-1. Use emojis relevantes (varie: 🔥⚡✨💥🎯🛍️🏷️🎁💎🌟)
-2. Máximo 200 palavras
-3. Estrutura variada — escolha UMA das opções abaixo e adapte:
-   A) Título impactante → benefícios em tópicos → preço → CTA
-   B) Gancho de urgência → descrição → benefícios → preço → CTA
-   C) Pergunta inicial → solução → preço → benefícios → CTA
-4. CTA variado: use apenas UM dos seguintes: "Garanta o seu 👉", "Peça agora:", "Aproveite:", "Compre já 🛒", "Não perca:", "Corre que é por tempo limitado 🏃"
-5. Formato para WhatsApp: use *negrito* para destaques
-6. Inclua o link no final
-7. NÃO use hashtags
-8. Se houver promoção, destaque o desconto
+Regras:
 
-Responda APENAS com o texto do anúncio, sem explicações.`;
+* Identifique automaticamente os benefícios do produto pelo nome informado.
+* Utilize linguagem simples, persuasiva e voltada para vendas.
+* Não invente especificações técnicas que não sejam evidentes pelo nome do produto.
+* Mantenha o texto curto e fácil de ler no WhatsApp.
+* Use emojis de forma moderada.
+* Formate a mensagem para ficar visualmente organizada.
+* Use *negrito* para destaques (formato WhatsApp).
+* NÃO use hashtags.
+
+Dados de entrada:
+Nome do produto: ${p.name}
+Preço: ${displayPrice}
+Link: ${p.productUrl}
+
+Retorne apenas a mensagem pronta para envio.`;
   }
 
   private fallbackTemplate(p: ProductInput): string {
