@@ -275,23 +275,75 @@ export class CheckoutService {
   }
 
   async cancelUserOrder(userId: string, orderId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, userId } });
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: { items: { select: { productId: true, quantity: true } } },
+    });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
     if (order.status !== 'PENDING')
       throw new BadRequestException('Apenas pedidos pendentes podem ser cancelados.');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return this.prisma.order.update({
-      where: { id: orderId },
+    return this.prisma.$transaction(async (tx) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { status: 'CANCELLED' as any },
-      select: { id: true, status: true },
+      const cancelled = await tx.order.update({
+        where: { id: orderId },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: { status: 'CANCELLED' as any },
+        select: { id: true, status: true },
+      });
+      for (const item of order.items) {
+        const updated = await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+          select: { stock: true, status: true },
+        });
+        if (updated.stock > 0 && updated.status === ProductStatus.INACTIVE) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { status: ProductStatus.ACTIVE },
+          });
+        }
+      }
+      return cancelled;
     });
   }
 
   async updateOrderStatus(orderId: string, status: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { select: { productId: true, quantity: true } } },
+    });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
+    const shouldRestoreStock =
+      status === 'CANCELLED' && order.status !== 'CANCELLED' && order.status !== 'REFUNDED';
+
+    if (shouldRestoreStock) {
+      return this.prisma.$transaction(async (tx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updated = await tx.order.update({
+          where: { id: orderId },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: { status: status as any },
+          select: { id: true, status: true },
+        });
+        for (const item of order.items) {
+          const product = await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+            select: { stock: true, status: true },
+          });
+          if (product.stock > 0 && product.status === ProductStatus.INACTIVE) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { status: ProductStatus.ACTIVE },
+            });
+          }
+        }
+        return updated;
+      });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this.prisma.order.update({
       where: { id: orderId },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
