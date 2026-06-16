@@ -61,7 +61,7 @@ export class AIContentService {
 
     const displayPrice = p.salePrice && p.salePrice < p.price ? fmt(p.salePrice) : fmt(p.price);
 
-    return `Crie uma copy de venda para divulgar no grupo de vendas do meu ecommerce. Use bastante emoji. Seja direto, sem textos longos.
+    return `Crie uma copy de venda para divulgar no grupo de vendas do meu ecommerce. Use bastante emoji. Seja direto, sem textos longos. Use quebras de linha para separar as partes da mensagem e deixar o texto organizado e fácil de ler no WhatsApp.
 
 Produto: ${p.name}
 Preço: ${displayPrice}
