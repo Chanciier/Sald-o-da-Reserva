@@ -57,6 +57,12 @@ export class CheckoutController {
     return this.checkout.updateOrderStatus(orderId, status);
   }
 
+  @Patch('orders/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancelOrder(@CurrentUser('id') userId: string, @Param('id') orderId: string) {
+    return this.checkout.cancelUserOrder(userId, orderId);
+  }
+
   @Get('orders/:id')
   findOrder(@CurrentUser() user: AuthenticatedUser, @Param('id') orderId: string) {
     const isStaff = user.role === Role.ADMIN || user.role === Role.VENDEDOR;

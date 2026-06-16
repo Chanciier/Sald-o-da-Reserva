@@ -289,12 +289,23 @@ export default function AdminPedidos() {
                     </td>
 
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/pedidos/${o.id}`}
-                        className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
-                      >
-                        Ver
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/pedidos/${o.id}`}
+                          className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
+                        >
+                          Ver
+                        </Link>
+                        {o.status === 'PENDING' && (
+                          <button
+                            onClick={() => mutation.mutate({ orderId: o.id, status: 'CANCELLED' })}
+                            disabled={mutation.isPending}
+                            className="rounded border border-destructive/40 px-2 py-1 text-xs text-destructive hover:bg-destructive/5 disabled:opacity-50 transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

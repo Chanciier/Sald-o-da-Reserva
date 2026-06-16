@@ -274,9 +274,23 @@ export class CheckoutService {
     };
   }
 
+  async cancelUserOrder(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, userId } });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+    if (order.status !== 'PENDING')
+      throw new BadRequestException('Apenas pedidos pendentes podem ser cancelados.');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.prisma.order.update({
+      where: { id: orderId },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: { status: 'CANCELLED' as any },
+      select: { id: true, status: true },
+    });
+  }
+
   async updateOrderStatus(orderId: string, status: string) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) throw new Error('Pedido não encontrado.');
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
 
     return this.prisma.order.update({
       where: { id: orderId },

@@ -61,6 +61,8 @@ export default function OrderDetailPage() {
   const [error, setError] = useState('');
   const [labelLoading, setLabelLoading] = useState(false);
   const [labelError, setLabelError] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -89,6 +91,30 @@ export default function OrderDetailPage() {
       .then((res) => setInvoice(res.data[0] ?? null))
       .catch(() => null);
   }, [token, isStaff, params.id]);
+
+  async function handleCancelOrder() {
+    if (!token || !order) return;
+    if (!window.confirm('Tem certeza que deseja cancelar este pedido?')) return;
+    setCancelling(true);
+    setCancelError('');
+    const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+    try {
+      const res = await fetch(`${BASE}/api/v1/orders/${order.id}/cancel`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { message?: string }).message ?? 'Erro ao cancelar pedido');
+      }
+      const updated = await getOrder(token, order.id);
+      setOrder(updated);
+    } catch (e) {
+      setCancelError((e as Error).message);
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   async function handlePurchaseLabel() {
     if (!token || !order) return;
@@ -209,7 +235,15 @@ export default function OrderDetailPage() {
             >
               Pagar com Cartão
             </Link>
+            <button
+              onClick={handleCancelOrder}
+              disabled={cancelling}
+              className="rounded-lg border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50 transition-colors"
+            >
+              {cancelling ? 'Cancelando...' : 'Cancelar pedido'}
+            </button>
           </div>
+          {cancelError && <p className="mt-2 text-xs text-destructive">{cancelError}</p>}
         </div>
       )}
 
