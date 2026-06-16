@@ -61,29 +61,13 @@ export class AIContentService {
 
     const displayPrice = p.salePrice && p.salePrice < p.price ? fmt(p.salePrice) : fmt(p.price);
 
-    return `Crie uma mensagem promocional para WhatsApp com foco em conversão.
+    return `Crie uma copy de venda do produto abaixo para divulgar no grupo de vendas do meu ecommerce.
 
-Regras:
-
-* Máximo de 8 linhas.
-* Linguagem simples, direta e persuasiva.
-* Destaque apenas os benefícios mais importantes.
-* Use emojis para chamar atenção.
-* Não faça descrições longas ou técnicas.
-* Não crie listas extensas.
-* Destaque o preço.
-* Termine com uma chamada para ação.
-* Inclua o link fornecido no final.
-* O texto deve ser rápido de ler em menos de 10 segundos.
-* Use *negrito* para destaques (formato WhatsApp).
-* NÃO use hashtags.
-
-Dados:
 Produto: ${p.name}
 Preço: ${displayPrice}
 Link: ${p.productUrl}
 
-Retorne apenas a mensagem pronta para envio no WhatsApp.`;
+Retorne apenas a mensagem pronta para envio.`;
   }
 
   private fallbackTemplate(p: ProductInput): string {
