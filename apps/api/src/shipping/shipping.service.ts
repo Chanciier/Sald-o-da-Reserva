@@ -68,6 +68,10 @@ export class ShippingService {
   private readonly webhookToken: string;
   private readonly userAgent: string;
   private readonly from: Record<string, string>;
+  // Allow-list opcional para restringir as opções de frete (ex.: só Loggi, que
+  // faz coleta na origem). Vazio = comportamento atual (todas as transportadoras).
+  private readonly allowedServiceIds: Set<number>;
+  private readonly allowedCarrierTokens: string[];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -101,6 +105,23 @@ export class ShippingService {
       country_id: 'BR',
       postal_code: this.config.get<string>('MELHOR_ENVIO_FROM_CEP', '').replace(/\D/g, ''),
     };
+
+    // Filtros opcionais de transportadora/serviço. Por padrão ficam vazios para
+    // NÃO alterar o fluxo atual. Configure no ambiente para travar a oferta de
+    // frete (ex.: MELHOR_ENVIO_ALLOWED_CARRIERS="Loggi" para só coleta na origem,
+    // ou MELHOR_ENVIO_ALLOWED_SERVICES="17,18" para serviços específicos).
+    this.allowedServiceIds = new Set(
+      this.config
+        .get<string>('MELHOR_ENVIO_ALLOWED_SERVICES', '')
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => Number.isInteger(n) && n > 0),
+    );
+    this.allowedCarrierTokens = this.config
+      .get<string>('MELHOR_ENVIO_ALLOWED_CARRIERS', '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
   }
 
   // ── Quote ─────────────────────────────────────────────────────────────────
@@ -139,8 +160,11 @@ export class ShippingService {
             .join(', '),
       );
       const filtered = services.filter((s) => !s.error && s.price && s.id > 0);
-      this.logger.log(`ME quote filtered: ${filtered.length} serviços disponíveis`);
-      return filtered.map((s) => ({
+
+      // Restringe às transportadoras/serviços permitidos, se configurado.
+      const available = this.applyServiceAllowList(filtered);
+      this.logger.log(`ME quote filtered: ${available.length} serviços disponíveis`);
+      return available.map((s) => ({
         serviceId: s.id,
         method: s.name.toUpperCase().replace(/\s+/g, '_'),
         name: s.name,
@@ -154,6 +178,31 @@ export class ShippingService {
       this.logger.error('ME quote error', err);
       return [];
     }
+  }
+
+  // Aplica a allow-list opcional (IDs têm prioridade; senão casa por nome da
+  // transportadora ou do serviço, case-insensitive). Vazio = retorna tudo,
+  // preservando o comportamento atual.
+  private applyServiceAllowList(services: MeService[]): MeService[] {
+    if (this.allowedServiceIds.size === 0 && this.allowedCarrierTokens.length === 0) {
+      return services;
+    }
+
+    const matched = services.filter((s) => {
+      if (this.allowedServiceIds.size > 0) return this.allowedServiceIds.has(s.id);
+      const carrier = s.company?.name?.toLowerCase() ?? '';
+      const name = s.name?.toLowerCase() ?? '';
+      return this.allowedCarrierTokens.some((t) => carrier.includes(t) || name.includes(t));
+    });
+
+    if (matched.length === 0 && services.length > 0) {
+      this.logger.warn(
+        `ME quote: allow-list removeu todas as ${services.length} opções ` +
+          `(ids=[${[...this.allowedServiceIds].join(',')}] carriers=[${this.allowedCarrierTokens.join(',')}]). ` +
+          'Confira MELHOR_ENVIO_ALLOWED_* — o frete ficará indisponível no checkout.',
+      );
+    }
+    return matched;
   }
 
   // ── Create shipment record (called from CheckoutService) ──────────────────
