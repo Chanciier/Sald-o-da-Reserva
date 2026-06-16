@@ -61,36 +61,29 @@ export class AIContentService {
 
     const displayPrice = p.salePrice && p.salePrice < p.price ? fmt(p.salePrice) : fmt(p.price);
 
-    return `Você é um especialista em marketing e copywriting para e-commerce.
-
-Com base apenas no nome e no preço do produto fornecidos, crie uma mensagem promocional para WhatsApp com o seguinte formato:
-
-* Emoji chamativo no início
-* Título de oferta em destaque
-* Nome do produto
-* Breve descrição destacando os principais benefícios e utilidades do produto
-* Lista com 3 a 5 vantagens usando emojis
-* Preço em destaque
-* Chamada para ação incentivando a compra
-* Link do produto ao final
+    return `Crie uma mensagem promocional para WhatsApp com foco em conversão.
 
 Regras:
 
-* Identifique automaticamente os benefícios do produto pelo nome informado.
-* Utilize linguagem simples, persuasiva e voltada para vendas.
-* Não invente especificações técnicas que não sejam evidentes pelo nome do produto.
-* Mantenha o texto curto e fácil de ler no WhatsApp.
-* Use emojis de forma moderada.
-* Formate a mensagem para ficar visualmente organizada.
+* Máximo de 8 linhas.
+* Linguagem simples, direta e persuasiva.
+* Destaque apenas os benefícios mais importantes.
+* Use emojis para chamar atenção.
+* Não faça descrições longas ou técnicas.
+* Não crie listas extensas.
+* Destaque o preço.
+* Termine com uma chamada para ação.
+* Inclua o link fornecido no final.
+* O texto deve ser rápido de ler em menos de 10 segundos.
 * Use *negrito* para destaques (formato WhatsApp).
 * NÃO use hashtags.
 
-Dados de entrada:
-Nome do produto: ${p.name}
+Dados:
+Produto: ${p.name}
 Preço: ${displayPrice}
 Link: ${p.productUrl}
 
-Retorne apenas a mensagem pronta para envio.`;
+Retorne apenas a mensagem pronta para envio no WhatsApp.`;
   }
 
   private fallbackTemplate(p: ProductInput): string {
