@@ -23,6 +23,7 @@ export async function fetchCustomerStats(token: string) {
 }
 
 export interface AdminOverview {
+  inventoryValue: number;
   revenueToday: number;
   revenueMonth: number;
   avgTicket: number;

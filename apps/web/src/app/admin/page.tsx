@@ -9,6 +9,7 @@ import {
   DollarSign,
   Calendar,
   Hash,
+  Warehouse,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchAdminStats } from '@/actions/analytics';
@@ -125,8 +126,8 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Stats row 2 — orders */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* Stats row 2 — orders + inventory */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Pedidos Hoje"
           value={data.ordersToday.toLocaleString('pt-BR')}
@@ -142,6 +143,12 @@ export default function AdminDashboard() {
           value={data.ordersTotal.toLocaleString('pt-BR')}
           icon={<Hash className="h-4 w-4" />}
           description="desde o início"
+        />
+        <StatCard
+          label="Valor do Estoque"
+          value={fmt(data.inventoryValue)}
+          icon={<Warehouse className="h-4 w-4" />}
+          description="preço × qtd em estoque"
         />
       </div>
 

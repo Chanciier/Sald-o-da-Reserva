@@ -36,6 +36,7 @@ export class AnalyticsService {
       recentOrders,
       topProducts,
       chartOrders,
+      allProducts,
     ] = await Promise.all([
       this.prisma.order.aggregate({
         where: { status: { in: PAID }, createdAt: { gte: today } },
@@ -78,6 +79,9 @@ export class AnalyticsService {
         select: { createdAt: true, total: true },
         orderBy: { createdAt: 'asc' },
       }),
+      this.prisma.product.findMany({
+        select: { price: true, salePrice: true, stock: true },
+      }),
     ]);
 
     const chartMap = new Map<string, { revenue: number; orders: number }>();
@@ -87,7 +91,13 @@ export class AnalyticsService {
       chartMap.set(date, { revenue: prev.revenue + o.total.toNumber(), orders: prev.orders + 1 });
     }
 
+    const inventoryValue = allProducts.reduce((sum, p) => {
+      const price = (p.salePrice ?? p.price) as unknown as { toNumber(): number };
+      return sum + price.toNumber() * p.stock;
+    }, 0);
+
     return {
+      inventoryValue,
       revenueToday: revToday._sum.total?.toNumber() ?? 0,
       revenueMonth: revMonth._sum.total?.toNumber() ?? 0,
       avgTicket: avgTicketAgg._avg.total?.toNumber() ?? 0,
