@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Clock, Menu, ShoppingCart, User, X } from 'lucide-react';
+import { Clock, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
@@ -16,11 +16,6 @@ const anchorLinks = [
   { label: 'Benefícios', href: '#beneficios' },
 ];
 
-const navLinks = [
-  { label: 'Produtos', href: '/produtos' },
-  { label: 'Categorias', href: '/categorias' },
-];
-
 export function Header() {
   const { user, logout } = useAuth();
   const { cart, setOpen } = useCart();
@@ -30,7 +25,6 @@ export function Header() {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const itemCount = cart?.itemCount ?? 0;
   const isHome = pathname === '/';
-  const links = isHome ? anchorLinks : navLinks;
   const hasItems = itemCount > 0;
 
   const [cartTimer, setCartTimer] = useState({ minutes: 15, seconds: 0 });
@@ -118,18 +112,39 @@ export function Header() {
           />
         </Link>
 
-        {/* Nav desktop */}
-        <nav className="hidden items-center gap-6 text-sm md:flex" aria-label="Navegação principal">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        {/* Nav desktop (home) ou busca (demais páginas) */}
+        {isHome ? (
+          <nav
+            className="hidden items-center gap-6 text-sm md:flex"
+            aria-label="Navegação principal"
+          >
+            {anchorLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        ) : (
+          <form
+            action="/produtos"
+            method="get"
+            role="search"
+            className="mx-2 hidden max-w-md flex-1 items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm md:flex"
+          >
+            <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              name="search"
+              placeholder="Buscar produtos, marcas, categorias..."
+              aria-label="Buscar produtos"
+              className="w-full bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </form>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-1">
@@ -213,6 +228,27 @@ export function Header() {
         </div>
       </div>
 
+      {/* Busca mobile (demais páginas) */}
+      {!isHome && (
+        <div className="border-t border-border px-4 py-2 md:hidden">
+          <form
+            action="/produtos"
+            method="get"
+            role="search"
+            className="flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm"
+          >
+            <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              name="search"
+              placeholder="Buscar produtos, marcas, categorias..."
+              aria-label="Buscar produtos"
+              className="w-full bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </form>
+        </div>
+      )}
+
       {/* Mobile nav */}
       {mobileOpen && (
         <nav
@@ -220,7 +256,7 @@ export function Header() {
           aria-label="Navegação mobile"
         >
           <ul className="flex flex-col gap-1">
-            {links.map((link) => (
+            {(isHome ? anchorLinks : []).map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}

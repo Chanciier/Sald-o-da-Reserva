@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { Flame, Zap, Dices, Eye, Hourglass } from 'lucide-react';
 import { getProducts, getCategories } from '@/lib/api';
 import { shuffleWithSeed, hasDiscount, discountPercent } from '@/lib/discovery';
-import { CategorySearchBar } from '@/components/products/discovery/category-search-bar';
+import { CategoryNav } from '@/components/products/discovery/category-nav';
 import { Hero } from '@/components/products/discovery/hero';
 import { LiveActivity } from '@/components/products/discovery/live-activity';
 import { ProductSection } from '@/components/products/discovery/product-section';
@@ -53,33 +53,29 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
       : (categories.find((c) => c.slug === categorySlug)?.name ?? categorySlug ?? 'Categoria');
 
     return (
-      <main className="mx-auto max-w-7xl px-4 py-8">
-        <Suspense>
-          <CategorySearchBar
-            categories={categories}
-            activeSlug={categorySlug}
-            defaultSearch={search}
-          />
-        </Suspense>
+      <main className="flex-1">
+        <CategoryNav categories={categories} activeSlug={categorySlug} />
 
-        <h1 className="mb-6 mt-6 text-2xl font-bold tracking-tight">{heading}</h1>
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <h1 className="mb-6 text-2xl font-bold tracking-tight">{heading}</h1>
 
-        {products.length === 0 ? (
-          <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border">
-            <p className="text-muted-foreground">Nenhum produto encontrado.</p>
+          {products.length === 0 ? (
+            <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border">
+              <p className="text-muted-foreground">Nenhum produto encontrado.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {products.map((product) => (
+                <DiscoveryProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-8">
+            <Suspense>
+              <Pagination page={productsResult.page} totalPages={productsResult.totalPages} />
+            </Suspense>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {products.map((product) => (
-              <DiscoveryProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
-
-        <div className="mt-8">
-          <Suspense>
-            <Pagination page={productsResult.page} totalPages={productsResult.totalPages} />
-          </Suspense>
         </div>
       </main>
     );
@@ -114,9 +110,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
 
   return (
     <main className="flex-1">
-      <Suspense>
-        <CategorySearchBar categories={categories} />
-      </Suspense>
+      <CategoryNav categories={categories} />
 
       <Hero slugs={slugs} />
       <LiveActivity products={products} />
