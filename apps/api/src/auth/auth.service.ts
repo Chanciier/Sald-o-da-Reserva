@@ -160,14 +160,14 @@ export class AuthService {
   }
 
   async forgotPassword(dto: ForgotPasswordDto, ip: string): Promise<void> {
-    await this.rateLimitService.check(`forgot:ip:${ip}`, 5, 3600);
+    await this.rateLimitService.check(`forgot:ip:${ip}`, 20, 3600);
 
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
 
     // Always return success — never reveal whether an email is registered
     if (!user) return;
 
-    await this.rateLimitService.check(`forgot:user:${user.id}`, 3, 3600);
+    await this.rateLimitService.check(`forgot:user:${user.id}`, 10, 3600);
 
     // Invalidate all pending reset tokens before issuing a new one
     await this.prisma.passwordReset.updateMany({
