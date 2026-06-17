@@ -59,6 +59,14 @@ export class PaymentsService {
 
   async createCard(orderId: string, userId: string, dto: CreateCardPaymentDto) {
     const order = await this.loadOrder(orderId, userId);
+
+    const MIN_INSTALLMENT_AMOUNT = 100;
+    if (dto.installments > 1 && order.total.toNumber() < MIN_INSTALLMENT_AMOUNT) {
+      throw new BadRequestException(
+        'Parcelamento disponível apenas para compras acima de R$ 100,00.',
+      );
+    }
+
     if (order.payment?.status === 'APPROVED') {
       return this.getById(order.payment.id, userId);
     }

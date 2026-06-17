@@ -38,7 +38,10 @@ function formatExpiry(v: string) {
   return `${d.slice(0, 2)}/${d.slice(2)}`;
 }
 
+const MIN_INSTALLMENT_AMOUNT = 100;
+
 export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps) {
+  const allowInstallments = amount >= MIN_INSTALLMENT_AMOUNT;
   const [mp, setMp] = useState<MercadoPagoInstance | null>(null);
   const [sdkLoading, setSdkLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -78,7 +81,7 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
 
   const loadInstallments = useCallback(
     async (bin: string) => {
-      if (!mp || bin.length < 6) {
+      if (!mp || bin.length < 6 || !allowInstallments) {
         setInstallmentOptions([]);
         return;
       }
@@ -106,13 +109,18 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
         setLoadingInstallments(false);
       }
     },
-    [mp, amount, installments],
+    [mp, amount, installments, allowInstallments],
   );
 
   useEffect(() => {
+    if (!allowInstallments) {
+      setInstallments(1);
+      setInstallmentOptions([]);
+      return;
+    }
     const bin = cardNumber.replace(/\D/g, '').slice(0, 6);
     if (bin.length === 6) loadInstallments(bin);
-  }, [cardNumber, loadInstallments]);
+  }, [cardNumber, loadInstallments, allowInstallments]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -258,24 +266,29 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
         <select
           value={installments}
           onChange={(e) => setInstallments(parseInt(e.target.value, 10))}
-          disabled={loadingInstallments}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+          disabled={loadingInstallments || !allowInstallments}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {(installmentOptions.length
-            ? installmentOptions
-            : [
+          {(!allowInstallments || !installmentOptions.length
+            ? [
                 {
                   installments: 1,
-                  recommended_message: `1x de R$ ${amount.toFixed(2)}`,
+                  recommended_message: `1x de R$ ${amount.toFixed(2).replace('.', ',')} (à vista)`,
                   total_amount: amount,
                 },
               ]
+            : installmentOptions
           ).map((opt) => (
             <option key={opt.installments} value={opt.installments}>
               {opt.recommended_message}
             </option>
           ))}
         </select>
+        {!allowInstallments && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Parcelamento disponível para compras acima de R$&nbsp;100,00.
+          </p>
+        )}
       </div>
 
       <button
