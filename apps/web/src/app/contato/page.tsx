@@ -52,11 +52,11 @@ export default function ContatoPage() {
             <h2 className="text-base font-semibold">Nossos Dados</h2>
             <ul className="space-y-2 text-muted-foreground">
               <li>
-                <span className="font-medium text-foreground">Razão Social:</span> Saldão da Reserva
-                Comércio Eletrônico Ltda.
+                <span className="font-medium text-foreground">Razão Social:</span> Saldão da Reversa
+                SJC Ltda.
               </li>
               <li>
-                <span className="font-medium text-foreground">CNPJ:</span> 00.000.000/0001-00
+                <span className="font-medium text-foreground">CNPJ:</span> 64.622.161/0001-08
               </li>
               <li>
                 <span className="font-medium text-foreground">E-mail:</span>{' '}
@@ -74,8 +74,8 @@ export default function ContatoPage() {
                 </a>
               </li>
               <li>
-                <span className="font-medium text-foreground">Endereço:</span> A ser preenchido pelo
-                administrador
+                <span className="font-medium text-foreground">Endereço:</span> R. Andorra, 500,
+                Jardim América, São José dos Campos - SP, CEP 12235-050
               </li>
             </ul>
           </div>
