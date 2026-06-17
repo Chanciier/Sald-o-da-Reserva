@@ -99,7 +99,6 @@ export class AuthController {
 
   @Post('forgot-password')
   @Public()
-  @UseGuards(TurnstileGuard)
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
     await this.authService.forgotPassword(dto, this.getIp(req));

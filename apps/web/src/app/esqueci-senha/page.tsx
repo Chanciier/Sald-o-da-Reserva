@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Mail } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -10,9 +10,9 @@ export default function EsqueciSenhaPage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit() {
     setStatus('loading');
     setErrorMsg('');
 
@@ -29,10 +29,29 @@ export default function EsqueciSenhaPage() {
       }
 
       setStatus('sent');
+      startCooldown();
     } catch (err) {
       setErrorMsg((err as Error).message);
       setStatus('error');
     }
+  }
+
+  function startCooldown() {
+    setResendCooldown(60);
+    const id = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) {
+          clearInterval(id);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
+
+  async function handleResend() {
+    if (resendCooldown > 0) return;
+    await submit();
   }
 
   return (
@@ -41,7 +60,7 @@ export default function EsqueciSenhaPage() {
         <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
           <Link
             href="/login"
-            className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
             Voltar ao login
@@ -53,20 +72,41 @@ export default function EsqueciSenhaPage() {
           </p>
 
           {status === 'sent' ? (
-            <div className="rounded-lg bg-success/10 px-4 py-4 text-sm text-success">
-              <p className="font-semibold">E-mail enviado!</p>
-              <p className="mt-1 text-muted-foreground">
-                Verifique sua caixa de entrada (e a pasta de spam). O link expira em 1 hora.
-              </p>
+            <div className="space-y-4">
+              <div className="rounded-lg bg-success/10 px-4 py-4 text-sm text-success">
+                <div className="mb-2 flex items-center gap-2 font-semibold">
+                  <Mail className="size-4" />
+                  E-mail enviado!
+                </div>
+                <p className="text-muted-foreground">
+                  Verifique sua caixa de entrada em <strong>{email}</strong> (e a pasta de spam). O
+                  link expira em 1 hora.
+                </p>
+              </div>
+
+              <button
+                onClick={handleResend}
+                disabled={resendCooldown > 0}
+                className="w-full rounded-lg border border-border py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {resendCooldown > 0 ? `Reenviar em ${resendCooldown}s` : 'Reenviar e-mail'}
+              </button>
+
               <Link
                 href="/login"
-                className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
+                className="block text-center text-sm font-medium text-primary hover:underline"
               >
                 Voltar ao login
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submit();
+              }}
+              className="flex flex-col gap-4"
+            >
               <div>
                 <label className="mb-1 block text-sm font-medium">E-mail</label>
                 <input
@@ -88,7 +128,7 @@ export default function EsqueciSenhaPage() {
               <button
                 type="submit"
                 disabled={status === 'loading'}
-                className="rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+                className="rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
               >
                 {status === 'loading' ? 'Enviando...' : 'Enviar instruções'}
               </button>
