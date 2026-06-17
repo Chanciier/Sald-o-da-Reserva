@@ -57,7 +57,7 @@ export default function EsqueciSenhaPage() {
   return (
     <main className="flex min-h-[calc(100vh-64px)] items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
           <Link
             href="/login"
             className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"

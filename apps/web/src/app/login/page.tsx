@@ -97,7 +97,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-[calc(100vh-64px)] items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
           <h1 className="mb-6 text-center text-2xl font-bold">
             {mode === 'login' ? 'Entrar' : 'Criar conta'}
           </h1>
