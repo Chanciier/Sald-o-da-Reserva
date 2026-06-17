@@ -1,20 +1,46 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private readonly resend: Resend | null;
+  private readonly smtp: nodemailer.Transporter | null;
   private readonly from: string;
   private readonly frontendUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    const apiKey = this.config.get<string>('RESEND_API_KEY', '');
-    this.from = this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@saldaodareserva.com.br');
+    const resendKey = this.config.get<string>('RESEND_API_KEY', '');
+    const smtpUser = this.config.get<string>('SMTP_USER', '');
+    const smtpPass = this.config.get<string>('SMTP_PASS', '');
+
+    this.from = this.config.get<string>(
+      'SMTP_FROM',
+      this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@saldaodareserva.com.br'),
+    );
     this.frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
-    this.resend = apiKey && !apiKey.startsWith('re_REPLACE') ? new Resend(apiKey) : null;
-    if (!this.resend) this.logger.warn('RESEND_API_KEY não configurado — e-mails apenas logados.');
+
+    this.resend = resendKey && !resendKey.startsWith('re_REPLACE') ? new Resend(resendKey) : null;
+
+    this.smtp =
+      smtpUser && smtpPass
+        ? nodemailer.createTransport({
+            host: this.config.get<string>('SMTP_HOST', 'smtp.gmail.com'),
+            port: this.config.get<number>('SMTP_PORT', 587),
+            secure: false,
+            auth: { user: smtpUser, pass: smtpPass },
+          })
+        : null;
+
+    if (!this.resend && !this.smtp) {
+      this.logger.warn('Nenhum provedor de e-mail configurado — e-mails apenas logados.');
+    } else if (this.smtp) {
+      this.logger.log(`MailService: usando SMTP (${smtpUser})`);
+    } else {
+      this.logger.log('MailService: usando Resend');
+    }
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -288,19 +314,34 @@ export class MailService {
   // ── Private ───────────────────────────────────────────────────────────────
 
   private async send(opts: { to: string; subject: string; html: string }): Promise<void> {
-    if (!this.resend) {
-      this.logger.log(`[DEV] Email to ${opts.to} | ${opts.subject}`);
+    if (this.resend) {
+      try {
+        await this.resend.emails.send({
+          from: `Saldão da Reserva <${this.from}>`,
+          to: opts.to,
+          subject: opts.subject,
+          html: opts.html,
+        });
+      } catch (err) {
+        this.logger.error(`Resend error to ${opts.to}: ${(err as Error).message}`);
+      }
       return;
     }
-    try {
-      await this.resend.emails.send({
-        from: `Saldão da Reserva <${this.from}>`,
-        to: opts.to,
-        subject: opts.subject,
-        html: opts.html,
-      });
-    } catch (err) {
-      this.logger.error(`Failed to send email to ${opts.to}: ${(err as Error).message}`);
+
+    if (this.smtp) {
+      try {
+        await this.smtp.sendMail({
+          from: `"Saldão da Reserva" <${this.from}>`,
+          to: opts.to,
+          subject: opts.subject,
+          html: opts.html,
+        });
+      } catch (err) {
+        this.logger.error(`SMTP error to ${opts.to}: ${(err as Error).message}`);
+      }
+      return;
     }
+
+    this.logger.log(`[DEV — sem provedor] Email to ${opts.to} | ${opts.subject}`);
   }
 }

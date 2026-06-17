@@ -16,13 +16,40 @@ import { QueryProductDto } from './dto/query-product.dto';
 import { WhatsappMarketingService } from '../whatsapp/whatsapp-marketing.service';
 
 const CACHE_TTL = 300;
-const keyItem = (slug: string) => `products:item:${slug}`;
+// v2: cache namespace bumped after public responses started stripping internal
+// fields — prevents serving pre-fix cached payloads that still carried them.
+const keyItem = (slug: string) => `products:item:v2:${slug}`;
 
 const INCLUDE_FULL = {
   category: true,
   images: { orderBy: { position: 'asc' as const } },
   createdBy: { select: { id: true, name: true, email: true } },
 };
+
+// Public listings/detail only need catalog data — no internal joins.
+const INCLUDE_PUBLIC = {
+  category: true,
+  images: { orderBy: { position: 'asc' as const } },
+};
+
+// Internal-only columns that must never reach unauthenticated clients.
+const PUBLIC_OMIT_KEYS = [
+  'ncm',
+  'cfop',
+  'cstCsosn',
+  'origem',
+  'internalCode',
+  'whatsappGroupIds',
+  'autoPublishWhatsapp',
+  'createdById',
+  'createdBy',
+] as const;
+
+function toPublicProduct<T extends Record<string, unknown>>(product: T): Partial<T> {
+  const copy: Record<string, unknown> = { ...product };
+  for (const key of PUBLIC_OMIT_KEYS) delete copy[key];
+  return copy as Partial<T>;
+}
 
 function serializeProduct<
   T extends {
@@ -151,8 +178,9 @@ export class ProductsService {
     return serializeProduct(product);
   }
 
-  async findAll(query: QueryProductDto) {
-    const cacheKey = `products:list:${Buffer.from(JSON.stringify(query)).toString('base64url')}`;
+  async findAll(query: QueryProductDto, isStaff = false) {
+    const scope = isStaff ? 'staff' : 'public';
+    const cacheKey = `products:list:${scope}:${Buffer.from(JSON.stringify(query)).toString('base64url')}`;
     const cached = await this.redis.getJson(cacheKey);
     if (cached) return cached;
 
@@ -200,7 +228,7 @@ export class ProductsService {
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        include: INCLUDE_FULL,
+        include: isStaff ? INCLUDE_FULL : INCLUDE_PUBLIC,
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
@@ -208,8 +236,9 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
+    const serialized = items.map(serializeProduct);
     const result = {
-      data: items.map(serializeProduct),
+      data: isStaff ? serialized : serialized.map(toPublicProduct),
       total,
       page,
       limit,
@@ -226,11 +255,11 @@ export class ProductsService {
 
     const product = await this.prisma.product.findUnique({
       where: { slug },
-      include: { category: true, images: { orderBy: { position: 'asc' } } },
+      include: INCLUDE_PUBLIC,
     });
     if (!product) throw new NotFoundException('Produto não encontrado.');
 
-    const serialized = serializeProduct(product);
+    const serialized = toPublicProduct(serializeProduct(product));
     await this.redis.setJson(keyItem(slug), serialized, CACHE_TTL);
     return serialized;
   }

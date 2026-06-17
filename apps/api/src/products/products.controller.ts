@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { ProductsService } from './products.service';
@@ -19,6 +20,7 @@ import { QueryProductDto } from './dto/query-product.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/types/auth.types';
 
 @Controller('products')
@@ -32,10 +34,15 @@ export class ProductsController {
     return this.productsService.create(dto, user.id);
   }
 
+  // Public catalog endpoint. OptionalJwtAuthGuard populates req.user when a
+  // staff token is sent (admin/vendedor panels reuse this route) so they keep
+  // receiving full data, while anonymous visitors get a stripped response.
   @Get()
   @Public()
-  findAll(@Query() query: QueryProductDto) {
-    return this.productsService.findAll(query);
+  @UseGuards(OptionalJwtAuthGuard)
+  findAll(@Query() query: QueryProductDto, @CurrentUser() user?: AuthenticatedUser) {
+    const isStaff = user?.role === Role.ADMIN || user?.role === Role.VENDEDOR;
+    return this.productsService.findAll(query, isStaff);
   }
 
   // Must be declared BEFORE :slug to avoid route conflict
