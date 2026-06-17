@@ -174,11 +174,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
 
       <div id="descobrir" className="scroll-mt-24" />
 
-      <DiscoveryFeed
-        initial={products.slice(0, 8)}
-        initialPage={1}
-        totalPages={Math.ceil(productsResult.total / 8)}
-      />
+      <DiscoveryFeed allProducts={products} />
 
       <RandomButton slugs={slugs} />
     </main>

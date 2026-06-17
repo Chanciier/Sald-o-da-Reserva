@@ -1,63 +1,46 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import type { Product } from '@/types/product';
-import { clientGetProducts } from '@/lib/discovery';
+import { shuffleWithSeed } from '@/lib/discovery';
 import { DiscoveryProductCard } from '@/components/products/discovery/discovery-product-card';
 
-export function DiscoveryFeed({
-  initial,
-  initialPage,
-  totalPages,
-}: {
-  initial: Product[];
-  initialPage: number;
-  totalPages: number;
-}) {
-  const [items, setItems] = useState<Product[]>(initial);
-  const [page, setPage] = useState(initialPage);
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(initialPage >= totalPages);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+const BATCH = 8;
 
-  const loadMore = useCallback(async () => {
-    const nextPage = page + 1;
-    if (nextPage > totalPages) {
-      setDone(true);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await clientGetProducts({
-        page: nextPage,
-        limit: 8,
-        status: 'ACTIVE',
-      });
-      setItems((prev) => [...prev, ...res.data]);
-      setPage(nextPage);
-      if (nextPage >= res.totalPages) setDone(true);
-    } catch {
-      setDone(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, totalPages]);
+function nextBatch(all: Product[], cycle: number): Product[] {
+  return shuffleWithSeed(all, cycle * 31 + 7).slice(0, BATCH);
+}
+
+export function DiscoveryFeed({ allProducts }: { allProducts: Product[] }) {
+  const cycleRef = useRef(1);
+  const [items, setItems] = useState<Product[]>(() => allProducts.slice(0, BATCH));
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadingRef = useRef(false);
+
+  const loadMore = useCallback(() => {
+    if (allProducts.length === 0 || loadingRef.current) return;
+    loadingRef.current = true;
+    const batch = nextBatch(allProducts, cycleRef.current);
+    cycleRef.current += 1;
+    setItems((prev) => [...prev, ...batch]);
+    loadingRef.current = false;
+  }, [allProducts]);
 
   useEffect(() => {
     const node = sentinelRef.current;
-    if (!node || done) return;
+    if (!node) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loading) {
-          void loadMore();
-        }
+        if (entries[0].isIntersecting) loadMore();
       },
       { rootMargin: '400px' },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loadMore, loading, done]);
+  }, [loadMore]);
+
+  if (allProducts.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-6">
@@ -81,14 +64,7 @@ export function DiscoveryFeed({
         ))}
       </div>
 
-      <div ref={sentinelRef} className="flex h-20 items-center justify-center" aria-hidden="true">
-        {loading && (
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Garimpando mais achados...
-          </span>
-        )}
-      </div>
+      <div ref={sentinelRef} className="h-20" aria-hidden="true" />
     </section>
   );
 }
