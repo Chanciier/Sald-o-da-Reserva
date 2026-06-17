@@ -1,39 +1,44 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { Product } from '@/types/product';
 
-const STORAGE_KEY = 'saldao:saved';
+const STORAGE_KEY = 'saldao:saved:v2';
 const CHANGE_EVENT = 'saldao-saved-change';
 
-function readSaved(): string[] {
+// Strips large HTML description to keep localStorage compact.
+function toStorable(p: Product): Product {
+  return { ...p, description: undefined as unknown as string };
+}
+
+function readSaved(): Product[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function writeSaved(ids: string[]): void {
+function writeSaved(products: Product[]): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
   } catch {
-    // ignore quota / serialization errors
+    // ignore quota errors
   }
 }
 
 export function useSavedProducts() {
-  const [saved, setSaved] = useState<string[]>([]);
+  const [savedProducts, setSavedProducts] = useState<Product[]>([]);
 
-  // SSR-safe initial read + subscribe to cross-component / cross-tab sync.
   useEffect(() => {
-    setSaved(readSaved());
+    setSavedProducts(readSaved());
 
-    const sync = () => setSaved(readSaved());
+    const sync = () => setSavedProducts(readSaved());
     window.addEventListener(CHANGE_EVENT, sync);
     window.addEventListener('storage', sync);
     return () => {
@@ -42,15 +47,21 @@ export function useSavedProducts() {
     };
   }, []);
 
-  const isSaved = useCallback((id: string) => saved.includes(id), [saved]);
+  const isSaved = useCallback(
+    (id: string) => savedProducts.some((p) => p.id === id),
+    [savedProducts],
+  );
 
-  const toggleSaved = useCallback((id: string) => {
+  const toggleSaved = useCallback((product: Product) => {
     const current = readSaved();
-    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+    const exists = current.some((p) => p.id === product.id);
+    const next = exists
+      ? current.filter((p) => p.id !== product.id)
+      : [...current, toStorable(product)];
     writeSaved(next);
-    setSaved(next);
+    setSavedProducts(next);
     window.dispatchEvent(new Event(CHANGE_EVENT));
   }, []);
 
-  return { saved, isSaved, toggleSaved };
+  return { savedProducts, isSaved, toggleSaved };
 }

@@ -176,7 +176,7 @@ export default async function ProductPage({ params }: PageProps) {
           {product.status === 'ACTIVE' && (
             <AddToCartButton productId={product.id} stock={product.stock} />
           )}
-          <SaveButton id={product.id} />
+          <SaveButton product={product} />
 
           {/* Short description */}
           {product.shortDescription && (

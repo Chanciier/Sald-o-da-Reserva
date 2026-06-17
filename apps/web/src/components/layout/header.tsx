@@ -20,7 +20,7 @@ const anchorLinks = [
 export function Header() {
   const { user, logout } = useAuth();
   const { cart, setOpen } = useCart();
-  const { saved } = useSavedProducts();
+  const { savedProducts: saved } = useSavedProducts();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);

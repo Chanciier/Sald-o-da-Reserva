@@ -1,43 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Bookmark, Loader2 } from 'lucide-react';
-import type { Product } from '@/types/product';
-import { clientGetProducts } from '@/lib/discovery';
+import { ArrowLeft, Bookmark } from 'lucide-react';
 import { useSavedProducts } from '@/hooks/use-saved-products';
 import { DiscoveryProductCard } from '@/components/products/discovery/discovery-product-card';
 
 export default function SalvosPage() {
-  const { saved } = useSavedProducts();
-  const [catalog, setCatalog] = useState<Product[] | null>(null);
+  const { savedProducts } = useSavedProducts();
 
-  useEffect(() => {
-    let active = true;
-    clientGetProducts({ limit: 200, status: 'ACTIVE' })
-      .then((res) => {
-        if (active) setCatalog(res.data);
-      })
-      .catch(() => {
-        if (active) setCatalog([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // Resolve os IDs salvos contra o catálogo, mais recém-salvos primeiro.
-  const savedProducts = useMemo(() => {
-    if (!catalog) return [];
-    const byId = new Map(catalog.map((p) => [p.id, p]));
-    return saved
-      .slice()
-      .reverse()
-      .map((id) => byId.get(id))
-      .filter((p): p is Product => Boolean(p));
-  }, [catalog, saved]);
-
-  const loading = catalog === null;
+  // Mais recém-salvos primeiro.
+  const items = [...savedProducts].reverse();
 
   return (
     <main className="flex-1">
@@ -57,21 +29,14 @@ export default function SalvosPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Salvos</h1>
             <p className="text-sm text-muted-foreground">
-              {savedProducts.length > 0
-                ? `${savedProducts.length} ${savedProducts.length === 1 ? 'item guardado' : 'itens guardados'}`
+              {items.length > 0
+                ? `${items.length} ${items.length === 1 ? 'item guardado' : 'itens guardados'}`
                 : 'Seus achados guardados ficam aqui'}
             </p>
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex h-64 items-center justify-center">
-            <span className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Carregando seus salvos...
-            </span>
-          </div>
-        ) : savedProducts.length === 0 ? (
+        {items.length === 0 ? (
           <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border text-center">
             <Bookmark className="size-8 text-muted-foreground" aria-hidden="true" />
             <p className="text-muted-foreground">Você ainda não salvou nenhum produto.</p>
@@ -84,7 +49,7 @@ export default function SalvosPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {savedProducts.map((p) => (
+            {items.map((p) => (
               <DiscoveryProductCard key={p.id} product={p} />
             ))}
           </div>

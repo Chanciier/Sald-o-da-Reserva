@@ -66,7 +66,7 @@ export function DiscoveryProductCard({
       {/* Botão salvar */}
       <button
         type="button"
-        onClick={() => toggleSaved(product.id)}
+        onClick={() => toggleSaved(product)}
         aria-label={saved ? 'Remover dos salvos' : 'Salvar produto'}
         aria-pressed={saved}
         className="absolute right-2 top-2 z-10 flex size-9 items-center justify-center rounded-full border border-border bg-background/80 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
