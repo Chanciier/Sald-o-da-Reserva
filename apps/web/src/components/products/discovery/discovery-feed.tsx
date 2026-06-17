@@ -16,17 +16,17 @@ export function DiscoveryFeed({ allProducts }: { allProducts: Product[] }) {
   const cycleRef = useRef(1);
   const [items, setItems] = useState<Product[]>(() => allProducts.slice(0, BATCH));
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const loadingRef = useRef(false);
 
   const loadMore = useCallback(() => {
-    if (allProducts.length === 0 || loadingRef.current) return;
-    loadingRef.current = true;
+    if (allProducts.length === 0) return;
     const batch = nextBatch(allProducts, cycleRef.current);
     cycleRef.current += 1;
     setItems((prev) => [...prev, ...batch]);
-    loadingRef.current = false;
   }, [allProducts]);
 
+  // Re-observa após cada lote: observar um elemento que já está intersectando
+  // dispara o callback de novo, então o feed continua preenchendo enquanto o
+  // sentinel permanece na zona de 400px — e segue carregando conforme rola.
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node) return;
@@ -38,7 +38,7 @@ export function DiscoveryFeed({ allProducts }: { allProducts: Product[] }) {
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loadMore]);
+  }, [loadMore, items.length]);
 
   if (allProducts.length === 0) return null;
 
