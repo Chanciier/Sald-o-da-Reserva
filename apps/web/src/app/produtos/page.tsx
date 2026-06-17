@@ -177,7 +177,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
       <DiscoveryFeed
         initial={products.slice(0, 8)}
         initialPage={1}
-        totalPages={productsResult.totalPages}
+        totalPages={Math.ceil(productsResult.total / 8)}
       />
 
       <RandomButton slugs={slugs} />
