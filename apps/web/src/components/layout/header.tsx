@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Clock, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
+import { Bookmark, Clock, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
+import { useSavedProducts } from '@/hooks/use-saved-products';
 import { pad } from '@/hooks/use-countdown';
 
 const anchorLinks = [
@@ -19,6 +20,7 @@ const anchorLinks = [
 export function Header() {
   const { user, logout } = useAuth();
   const { cart, setOpen } = useCart();
+  const { saved } = useSavedProducts();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -175,6 +177,21 @@ export function Header() {
 
             {userMenuOpen && (
               <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-border bg-background shadow-lg z-50 overflow-hidden">
+                <Link
+                  href="/salvos"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center justify-between border-b border-border px-4 py-2.5 text-sm transition-colors hover:bg-muted"
+                >
+                  <span className="flex items-center gap-2 font-medium">
+                    <Bookmark className="size-4" aria-hidden="true" />
+                    Salvos
+                  </span>
+                  {saved.length > 0 && (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
+                      {saved.length}
+                    </span>
+                  )}
+                </Link>
                 {user ? (
                   <>
                     <div className="border-b border-border px-4 py-3">
@@ -267,6 +284,23 @@ export function Header() {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link
+                href="/salvos"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                <span className="flex items-center gap-2">
+                  <Bookmark className="size-4" aria-hidden="true" />
+                  Salvos
+                </span>
+                {saved.length > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
+                    {saved.length}
+                  </span>
+                )}
+              </Link>
+            </li>
             {user ? (
               <>
                 <li>
