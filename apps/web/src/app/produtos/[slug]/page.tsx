@@ -1,28 +1,30 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getProduct } from '@/lib/api';
-import { Badge } from '@/components/ui/badge';
-import { AddToCartButton } from '@/components/products/add-to-cart-button';
+import { ChevronLeft, Eye, Bookmark, Package, ShieldCheck, Truck, Zap, Dices } from 'lucide-react';
+import type { Metadata } from 'next';
+
+import { getProduct, getProducts } from '@/lib/api';
+import {
+  effectivePrice,
+  hasDiscount,
+  discountPercent,
+  deriveBadges,
+  pseudoViews,
+  pseudoSaves,
+  formatBRL,
+  shuffleWithSeed,
+} from '@/lib/discovery';
+
 import { ProductImages } from '@/components/products/product-images';
+import { AddToCartButton } from '@/components/products/add-to-cart-button';
 import { ProductReviews } from '@/components/products/product-reviews';
 import { ShareButton } from '@/components/products/share-button';
-import type { Metadata } from 'next';
+import { ProductBadge } from '@/components/products/discovery/product-badge';
+import { ProductSection } from '@/components/products/discovery/product-section';
+import { SaveButton } from '@/components/products/discovery/save-button';
 
 interface PageProps {
   params: { slug: string };
-}
-
-const statusLabel: Record<
-  string,
-  { label: string; variant: 'success' | 'warning' | 'destructive' }
-> = {
-  ACTIVE: { label: 'Disponível', variant: 'success' },
-  OUT_OF_STOCK: { label: 'Sem estoque', variant: 'warning' },
-  INACTIVE: { label: 'Inativo', variant: 'destructive' },
-};
-
-function formatPrice(value: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -58,71 +60,123 @@ export default async function ProductPage({ params }: PageProps) {
   const product = await getProduct(params.slug).catch(() => null);
   if (!product) notFound();
 
-  const status = statusLabel[product.status] ?? statusLabel.ACTIVE;
-  const hasDiscount = product.salePrice !== null && product.salePrice < product.price;
-  const discount = hasDiscount
-    ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
-    : 0;
+  // Related products — one broad fetch, two slices
+  const broadResult = await getProducts({ limit: 24 }).catch(() => ({ data: [] }));
+  const broadList = broadResult.data.filter((p) => p.id !== product.id);
+
+  const semelhantes = product.category?.slug
+    ? broadList.filter((p) => p.category?.slug === product.category!.slug).slice(0, 8)
+    : [];
+
+  const tambemGosta = shuffleWithSeed(broadList, parseInt(product.id, 16) || 0).slice(0, 8);
+
+  const price = effectivePrice(product);
+  const discounted = hasDiscount(product);
+  const discount = discountPercent(product);
+  const economia = discounted ? product.price - price : 0;
+  const badges = deriveBadges(product);
+  const views = pseudoViews(product);
+  const saves = pseudoSaves(product);
+  const lowStock = product.stock <= 3;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/produtos" className="hover:text-foreground">
-          Produtos
+    <main className="mx-auto max-w-7xl px-4 py-4">
+      {/* Back link */}
+      <div className="mb-6">
+        <Link
+          href="/produtos"
+          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronLeft className="size-4" aria-hidden="true" />
+          Voltar para os produtos
         </Link>
-        {product.category && (
-          <>
-            <span>/</span>
-            <Link
-              href={`/produtos?categorySlug=${product.category.slug}`}
-              className="hover:text-foreground"
-            >
-              {product.category.name}
-            </Link>
-          </>
-        )}
-        <span>/</span>
-        <span className="text-foreground">{product.name}</span>
-      </nav>
+      </div>
 
-      {/* Main grid: image + info */}
-      <div className="grid gap-8 md:grid-cols-2">
-        <ProductImages images={product.images ?? []} name={product.name} />
-
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant={status.variant}>{status.label}</Badge>
-            {hasDiscount && <Badge variant="destructive">-{discount}% OFF</Badge>}
-            {product.category && <Badge variant="secondary">{product.category.name}</Badge>}
+      {/* Two-column grid */}
+      <div className="grid gap-6 pb-8 md:grid-cols-2 md:gap-10">
+        {/* Image gallery */}
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-muted">
+          <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5">
+            {badges.map((b) => (
+              <ProductBadge key={b} type={b} />
+            ))}
           </div>
-
-          {product.brand && (
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              {product.brand}
-            </p>
+          {discounted && (
+            <span className="absolute bottom-3 left-3 z-10 rounded-full bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground shadow-sm">
+              -{discount}%
+            </span>
           )}
+          <ProductImages images={product.images ?? []} name={product.name} />
+        </div>
 
-          <div className="flex items-start justify-between gap-3">
-            <h1 className="text-2xl font-bold leading-tight">{product.name}</h1>
-            <ShareButton title={product.name} text={product.shortDescription} />
-          </div>
-
-          {/* Price */}
+        {/* Details column */}
+        <div className="flex flex-col gap-5">
+          {/* Category + title */}
           <div>
-            {hasDiscount ? (
-              <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold text-primary">
-                  {formatPrice(product.salePrice!)}
-                </span>
-                <span className="text-lg text-muted-foreground line-through">
-                  {formatPrice(product.price)}
-                </span>
-              </div>
-            ) : (
-              <span className="text-3xl font-bold">{formatPrice(product.price)}</span>
+            {product.category && (
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {product.category.name}
+              </span>
             )}
+            <div className="mt-1 flex items-start justify-between gap-3">
+              <h1 className="text-balance text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+                {product.name}
+              </h1>
+              <ShareButton title={product.name} text={product.shortDescription} />
+            </div>
           </div>
+
+          {/* Social proof */}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <Eye className="size-4 text-accent" aria-hidden="true" />
+              {views} pessoas viram
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Bookmark className="size-4 text-accent" aria-hidden="true" />
+              {saves} salvaram
+            </span>
+          </div>
+
+          {/* Price card */}
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex flex-wrap items-end gap-3">
+              <span className="text-3xl font-extrabold text-card-foreground sm:text-4xl">
+                {formatBRL(price)}
+              </span>
+              {discounted && (
+                <span className="pb-1 text-base text-muted-foreground line-through">
+                  {formatBRL(product.price)}
+                </span>
+              )}
+            </div>
+            {discounted && (
+              <p className="mt-1 text-sm font-semibold text-accent">
+                Você economiza {formatBRL(economia)} ({discount}% off)
+              </p>
+            )}
+
+            {/* Stock urgency */}
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-muted px-3 py-2.5 text-sm font-medium">
+              <Package
+                className={lowStock ? 'size-4 text-accent' : 'size-4 text-foreground'}
+                aria-hidden="true"
+              />
+              {product.stock === 1 ? (
+                <span className="text-accent">Última unidade disponível!</span>
+              ) : lowStock ? (
+                <span className="text-accent">Apenas {product.stock} unidades restantes</span>
+              ) : (
+                <span>{product.stock} unidades disponíveis</span>
+              )}
+            </div>
+          </div>
+
+          {/* CTAs */}
+          {product.status === 'ACTIVE' && (
+            <AddToCartButton productId={product.id} stock={product.stock} />
+          )}
+          <SaveButton id={product.id} />
 
           {/* Short description */}
           {product.shortDescription && (
@@ -131,40 +185,21 @@ export default async function ProductPage({ params }: PageProps) {
             </p>
           )}
 
-          {/* Details table */}
-          <div className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 text-sm">
-            <div>
-              <span className="text-muted-foreground">SKU</span>
-              <p className="font-medium">{product.sku}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Estoque</span>
-              <p className="font-medium">{product.stock} unidades</p>
-            </div>
-            {product.weight && (
-              <div>
-                <span className="text-muted-foreground">Peso</span>
-                <p className="font-medium">{product.weight} kg</p>
-              </div>
-            )}
-            {product.dimensions && (
-              <div>
-                <span className="text-muted-foreground">Dimensões</span>
-                <p className="font-medium">
-                  {product.dimensions.width} × {product.dimensions.height} ×{' '}
-                  {product.dimensions.depth} {product.dimensions.unit}
-                </p>
-              </div>
-            )}
+          {/* Guarantees */}
+          <div className="grid grid-cols-2 gap-3 border-t border-border pt-4 text-sm">
+            <span className="inline-flex items-center gap-2 text-muted-foreground">
+              <ShieldCheck className="size-4 text-foreground" aria-hidden="true" />
+              Compra segura / NF-e
+            </span>
+            <span className="inline-flex items-center gap-2 text-muted-foreground">
+              <Truck className="size-4 text-foreground" aria-hidden="true" />
+              Entrega para todo o Brasil
+            </span>
           </div>
-
-          {product.status === 'ACTIVE' && (
-            <AddToCartButton productId={product.id} stock={product.stock} />
-          )}
         </div>
       </div>
 
-      {/* Full description — below the grid */}
+      {/* Full description */}
       {product.description && (
         <section className="mt-10 border-t border-border pt-8">
           <h2 className="mb-4 text-lg font-semibold">Descrição completa</h2>
@@ -183,6 +218,24 @@ export default async function ProductPage({ params }: PageProps) {
 
       {/* Reviews */}
       <ProductReviews productId={product.id} />
+
+      {/* Related sections */}
+      {semelhantes.length > 0 && (
+        <ProductSection
+          title="Produtos semelhantes"
+          subtitle={`Mais achados em ${product.category?.name ?? 'outras categorias'}`}
+          icon={<Zap className="size-5" aria-hidden="true" />}
+          products={semelhantes}
+        />
+      )}
+      {tambemGosta.length > 0 && (
+        <ProductSection
+          title="Você também pode gostar"
+          subtitle="Misturamos categorias pra te surpreender"
+          icon={<Dices className="size-5" aria-hidden="true" />}
+          products={tambemGosta}
+        />
+      )}
     </main>
   );
 }
