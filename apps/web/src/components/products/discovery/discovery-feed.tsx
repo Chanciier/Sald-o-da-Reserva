@@ -7,6 +7,7 @@ import { shuffleWithSeed } from '@/lib/discovery';
 import { DiscoveryProductCard } from '@/components/products/discovery/discovery-product-card';
 
 const BATCH = 8;
+const MARGIN = 600;
 
 function nextBatch(all: Product[], cycle: number): Product[] {
   return shuffleWithSeed(all, cycle * 31 + 7).slice(0, BATCH);
@@ -24,21 +25,32 @@ export function DiscoveryFeed({ allProducts }: { allProducts: Product[] }) {
     setItems((prev) => [...prev, ...batch]);
   }, [allProducts]);
 
-  // Re-observa após cada lote: observar um elemento que já está intersectando
-  // dispara o callback de novo, então o feed continua preenchendo enquanto o
-  // sentinel permanece na zona de 400px — e segue carregando conforme rola.
+  // Gatilho por rolagem: quando o sentinel entra na zona de MARGIN, carrega.
   useEffect(() => {
     const node = sentinelRef.current;
-    if (!node) return;
+    if (!node || allProducts.length === 0) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) loadMore();
       },
-      { rootMargin: '400px' },
+      { rootMargin: `${MARGIN}px` },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loadMore, items.length]);
+  }, [loadMore, allProducts.length]);
+
+  // Preenchimento contínuo: após cada lote, se o sentinel ainda estiver na zona
+  // (tela alta, rolagem rápida ou conteúdo curto), agenda outro lote no próximo
+  // frame. Isso garante que o footer nunca seja alcançado enquanto há produtos.
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || allProducts.length === 0) return;
+    const rect = node.getBoundingClientRect();
+    if (rect.top <= window.innerHeight + MARGIN) {
+      const id = requestAnimationFrame(() => loadMore());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [items.length, loadMore, allProducts.length]);
 
   if (allProducts.length === 0) return null;
 
