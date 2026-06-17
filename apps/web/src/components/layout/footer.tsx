@@ -95,11 +95,15 @@ export function Footer() {
           <div>
             <h3 className="text-sm font-bold text-foreground">Atendimento</h3>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li>Seg a Sex, 8h às 20h</li>
-              <li>Sáb, 9h às 15h</li>
+              <li>Seg a Sex, 7h às 19h</li>
               <li>
-                <a href="mailto:contato@saldaodareserva.com.br" className="hover:text-foreground">
-                  contato@saldaodareserva.com.br
+                <a href="tel:+5512981116645" className="hover:text-foreground">
+                  (12) 98111-6645
+                </a>
+              </li>
+              <li>
+                <a href="mailto:saldaodareversasjc@gmail.com" className="hover:text-foreground">
+                  saldaodareversasjc@gmail.com
                 </a>
               </li>
             </ul>

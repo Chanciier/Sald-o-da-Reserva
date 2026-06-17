@@ -61,10 +61,16 @@ export default function ContatoPage() {
               <li>
                 <span className="font-medium text-foreground">E-mail:</span>{' '}
                 <a
-                  href="mailto:contato@saldaodareserva.com.br"
+                  href="mailto:saldaodareversasjc@gmail.com"
                   className="text-primary hover:underline"
                 >
-                  contato@saldaodareserva.com.br
+                  saldaodareversasjc@gmail.com
+                </a>
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Celular:</span>{' '}
+                <a href="tel:+5512981116645" className="text-primary hover:underline">
+                  (12) 98111-6645
                 </a>
               </li>
               <li>
@@ -77,9 +83,8 @@ export default function ContatoPage() {
           <div className="rounded-xl border border-border p-6 text-sm space-y-2">
             <h2 className="text-base font-semibold">Horário de Atendimento</h2>
             <ul className="space-y-1 text-muted-foreground">
-              <li>Segunda a Sexta: 8h às 20h</li>
-              <li>Sábado: 9h às 15h</li>
-              <li>Domingos e feriados: sem atendimento</li>
+              <li>Segunda a Sexta: 7h às 19h</li>
+              <li>Sábados, domingos e feriados: sem atendimento</li>
             </ul>
           </div>
         </div>

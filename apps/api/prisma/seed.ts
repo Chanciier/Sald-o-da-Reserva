@@ -104,7 +104,7 @@ async function main() {
       slug: 'contato',
       title: 'Contato',
       content:
-        '<h2>Nossos Dados</h2><ul><li><strong>Razão Social:</strong> Saldão da Reserva Comércio Eletrônico Ltda.</li><li><strong>CNPJ:</strong> 00.000.000/0001-00</li><li><strong>E-mail:</strong> contato@saldaodareserva.com.br</li></ul><h2>Horário</h2><ul><li>Segunda a Sexta: 8h às 20h</li><li>Sábado: 9h às 15h</li></ul><p><em>Conteúdo editável pelo administrador.</em></p>',
+        '<h2>Nossos Dados</h2><ul><li><strong>Razão Social:</strong> Saldão da Reserva Comércio Eletrônico Ltda.</li><li><strong>CNPJ:</strong> 00.000.000/0001-00</li><li><strong>E-mail:</strong> saldaodareversasjc@gmail.com</li><li><strong>Celular:</strong> (12) 98111-6645</li></ul><h2>Horário</h2><ul><li>Segunda a Sexta: 7h às 19h</li></ul><p><em>Conteúdo editável pelo administrador.</em></p>',
       published: true,
     },
   ];
