@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -130,6 +131,13 @@ export class AffiliateController {
   @HttpCode(HttpStatus.OK)
   rejectWithdrawal(@Param('id') id: string, @Body() dto: ReviewApplicationDto) {
     return this.affiliates.rejectWithdrawal(id, dto.note);
+  }
+
+  @Delete('admin/:id')
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  remove(@Param('id') id: string) {
+    return this.affiliates.removeAffiliate(id);
   }
 
   // ── Admin: config ─────────────────────────────────────────────────────────────

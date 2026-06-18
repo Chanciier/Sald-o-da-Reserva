@@ -104,6 +104,18 @@ export default function AdminPedidos() {
     },
   });
 
+  const syncTracking = useMutation({
+    mutationFn: (orderId: string) =>
+      fetch(`${BASE}/api/v1/shipping/admin/${orderId}/sync`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token!}` },
+      }).then(async (r) => {
+        if (!r.ok) throw new Error((await r.json()).message ?? 'Erro');
+        return r.json();
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-orders'] }),
+  });
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setSearch(searchInput);
@@ -262,15 +274,29 @@ export default function AdminPedidos() {
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {o.deliveryMethod === 'PICKUP' ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                          🏪 Retirada na Loja
+                          Retirada na Loja
                         </span>
                       ) : o.shipment ? (
-                        <>
-                          <p>{o.shipment.carrier || o.shipment.status}</p>
-                          {o.shipment.trackingCode && (
-                            <p className="font-mono opacity-70">{o.shipment.trackingCode}</p>
+                        <div className="flex items-start gap-1.5">
+                          <div>
+                            <p>{o.shipment.carrier || o.shipment.status}</p>
+                            {o.shipment.trackingCode && (
+                              <p className="font-mono opacity-70">{o.shipment.trackingCode}</p>
+                            )}
+                          </div>
+                          {o.shipment.status === 'LABEL_PURCHASED' && (
+                            <button
+                              onClick={() => syncTracking.mutate(o.id)}
+                              disabled={syncTracking.isPending}
+                              title="Sincronizar rastreio com Melhor Envio"
+                              className="mt-0.5 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            >
+                              <RefreshCw
+                                className={`h-3 w-3 ${syncTracking.isPending ? 'animate-spin' : ''}`}
+                              />
+                            </button>
                           )}
-                        </>
+                        </div>
                       ) : (
                         '—'
                       )}

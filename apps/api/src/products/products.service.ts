@@ -56,6 +56,7 @@ function serializeProduct<
     price: Prisma.Decimal;
     salePrice: Prisma.Decimal | null;
     weight: Prisma.Decimal | null;
+    commissionRate: Prisma.Decimal | null;
   },
 >(p: T) {
   return {
@@ -63,6 +64,7 @@ function serializeProduct<
     price: p.price.toNumber(),
     salePrice: p.salePrice?.toNumber() ?? null,
     weight: p.weight?.toNumber() ?? null,
+    commissionRate: p.commissionRate?.toNumber() ?? null,
   };
 }
 

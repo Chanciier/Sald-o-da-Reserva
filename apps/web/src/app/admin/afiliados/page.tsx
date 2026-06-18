@@ -11,6 +11,7 @@ import {
   Music2,
   Copy,
   ClipboardCheck,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -330,6 +331,25 @@ export default function AdminAfiliadosPage() {
     },
   });
 
+  const removeAffiliate = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`${API}/affiliates/admin/${id}`, token!, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-affiliates'] });
+      qc.invalidateQueries({ queryKey: ['admin-affiliate-applications'] });
+    },
+  });
+
+  function handleRemoveAffiliate(id: string, name: string | null) {
+    if (
+      !window.confirm(
+        `Remover o afiliado "${name ?? id}"? O código ficará inativo e a candidatura será revertida para recusada.`,
+      )
+    )
+      return;
+    removeAffiliate.mutate(id);
+  }
+
   const rejectWithdrawal = useMutation({
     mutationFn: ({ id, note }: { id: string; note: string }) =>
       apiFetch(`${API}/affiliates/admin/withdrawals/${id}/reject`, token!, {
@@ -551,19 +571,36 @@ export default function AdminAfiliadosPage() {
                     <p className="font-medium">
                       {a.name ?? a.email}
                       <span className="ml-2 font-mono text-xs text-muted-foreground">{a.code}</span>
+                      {!a.isActive && (
+                        <span className="ml-2 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                          Inativo
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {a.orders} pedidos · {a.commissionsCount} comissões
                     </p>
                   </div>
-                  <div className="text-right text-xs">
-                    <p className="text-muted-foreground">
-                      Pendente:{' '}
-                      <span className="font-semibold text-foreground">{fmt(a.pending)}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Pago: <span className="font-semibold text-green-600">{fmt(a.paid)}</span>
-                    </p>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right text-xs">
+                      <p className="text-muted-foreground">
+                        Pendente:{' '}
+                        <span className="font-semibold text-foreground">{fmt(a.pending)}</span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        Pago: <span className="font-semibold text-green-600">{fmt(a.paid)}</span>
+                      </p>
+                    </div>
+                    {a.isActive && (
+                      <button
+                        onClick={() => handleRemoveAffiliate(a.id, a.name)}
+                        disabled={removeAffiliate.isPending}
+                        title="Remover afiliado"
+                        className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

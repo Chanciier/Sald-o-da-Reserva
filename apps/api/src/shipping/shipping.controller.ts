@@ -60,6 +60,13 @@ export class ShippingController {
     return this.shipping.purchaseLabel(orderId);
   }
 
+  @Post('admin/:orderId/sync')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  adminSync(@Param('orderId') orderId: string) {
+    return this.shipping.adminSyncTracking(orderId);
+  }
+
   @Post('webhook')
   @Public()
   @HttpCode(HttpStatus.OK)

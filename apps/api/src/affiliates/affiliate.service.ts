@@ -699,6 +699,32 @@ export class AffiliateService {
     }));
   }
 
+  async removeAffiliate(id: string) {
+    const affiliate = await this.prisma.affiliate.findUnique({
+      where: { id },
+      include: { user: { select: { id: true } } },
+    });
+    if (!affiliate) throw new NotFoundException('Afiliado não encontrado.');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.affiliate.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      await tx.affiliateApplication.updateMany({
+        where: { userId: affiliate.userId },
+        data: {
+          status: ApplicationStatus.REJECTED,
+          reviewNote: 'Afiliado removido pelo administrador.',
+          reviewedAt: new Date(),
+        },
+      });
+    });
+
+    this.logger.log(`Afiliado removido: id=${id}`);
+    return { id, removed: true };
+  }
+
   async payCommission(id: string) {
     const commission = await this.prisma.commission.findUnique({ where: { id } });
     if (!commission) throw new NotFoundException('Comissão não encontrada.');
