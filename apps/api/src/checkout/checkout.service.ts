@@ -121,7 +121,11 @@ export class CheckoutService {
     const total = round2(Math.max(0, cart.subtotal - discount + shippingCost));
 
     // Atribuição de afiliado (via código do cookie ?ref=). Null se inválido ou auto-indicação.
+    // Fallback para user.referredByCode quando não veio código do cookie.
     const affiliateId = await this.affiliateService.resolveAffiliateId(dto.affiliateCode, userId);
+
+    // Taxa de comissão global (fallback por item quando o produto não define a sua).
+    const configCommissionRate = await this.affiliateService.getCommissionRate();
 
     const order = await this.prisma.$transaction(async (tx) => {
       const pickupCode = isPickup
@@ -148,6 +152,10 @@ export class CheckoutService {
           items: {
             create: cart.items.map((item) => {
               const unitPrice = item.salePrice ?? item.price;
+              const product = productMap.get(item.productId);
+              const commissionRate = product?.commissionRate
+                ? product.commissionRate.toNumber()
+                : configCommissionRate;
               return {
                 productId: item.productId,
                 name: item.name,
@@ -155,6 +163,7 @@ export class CheckoutService {
                 price: unitPrice,
                 quantity: item.quantity,
                 subtotal: round2(unitPrice * item.quantity),
+                commissionRate,
               };
             }),
           },

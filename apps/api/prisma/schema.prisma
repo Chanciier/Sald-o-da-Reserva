@@ -101,6 +101,18 @@ enum CommissionStatus {
   CANCELLED
 }
 
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  PAID
+  REJECTED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -109,6 +121,8 @@ model User {
   passwordHash String   @map("password_hash")
   role         Role     @default(CLIENTE)
   isActive     Boolean  @default(true) @map("is_active")
+  referredByCode String?  @map("referred_by_code")
+  referredAt     DateTime? @map("referred_at")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -122,6 +136,7 @@ model User {
   consents        UserConsent[]
   reviews         Review[]
   affiliate       Affiliate?
+  affiliateApplication AffiliateApplication?
 
   @@map("users")
 }
@@ -193,6 +208,7 @@ model Product {
   cstCsosn            String?       @map("cst_csosn") @db.VarChar(10)
   pickupAvailable     Boolean       @default(false) @map("pickup_available")
   featuredOffer       Boolean       @default(false) @map("featured_offer")
+  commissionRate      Decimal?      @map("commission_rate") @db.Decimal(5, 2)
   status              ProductStatus @default(ACTIVE)
   metaTitle           String?       @map("meta_title") @db.VarChar(200)
   metaDescription     String?       @map("meta_description") @db.VarChar(500)
@@ -365,6 +381,7 @@ model OrderItem {
   price     Decimal @db.Decimal(10, 2)
   quantity  Int
   subtotal  Decimal @db.Decimal(10, 2)
+  commissionRate Decimal? @map("commission_rate") @db.Decimal(5, 2)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
@@ -574,45 +591,91 @@ model Review {
 }
 
 model Affiliate {
-  id        String   @id @default(cuid())
-  userId    String   @unique @map("user_id")
-  code      String   @unique
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(cuid())
+  userId     String   @unique @map("user_id")
+  code       String   @unique
+  isActive   Boolean  @default(true) @map("is_active")
+  pixKey     String?  @map("pix_key")
+  pixKeyType String?  @map("pix_key_type")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   orders      Order[]
   commissions Commission[]
+  withdrawals Withdrawal[]
 
   @@index([code])
   @@map("affiliates")
 }
 
 model Commission {
-  id          String           @id @default(cuid())
-  affiliateId String           @map("affiliate_id")
-  orderId     String           @unique @map("order_id")
-  baseAmount  Decimal          @map("base_amount") @db.Decimal(10, 2)
-  rate        Decimal          @db.Decimal(5, 2)
-  amount      Decimal          @db.Decimal(10, 2)
-  status      CommissionStatus @default(PENDING)
-  paidAt      DateTime?        @map("paid_at")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  id           String           @id @default(cuid())
+  affiliateId  String           @map("affiliate_id")
+  orderId      String           @unique @map("order_id")
+  withdrawalId String?          @map("withdrawal_id")
+  baseAmount   Decimal          @map("base_amount") @db.Decimal(10, 2)
+  rate         Decimal          @db.Decimal(5, 2)
+  amount       Decimal          @db.Decimal(10, 2)
+  status       CommissionStatus @default(PENDING)
+  paidAt       DateTime?        @map("paid_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
 
-  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  affiliate  Affiliate   @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  withdrawal Withdrawal? @relation(fields: [withdrawalId], references: [id], onDelete: SetNull)
 
   @@index([affiliateId])
   @@index([status])
+  @@index([withdrawalId])
   @@map("commissions")
+}
+
+model AffiliateApplication {
+  id         String            @id @default(cuid())
+  userId     String            @unique @map("user_id")
+  fullName   String            @map("full_name")
+  cpf        String
+  instagram  String?
+  facebook   String?
+  tiktok     String?
+  status     ApplicationStatus @default(PENDING)
+  reviewNote String?           @map("review_note")
+  reviewedAt DateTime?         @map("reviewed_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("affiliate_applications")
+}
+
+model Withdrawal {
+  id          String           @id @default(cuid())
+  affiliateId String           @map("affiliate_id")
+  amount      Decimal          @db.Decimal(10, 2)
+  pixKey      String           @map("pix_key")
+  pixKeyType  String           @map("pix_key_type")
+  status      WithdrawalStatus @default(PENDING)
+  note        String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  paidAt      DateTime?        @map("paid_at")
+
+  affiliate   Affiliate    @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  commissions Commission[]
+
+  @@index([affiliateId])
+  @@index([status])
+  @@map("withdrawals")
 }
 
 model AffiliateConfig {
   id             String   @id @default("singleton")
   commissionRate Decimal  @default(10) @map("commission_rate") @db.Decimal(5, 2)
   cookieDays     Int      @default(30) @map("cookie_days")
+  minWithdrawal  Decimal  @default(50) @map("min_withdrawal") @db.Decimal(10, 2)
   isActive       Boolean  @default(true) @map("is_active")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

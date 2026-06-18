@@ -149,6 +149,7 @@ export class ProductsService {
         minimumStock: dto.minimumStock ?? 0,
         pickupAvailable: dto.pickupAvailable ?? false,
         featuredOffer: dto.featuredOffer ?? false,
+        commissionRate: dto.commissionRate ?? null,
         status: dto.status,
         autoPublishWhatsapp: dto.autoPublishWhatsapp ?? false,
         whatsappGroupIds: dto.whatsappGroupIds ?? [],

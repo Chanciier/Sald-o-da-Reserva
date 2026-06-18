@@ -285,6 +285,74 @@ export class MailService {
     await this.send({ to: email, subject, html });
   }
 
+  // ── Affiliates ──────────────────────────────────────────────────────────────
+
+  async sendAffiliateApprovedEmail(
+    email: string,
+    name: string | null | undefined,
+    code: string,
+  ): Promise<void> {
+    const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
+    const panelUrl = `${this.frontendUrl}/afiliados`;
+    const subject = 'Sua candidatura de afiliado foi aprovada — Saldão da Reserva';
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:20px;color:#1a1a1a">Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 8px">${greeting}</p>
+          <p style="margin:0 0 24px">Sua candidatura ao programa de afiliados foi <strong>aprovada</strong>! 🎉</p>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:0 0 24px">
+            <p style="margin:0 0 6px;font-size:13px;color:#166534">Seu código de afiliado</p>
+            <p style="margin:0;font-size:22px;font-weight:700;color:#15803d;letter-spacing:2px">${code}</p>
+          </div>
+          <a href="${panelUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600">
+            Acessar painel de afiliado
+          </a>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#999">Saldão da Reserva · Este é um e-mail automático, não responda.</p>
+        </div>
+      </div>
+    `;
+
+    await this.send({ to: email, subject, html });
+  }
+
+  async sendAffiliateRejectedEmail(
+    email: string,
+    name: string | null | undefined,
+    note?: string,
+  ): Promise<void> {
+    const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
+    const subject = 'Atualização sobre sua candidatura de afiliado — Saldão da Reserva';
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:20px;color:#1a1a1a">Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 8px">${greeting}</p>
+          <p style="margin:0 0 16px">Avaliamos sua candidatura ao programa de afiliados e, no momento, ela <strong>não foi aprovada</strong>.</p>
+          ${
+            note
+              ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:0 0 16px">
+                  <p style="margin:0;font-size:14px;color:#991b1b">${note.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                </div>`
+              : ''
+          }
+          <p style="margin:0 0 16px;font-size:14px;color:#444">Você pode revisar suas informações e enviar uma nova candidatura quando quiser.</p>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#999">Saldão da Reserva · Este é um e-mail automático, não responda.</p>
+        </div>
+      </div>
+    `;
+
+    await this.send({ to: email, subject, html });
+  }
+
   // ── Contact ───────────────────────────────────────────────────────────────
 
   async sendContactEmail(

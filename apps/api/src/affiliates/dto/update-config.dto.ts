@@ -14,6 +14,11 @@ export class UpdateAffiliateConfigDto {
   cookieDays?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minWithdrawal?: number;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }
