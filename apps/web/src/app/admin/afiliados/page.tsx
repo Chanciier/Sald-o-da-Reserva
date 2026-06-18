@@ -213,8 +213,6 @@ export default function AdminAfiliadosPage() {
   const [filter, setFilter] = useState<Status | 'ALL'>('ALL');
   const [appFilter, setAppFilter] = useState<AppStatus | 'ALL'>('PENDING');
   const [wdFilter, setWdFilter] = useState<WithdrawalStatus | 'ALL'>('PENDING');
-  const [rate, setRate] = useState('');
-  const [cookieDays, setCookieDays] = useState('');
   const [minWithdrawal, setMinWithdrawal] = useState('');
 
   const configQuery = useQuery<Config>({
@@ -225,8 +223,6 @@ export default function AdminAfiliadosPage() {
 
   useEffect(() => {
     if (configQuery.data) {
-      setRate(String(configQuery.data.commissionRate));
-      setCookieDays(String(configQuery.data.cookieDays));
       setMinWithdrawal(String(configQuery.data.minWithdrawal ?? ''));
     }
   }, [configQuery.data]);
@@ -286,11 +282,7 @@ export default function AdminAfiliadosPage() {
     mutationFn: () =>
       apiFetch(`${API}/affiliates/admin/config`, token!, {
         method: 'PUT',
-        body: JSON.stringify({
-          commissionRate: Number(rate),
-          cookieDays: Number(cookieDays),
-          minWithdrawal: Number(minWithdrawal),
-        }),
+        body: JSON.stringify({ minWithdrawal: Number(minWithdrawal) }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-affiliate-config'] }),
   });
@@ -418,33 +410,6 @@ export default function AdminAfiliadosPage() {
           <div className="flex flex-wrap items-end gap-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Taxa de comissão (%)
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                step={0.5}
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                className="w-32 rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Duração do cookie (dias)
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={365}
-                value={cookieDays}
-                onChange={(e) => setCookieDays(e.target.value)}
-                className="w-32 rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 Saque mínimo (R$)
               </label>
               <input
@@ -471,9 +436,7 @@ export default function AdminAfiliadosPage() {
             )}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            A taxa é registrada em cada venda no momento da compra — alterá-la não muda comissões já
-            geradas. O saque mínimo é o valor mínimo que o afiliado precisa acumular para solicitar
-            um saque.
+            Valor mínimo que o afiliado precisa acumular em comissões para solicitar um saque.
           </p>
         </div>
       )}

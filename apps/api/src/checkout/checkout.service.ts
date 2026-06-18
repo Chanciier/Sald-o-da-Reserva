@@ -120,8 +120,7 @@ export class CheckoutService {
 
     const total = round2(Math.max(0, cart.subtotal - discount + shippingCost));
 
-    // Atribuição de afiliado (via código do cookie ?ref=). Null se inválido ou auto-indicação.
-    // Fallback para user.referredByCode quando não veio código do cookie.
+    // Atribuição de afiliado (via código da sessão ?ref=). Null se inválido ou auto-indicação.
     const affiliateId = await this.affiliateService.resolveAffiliateId(dto.affiliateCode, userId);
 
     // Taxa de comissão global (fallback por item quando o produto não define a sua).

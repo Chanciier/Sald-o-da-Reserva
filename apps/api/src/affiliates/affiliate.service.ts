@@ -107,7 +107,7 @@ export class AffiliateService {
       };
     }
 
-    const [commissions, withdrawals] = await Promise.all([
+    const [commissions, withdrawals, clickData] = await Promise.all([
       this.prisma.commission.findMany({
         where: { affiliateId: affiliate.id },
         orderBy: { createdAt: 'desc' },
@@ -118,9 +118,43 @@ export class AffiliateService {
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
+      this.prisma.affiliateClick.findMany({
+        where: { affiliateId: affiliate.id },
+        include: { product: { select: { id: true, name: true, slug: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 2000,
+      }),
     ]);
 
     const totals = this.computeTotals(commissions);
+
+    // Aggregate clicks por produto
+    const clickMap = new Map<
+      string,
+      {
+        productId: string | null;
+        productName: string | null;
+        productSlug: string | null;
+        count: number;
+      }
+    >();
+    for (const c of clickData) {
+      const key = c.productId ?? '__none__';
+      const entry = clickMap.get(key);
+      if (entry) {
+        entry.count++;
+      } else {
+        clickMap.set(key, {
+          productId: c.productId,
+          productName: c.product?.name ?? null,
+          productSlug: c.product?.slug ?? null,
+          count: 1,
+        });
+      }
+    }
+    const clicks = Array.from(clickMap.values())
+      .filter((c) => c.productId !== null)
+      .sort((a, b) => b.count - a.count);
 
     return {
       application: applicationOut,
@@ -133,6 +167,7 @@ export class AffiliateService {
       },
       config,
       totals,
+      clicks,
       commissions: commissions.map((c) => ({
         id: c.id,
         orderId: c.orderId,
@@ -327,56 +362,45 @@ export class AffiliateService {
     };
   }
 
-  // ── Atribuição (track + checkout) ───────────────────────────────────────────
+  // ── Registro de clique em link de afiliado (público) ───────────────────────
 
-  /** Registra a indicação no usuário autenticado. Idempotente. */
-  async track(userId: string, code: string) {
-    if (!code?.trim()) throw new BadRequestException('Código de afiliado obrigatório.');
+  async recordClick(code: string, productSlug?: string): Promise<void> {
     const config = await this.getConfig();
-    if (!config.isActive) return { tracked: false };
+    if (!config.isActive) return;
+
+    const affiliate = await this.prisma.affiliate.findUnique({
+      where: { code: code.trim().toUpperCase() },
+      select: { id: true, isActive: true },
+    });
+    if (!affiliate?.isActive) return;
+
+    let productId: string | null = null;
+    if (productSlug?.trim()) {
+      const product = await this.prisma.product.findUnique({
+        where: { slug: productSlug.trim() },
+        select: { id: true },
+      });
+      productId = product?.id ?? null;
+    }
+
+    await this.prisma.affiliateClick.create({
+      data: { affiliateId: affiliate.id, productId },
+    });
+  }
+
+  // ── Atribuição (checkout) ───────────────────────────────────────────────────
+
+  /** Resolve o affiliateId a partir do código da sessão. Null se inválido ou auto-indicação. */
+  async resolveAffiliateId(code: string | undefined, buyerUserId: string): Promise<string | null> {
+    const config = await this.getConfig();
+    if (!config.isActive) return null;
+    if (!code?.trim()) return null;
 
     const affiliate = await this.prisma.affiliate.findUnique({
       where: { code: code.trim().toUpperCase() },
     });
-    if (!affiliate || !affiliate.isActive) return { tracked: false };
-    if (affiliate.userId === userId) return { tracked: false }; // sem auto-indicação
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { referredByCode: affiliate.code, referredAt: new Date() },
-    });
-    return { tracked: true, code: affiliate.code };
-  }
-
-  /**
-   * Resolve o affiliateId. Prioriza o código do cookie; se ausente, faz fallback
-   * em user.referredByCode (se dentro da janela de cookieDays). Null se inválido
-   * ou auto-indicação.
-   */
-  async resolveAffiliateId(code: string | undefined, buyerUserId: string): Promise<string | null> {
-    const config = await this.getConfig();
-    if (!config.isActive) return null;
-
-    let resolvedCode = code?.trim();
-
-    if (!resolvedCode) {
-      // Fallback: indicação persistida no usuário (dentro da janela).
-      const user = await this.prisma.user.findUnique({
-        where: { id: buyerUserId },
-        select: { referredByCode: true, referredAt: true },
-      });
-      if (!user?.referredByCode || !user.referredAt) return null;
-      const ageMs = Date.now() - user.referredAt.getTime();
-      const windowMs = config.cookieDays * 24 * 60 * 60 * 1000;
-      if (ageMs > windowMs) return null;
-      resolvedCode = user.referredByCode;
-    }
-
-    const affiliate = await this.prisma.affiliate.findUnique({
-      where: { code: resolvedCode.toUpperCase() },
-    });
     if (!affiliate || !affiliate.isActive) return null;
-    if (affiliate.userId === buyerUserId) return null; // sem auto-indicação
+    if (affiliate.userId === buyerUserId) return null;
     return affiliate.id;
   }
 

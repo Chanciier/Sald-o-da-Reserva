@@ -223,9 +223,10 @@ model Product {
   createdBy    User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
   images       Image[]
   orderItems   OrderItem[]
-  reviews      Review[]
+  reviews         Review[]
   whatsappLogs    WhatsappMessageLog[]
   whatsappContent WhatsappContentHistory[]
+  affiliateClicks AffiliateClick[]
 
   @@index([categoryId])
   @@index([status])
@@ -600,10 +601,11 @@ model Affiliate {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   orders      Order[]
   commissions Commission[]
   withdrawals Withdrawal[]
+  clicks      AffiliateClick[]
 
   @@index([code])
   @@map("affiliates")
@@ -669,6 +671,19 @@ model Withdrawal {
   @@index([affiliateId])
   @@index([status])
   @@map("withdrawals")
+}
+
+model AffiliateClick {
+  id          String    @id @default(cuid())
+  affiliateId String    @map("affiliate_id")
+  productId   String?   @map("product_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([affiliateId])
+  @@map("affiliate_clicks")
 }
 
 model AffiliateConfig {

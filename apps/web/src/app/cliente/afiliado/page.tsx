@@ -14,6 +14,8 @@ import {
   Facebook,
   Music2,
   KeyRound,
+  Search,
+  MousePointerClick,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -61,13 +63,27 @@ interface Withdrawal {
   paidAt: string | null;
 }
 
+interface ClickStat {
+  productId: string;
+  productName: string | null;
+  productSlug: string | null;
+  count: number;
+}
+
 interface AffiliateMe {
   application: Application | null;
   affiliate: Affiliate | null;
   config: { commissionRate: number; cookieDays: number; minWithdrawal: number };
   totals: { available: number; pending: number; paid: number };
+  clicks: ClickStat[];
   commissions: Commission[];
   withdrawals: Withdrawal[];
+}
+
+interface ProductItem {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 const PIX_KEY_LABEL: Record<PixKeyType, string> = {
@@ -125,7 +141,6 @@ export default function AfiliadoPage() {
   const { token, user } = useAuth();
   const qc = useQueryClient();
   const [origin, setOrigin] = useState('');
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => setOrigin(window.location.origin), []);
 
@@ -143,20 +158,12 @@ export default function AfiliadoPage() {
     );
   }
 
-  const { application, affiliate, config } = data;
+  const { application, affiliate } = data;
 
   // D) Aprovado → painel completo
   if (affiliate) {
     return (
-      <AffiliatePanel
-        data={data}
-        affiliate={affiliate}
-        origin={origin}
-        copied={copied}
-        setCopied={setCopied}
-        token={token!}
-        qc={qc}
-      />
+      <AffiliatePanel data={data} affiliate={affiliate} origin={origin} token={token!} qc={qc} />
     );
   }
 
@@ -180,19 +187,17 @@ export default function AfiliadoPage() {
   }
 
   // A) Sem nada / C) Rejeitado → formulário
-  return <ApplyView application={application} config={config} user={user} token={token!} qc={qc} />;
+  return <ApplyView application={application} user={user} token={token!} qc={qc} />;
 }
 
 // ── A / C: Formulário de solicitação ────────────────────────────────────────
 function ApplyView({
   application,
-  config,
   user,
   token,
   qc,
 }: {
   application: Application | null;
-  config: AffiliateMe['config'];
   user: ReturnType<typeof useAuth>['user'];
   token: string;
   qc: ReturnType<typeof useQueryClient>;
@@ -267,8 +272,8 @@ function ApplyView({
               {rejected ? 'Reenviar solicitação' : 'Seja um afiliado'}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Ganhe <strong>{config.commissionRate}% de comissão</strong> sobre cada produto vendido
-              por quem você indicar. Sem custo para participar.
+              Ganhe <strong>comissão</strong> sobre cada produto vendido por quem você indicar. Sem
+              custo para participar.
             </p>
           </div>
         </div>
@@ -360,36 +365,60 @@ function ApplyView({
 }
 
 // ── D: Painel do afiliado aprovado ──────────────────────────────────────────
+function CopyLinkButton({ link }: { link: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(link);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch {
+          // ignore
+        }
+      }}
+      title="Copiar link"
+      className="flex shrink-0 items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+    >
+      {copied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
+      {copied ? 'Copiado!' : 'Copiar'}
+    </button>
+  );
+}
+
 function AffiliatePanel({
   data,
   affiliate,
   origin,
-  copied,
-  setCopied,
   token,
   qc,
 }: {
   data: AffiliateMe;
   affiliate: Affiliate;
   origin: string;
-  copied: boolean;
-  setCopied: (v: boolean) => void;
   token: string;
   qc: ReturnType<typeof useQueryClient>;
 }) {
-  const { config, totals, commissions, withdrawals } = data;
-  const link = `${origin}/?ref=${affiliate.code}`;
+  const { config, totals, clicks, commissions, withdrawals } = data;
 
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>(affiliate.pixKeyType ?? 'CPF');
   const [pixKey, setPixKey] = useState(affiliate.pixKey ?? '');
   const [pixError, setPixError] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
+  const [productSearch, setProductSearch] = useState('');
 
-  async function copyLink() {
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+  const { data: productsData, isLoading: productsLoading } = useQuery<{ data: ProductItem[] }>({
+    queryKey: ['products-affiliate'],
+    queryFn: () => fetch(`${API}/products?status=ACTIVE&limit=200`).then((r) => r.json()),
+    staleTime: 60_000,
+  });
+
+  const allProducts = productsData?.data ?? [];
+  const clickMap = new Map(clicks.map((c) => [c.productId, c.count]));
+  const filteredProducts = productSearch.trim()
+    ? allProducts.filter((p) => p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
+    : allProducts;
 
   const savePix = useMutation({
     mutationFn: (body: object) =>
@@ -419,38 +448,64 @@ function AffiliatePanel({
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold">Programa de Afiliados</h1>
-        <p className="text-sm text-muted-foreground">
-          Você recebe {config.commissionRate}% de comissão sobre cada produto vendido por sua
-          indicação.
-        </p>
-      </div>
+      <h1 className="text-xl font-bold">Programa de Afiliados</h1>
 
-      {/* Link de afiliado */}
-      <div className="rounded-xl border bg-card p-5 shadow-sm">
-        <p className="mb-2 flex items-center gap-1.5 text-sm font-medium">
-          <Link2 className="size-4 text-primary" />
-          Seu link de afiliado
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            readOnly
-            value={link}
-            onFocus={(e) => e.currentTarget.select()}
-            className="flex-1 rounded-lg border border-input bg-muted/40 px-3 py-2 text-sm"
-          />
-          <button
-            onClick={copyLink}
-            className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            {copied ? 'Copiado!' : 'Copiar'}
-          </button>
+      {/* Links por produto */}
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3">
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            <Link2 className="size-4 text-primary" />
+            Links por produto
+          </p>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Buscar produto..."
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              className="h-8 w-48 rounded-lg border bg-background pl-8 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Compartilhe esse link. Quem comprar em até {config.cookieDays} dias após clicar gera
-          comissão para você.
+        {productsLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : !filteredProducts.length ? (
+          <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+            {productSearch ? 'Nenhum produto encontrado.' : 'Nenhum produto disponível.'}
+          </p>
+        ) : (
+          <div className="max-h-96 divide-y overflow-y-auto">
+            {filteredProducts.map((p) => {
+              const count = clickMap.get(p.id) ?? 0;
+              const productLink = `${origin}/produtos/${p.slug}?ref=${affiliate.code}`;
+              return (
+                <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{p.name}</p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                      {productLink}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    {count > 0 && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MousePointerClick className="size-3.5" />
+                        {count}
+                      </span>
+                    )}
+                    <CopyLinkButton link={productLink} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="border-t px-5 py-2 text-xs text-muted-foreground">
+          O link de afiliado dura apenas durante a sessão do visitante. Código:{' '}
+          <span className="font-mono font-semibold">{affiliate.code}</span>
         </p>
       </div>
 

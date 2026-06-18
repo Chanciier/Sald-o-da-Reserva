@@ -16,9 +16,10 @@ import { UpdateAffiliateConfigDto } from './dto/update-config.dto';
 import { ApplyAffiliateDto } from './dto/apply.dto';
 import { UpdatePixDto } from './dto/update-pix.dto';
 import { ReviewApplicationDto } from './dto/review-application.dto';
-import { TrackAffiliateDto } from './dto/track.dto';
+import { RecordClickDto } from './dto/record-click.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('affiliates')
 export class AffiliateController {
@@ -48,12 +49,13 @@ export class AffiliateController {
     return this.affiliates.requestWithdrawal(userId);
   }
 
-  // ── Atribuição ──────────────────────────────────────────────────────────────
+  // ── Registro de clique (público) ───────────────────────────────────────────
 
-  @Post('track')
+  @Post('click')
+  @Public()
   @HttpCode(HttpStatus.OK)
-  track(@CurrentUser('id') userId: string, @Body() dto: TrackAffiliateDto) {
-    return this.affiliates.track(userId, dto.code);
+  click(@Body() dto: RecordClickDto) {
+    return this.affiliates.recordClick(dto.code, dto.productSlug).then(() => ({ ok: true }));
   }
 
   // ── Admin: afiliados / comissões ────────────────────────────────────────────
