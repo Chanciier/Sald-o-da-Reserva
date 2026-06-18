@@ -8,6 +8,7 @@ import { QueryProvider } from '@/providers/query-provider';
 import { ConditionalHeader } from '@/components/layout/conditional-header';
 import { ConditionalFooter } from '@/components/layout/conditional-footer';
 import { CookieBanner } from '@/components/cookie-banner';
+import { AffiliateRefCapture } from '@/components/affiliate/ref-capture';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -44,6 +45,7 @@ export default function RootLayout({
               {children}
               <ConditionalFooter />
               <CookieBanner />
+              <AffiliateRefCapture />
             </CartProvider>
           </AuthProvider>
         </QueryProvider>
