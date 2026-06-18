@@ -218,6 +218,15 @@ export class CheckoutService {
         items: true,
         coupon: { select: { code: true } },
         shipment: { select: { status: true, trackingCode: true, carrier: true, service: true } },
+        payment: {
+          select: {
+            method: true,
+            status: true,
+            amount: true,
+            cardBrand: true,
+            cardLast4: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
