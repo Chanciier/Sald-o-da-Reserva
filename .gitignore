@@ -43,3 +43,10 @@ packages/*/node_modules/
 # Cache
 .eslintcache
 *.tsbuildinfo
+
+# claude-flow / ruflo tooling state (não faz parte do projeto)
+.swarm/
+.hive-mind/
+ruvector.db
+*.db-shm
+*.db-wal
