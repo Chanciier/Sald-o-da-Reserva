@@ -139,10 +139,7 @@ const NAV: NavItem[] = [
   {
     label: 'Marketing',
     icon: MessageCircle,
-    children: [
-      { href: '/admin/whatsapp', label: 'Grupos WhatsApp' },
-      { href: '/admin/afiliados', label: 'Afiliados' },
-    ],
+    children: [{ href: '/admin/whatsapp', label: 'Grupos WhatsApp' }],
   },
   {
     label: 'Logs',

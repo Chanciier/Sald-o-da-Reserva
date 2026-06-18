@@ -545,24 +545,6 @@ export class ShippingService {
     return { meOrderId, labelUrl };
   }
 
-  async adminSyncTracking(orderId: string) {
-    const shipment = await this.prisma.shipment.findUnique({
-      where: { orderId },
-      include: { events: { orderBy: { createdAt: 'asc' } } },
-    });
-    if (!shipment) throw new NotFoundException('Envio não encontrado.');
-
-    if (shipment.meOrderId && this.token) {
-      await this.syncTracking(shipment.id, shipment.meOrderId, shipment.status);
-    }
-
-    const fresh = await this.prisma.shipment.findUnique({
-      where: { orderId },
-      include: { events: { orderBy: { createdAt: 'asc' } } },
-    });
-    return this.serializeShipment(fresh!);
-  }
-
   async fetchMeTrackingRaw(meOrderId: string): Promise<MeTracking | null> {
     if (!this.token) return null;
     try {

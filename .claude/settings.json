@@ -298,7 +298,18 @@
       "Bash(echo \"exit:$? bytes:$\\(wc -c </tmp/h.html\\)\")",
       "PowerShell(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Sald�o da Reserva\" status)",
       "PowerShell(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Sald�o da Reserva\" diff --stat HEAD)",
-      "PowerShell(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Sald�o da Reserva\" log --oneline -5)"
+      "PowerShell(git -C \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Sald�o da Reserva\" log --oneline -5)",
+      "PowerShell(railway --version 2>&1)",
+      "Bash(NEXT_PUBLIC_API_URL=\"https://caring-purpose-production-8734.up.railway.app\" node --input-type=module -e \"import\\('./next.config.mjs'\\).then\\(m => { const h = m.default.headers ? null : null; return m.default.headers\\(\\); }\\).then\\(r => console.log\\(JSON.stringify\\(r[0].headers.find\\(x=>x.key==='Content-Security-Policy'\\).value\\)\\)\\).catch\\(e => { console.error\\('FAIL', e\\); process.exit\\(1\\); }\\)\")",
+      "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\"; npm audit --json 2>&1 | Out-File -FilePath \"$env:TEMP\\\\audit.json\" -Encoding utf8; node -e \"const a=require\\(process.env.TEMP+'/audit.json'\\); const v=a.metadata.vulnerabilities; console.log\\('Total:',v.total,'| critical:',v.critical,'high:',v.high,'moderate:',v.moderate,'low:',v.low\\); const adv=a.vulnerabilities||{}; const names=Object.keys\\(adv\\).filter\\(k=>['critical','high'].includes\\(adv[k].severity\\)\\); console.log\\('\\\\nHIGH/CRITICAL packages:'\\); names.forEach\\(n=>{const x=adv[n]; console.log\\('-',n,'\\('+x.severity+'\\)',Array.isArray\\(x.via\\)?x.via.map\\(vv=>typeof vv==='string'?vv:vv.title\\).join\\('; '\\):''\\);}\\);\")",
+      "PowerShell(railway --help 2>&1)",
+      "PowerShell(railway scale --help 2>&1)",
+      "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\"; npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 20; Write-Host \"---- exit: $LASTEXITCODE ----\")",
+      "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\"; npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 15; Write-Host \"---- tsc exit: $LASTEXITCODE ----\")",
+      "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\"; npx next build 2>&1 | Select-String \"teste-erro|Compiled|Export encountered|Failed|error|✓|✗\" | Select-Object -First 25; Write-Host \"---- build exit: $LASTEXITCODE ----\")",
+      "Bash(node -e \"const {PrismaClient}=require\\('@prisma/client'\\); const p=new PrismaClient\\(\\); console.log\\('affiliate model:', typeof p.affiliate\\); console.log\\('commission model:', typeof p.commission\\); console.log\\('affiliateConfig model:', typeof p.affiliateConfig\\); process.exit\\(0\\)\")",
+      "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\"; npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 20; Write-Host \"---- web tsc exit: $LASTEXITCODE ----\")",
+      "Bash(git revert *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Adrian\\.claude\\projects\\c--Users-Adrian-Desktop-Sald-o-da-Reserva\\memory",

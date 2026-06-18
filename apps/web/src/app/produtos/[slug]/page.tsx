@@ -16,7 +16,6 @@ import {
 } from '@/lib/discovery';
 
 import { ProductImages } from '@/components/products/product-images';
-import { AffiliateClickRecorder } from '@/components/affiliate/affiliate-click-recorder';
 import { AddToCartButton } from '@/components/products/add-to-cart-button';
 import { ProductReviews } from '@/components/products/product-reviews';
 import { ShareButton } from '@/components/products/share-button';
@@ -82,7 +81,6 @@ export default async function ProductPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-4">
-      <AffiliateClickRecorder productSlug={params.slug} />
       {/* Back link */}
       <div className="mb-6">
         <Link

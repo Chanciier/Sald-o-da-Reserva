@@ -5,10 +5,9 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { MercadoPagoModule } from '../mercadopago/mercadopago.module';
 import { InvoiceModule } from '../invoices/invoice.module';
 import { ShippingModule } from '../shipping/shipping.module';
-import { AffiliateModule } from '../affiliates/affiliate.module';
 
 @Module({
-  imports: [PrismaModule, MercadoPagoModule, InvoiceModule, ShippingModule, AffiliateModule],
+  imports: [PrismaModule, MercadoPagoModule, InvoiceModule, ShippingModule],
   controllers: [WebhooksController],
   providers: [WebhooksService],
 })

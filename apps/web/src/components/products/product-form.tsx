@@ -54,7 +54,6 @@ const schema = z.object({
   categoryId: z.string().optional(),
   price: z.coerce.number({ message: 'Informe o preço' }).min(0, 'Preço inválido'),
   salePrice: z.coerce.number().min(0).optional().nullable(),
-  commissionRate: z.coerce.number().min(0).max(100).optional().nullable(),
   stock: z.coerce.number().int().min(0),
   minimumStock: z.coerce.number().int().min(0),
   weight: z.coerce.number().min(0).optional().nullable(),
@@ -181,7 +180,6 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           categoryId: initialData.categoryId ?? '',
           price: initialData.price,
           salePrice: initialData.salePrice ?? undefined,
-          commissionRate: initialData.commissionRate ?? undefined,
           stock: initialData.stock,
           minimumStock: initialData.minimumStock,
           weight: initialData.weight ?? undefined,
@@ -320,7 +318,6 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       categoryId: data.categoryId || undefined,
       price: data.price,
       salePrice: data.salePrice || undefined,
-      commissionRate: data.commissionRate || undefined,
       stock: data.stock,
       minimumStock: data.minimumStock,
       weight: data.weight || undefined,
@@ -607,24 +604,6 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                   className={inputCls}
                   placeholder="Opcional"
                 />
-              </div>
-              <div>
-                <label className={labelCls}>Comissão de afiliado (%)</label>
-                <input
-                  {...register('commissionRate')}
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="100"
-                  className={inputCls}
-                  placeholder="ex: 10"
-                />
-                {errors.commissionRate && (
-                  <p className={errorCls}>{errors.commissionRate.message}</p>
-                )}
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Deixe vazio para usar a taxa padrão do programa.
-                </p>
               </div>
             </div>
           </div>

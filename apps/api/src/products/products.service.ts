@@ -56,7 +56,6 @@ function serializeProduct<
     price: Prisma.Decimal;
     salePrice: Prisma.Decimal | null;
     weight: Prisma.Decimal | null;
-    commissionRate: Prisma.Decimal | null;
   },
 >(p: T) {
   return {
@@ -64,7 +63,6 @@ function serializeProduct<
     price: p.price.toNumber(),
     salePrice: p.salePrice?.toNumber() ?? null,
     weight: p.weight?.toNumber() ?? null,
-    commissionRate: p.commissionRate?.toNumber() ?? null,
   };
 }
 
@@ -151,7 +149,6 @@ export class ProductsService {
         minimumStock: dto.minimumStock ?? 0,
         pickupAvailable: dto.pickupAvailable ?? false,
         featuredOffer: dto.featuredOffer ?? false,
-        commissionRate: dto.commissionRate ?? null,
         status: dto.status,
         autoPublishWhatsapp: dto.autoPublishWhatsapp ?? false,
         whatsappGroupIds: dto.whatsappGroupIds ?? [],

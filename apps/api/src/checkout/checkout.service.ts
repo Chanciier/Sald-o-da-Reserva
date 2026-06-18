@@ -3,7 +3,6 @@ import { DeliveryMethod, Prisma, ProductStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
-import { AffiliateService } from '../affiliates/affiliate.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
 
 function round2(n: number) {
@@ -33,7 +32,6 @@ export class CheckoutService {
     private readonly prisma: PrismaService,
     private readonly cartService: CartService,
     private readonly shippingService: ShippingService,
-    private readonly affiliateService: AffiliateService,
   ) {}
 
   async getShippingOptions(_subtotal: number, cep?: string): Promise<ShippingQuoteOption[]> {
@@ -120,12 +118,6 @@ export class CheckoutService {
 
     const total = round2(Math.max(0, cart.subtotal - discount + shippingCost));
 
-    // Atribuição de afiliado (via código da sessão ?ref=). Null se inválido ou auto-indicação.
-    const affiliateId = await this.affiliateService.resolveAffiliateId(dto.affiliateCode, userId);
-
-    // Taxa de comissão global (fallback por item quando o produto não define a sua).
-    const configCommissionRate = await this.affiliateService.getCommissionRate();
-
     const order = await this.prisma.$transaction(async (tx) => {
       const pickupCode = isPickup
         ? await this.generatePickupCode(tx as typeof this.prisma)
@@ -135,7 +127,6 @@ export class CheckoutService {
         data: {
           userId,
           couponId,
-          affiliateId,
           deliveryMethod: dto.deliveryMethod ?? DeliveryMethod.SHIPPING,
           pickupCode,
           subtotal: cart.subtotal,
@@ -151,10 +142,6 @@ export class CheckoutService {
           items: {
             create: cart.items.map((item) => {
               const unitPrice = item.salePrice ?? item.price;
-              const product = productMap.get(item.productId);
-              const commissionRate = product?.commissionRate
-                ? product.commissionRate.toNumber()
-                : configCommissionRate;
               return {
                 productId: item.productId,
                 name: item.name,
@@ -162,7 +149,6 @@ export class CheckoutService {
                 price: unitPrice,
                 quantity: item.quantity,
                 subtotal: round2(unitPrice * item.quantity),
-                commissionRate,
               };
             }),
           },

@@ -32,7 +32,6 @@ export interface Product {
   description: string | null;
   price: number;
   salePrice: number | null;
-  commissionRate: number | null;
   weight: number | null;
   dimensions: { width: number; height: number; depth: number; unit: string } | null;
   stock: number;

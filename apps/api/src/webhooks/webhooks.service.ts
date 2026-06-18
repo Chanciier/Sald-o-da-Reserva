@@ -7,7 +7,6 @@ import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { RedisService } from '../redis/redis.service';
 import { InvoiceService } from '../invoices/invoice.service';
 import { ShippingService } from '../shipping/shipping.service';
-import { AffiliateService } from '../affiliates/affiliate.service';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 
 // Payment statuses that trigger stock restoration and order cancellation
@@ -31,7 +30,6 @@ export class WebhooksService {
     private readonly redis: RedisService,
     private readonly invoiceService: InvoiceService,
     private readonly shippingService: ShippingService,
-    private readonly affiliateService: AffiliateService,
     private readonly config: ConfigService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
@@ -207,26 +205,6 @@ export class WebhooksService {
         .catch((e) =>
           this.logger.warn(
             `Webhook MP: auto-shipping skipped for order=${payment.orderId} — ${(e as Error).message}`,
-          ),
-        );
-
-      // Comissão de afiliado (idempotente; só cria se o pedido tiver afiliado)
-      this.affiliateService
-        .createCommissionForOrder(payment.orderId)
-        .catch((e) =>
-          this.logger.warn(
-            `Webhook MP: comissão de afiliado falhou para order=${payment.orderId} — ${(e as Error).message}`,
-          ),
-        );
-    }
-
-    // Reembolso/cancelamento/chargeback → cancela comissão pendente
-    if (RESTORE_ON.includes(newStatus)) {
-      this.affiliateService
-        .cancelCommissionForOrder(payment.orderId)
-        .catch((e) =>
-          this.logger.warn(
-            `Webhook MP: cancelamento de comissão falhou para order=${payment.orderId} — ${(e as Error).message}`,
           ),
         );
     }

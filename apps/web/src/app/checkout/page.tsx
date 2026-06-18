@@ -7,7 +7,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import { createOrder } from '@/lib/cart-api';
-import { getAffiliateRef } from '@/components/affiliate/ref-capture';
 import { getShippingQuote } from '@/lib/shipping';
 import type { ShippingOption } from '@/types/cart';
 import type { PaymentMethod } from '@/types/payment';
@@ -252,7 +251,6 @@ export default function CheckoutPage() {
               deliveryMax: selectedShipping!.deliveryMax,
             }),
         couponCode: cart.couponCode ?? undefined,
-        affiliateCode: getAffiliateRef(),
       });
       await refresh();
       router.push(`/pagamento/${order.id}?method=${selectedPayment}`);

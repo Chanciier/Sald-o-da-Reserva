@@ -7,7 +7,6 @@ import {
   IsObject,
   IsOptional,
   IsString,
-  Max,
   MaxLength,
   Min,
   MinLength,
@@ -100,13 +99,6 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   featuredOffer?: boolean;
-
-  @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(100)
-  @Type(() => Number)
-  commissionRate?: number;
 
   @IsOptional()
   @IsEnum(ProductStatus)

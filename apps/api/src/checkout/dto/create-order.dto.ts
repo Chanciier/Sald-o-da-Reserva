@@ -118,9 +118,4 @@ export class CreateOrderDto {
   @IsString()
   @Matches(/^\d{11}$/, { message: 'CPF deve conter 11 dígitos numéricos.' })
   cpf?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(16)
-  affiliateCode?: string;
 }

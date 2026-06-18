@@ -15,7 +15,6 @@ import {
   LayoutGrid,
   Menu,
   X,
-  TrendingUp,
 } from 'lucide-react';
 
 const NAV = [
@@ -24,7 +23,6 @@ const NAV = [
   { href: '/cliente/rastreamento', label: 'Rastreamento', icon: Truck },
   { href: '/cliente/enderecos', label: 'Meus Endereços', icon: MapPin },
   { href: '/cliente/pagamentos', label: 'Pagamentos', icon: CreditCard },
-  { href: '/cliente/afiliado', label: 'Afiliados', icon: TrendingUp },
   { href: '/cliente/perfil', label: 'Meu Perfil', icon: User },
 ];
 
