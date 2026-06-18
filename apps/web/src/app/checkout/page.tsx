@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import { createOrder } from '@/lib/cart-api';
@@ -11,6 +12,18 @@ import type { ShippingOption } from '@/types/cart';
 import type { PaymentMethod } from '@/types/payment';
 
 import { STORE } from '@/lib/store';
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+async function fetchOrders(token: string) {
+  const res = await fetch(`${API}/api/v1/orders`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message ?? 'Erro');
+  return Array.isArray(data) ? data : [];
+}
 
 type DeliveryMethod = 'SHIPPING' | 'PICKUP';
 
@@ -115,8 +128,42 @@ export default function CheckoutPage() {
 
   const isPickup = deliveryMethod === 'PICKUP';
 
+  const { data: orders = [] } = useQuery({
+    queryKey: ['checkout-saved-addresses'],
+    queryFn: () => fetchOrders(token!),
+    enabled: !!token,
+  });
+
+  const savedAddresses = useMemo(() => {
+    const seen = new Set<string>();
+    const list: AddressForm[] = [];
+    for (const o of orders) {
+      const a = o.shippingAddress as Partial<AddressForm> | undefined;
+      if (!a?.cep) continue;
+      const key = `${a.cep}-${a.street}-${a.number}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push({
+        name: a.name ?? '',
+        cep: a.cep ?? '',
+        street: a.street ?? '',
+        number: a.number ?? '',
+        complement: a.complement ?? '',
+        neighborhood: a.neighborhood ?? '',
+        city: a.city ?? '',
+        state: a.state ?? '',
+      });
+    }
+    return list;
+  }, [orders]);
+
   function set(field: keyof AddressForm, value: string) {
     setAddress((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function selectSavedAddress(a: AddressForm) {
+    setAddress(a);
+    void fetchShippingQuotes(a.cep);
   }
 
   async function lookupCep(cep: string) {
@@ -338,6 +385,45 @@ export default function CheckoutPage() {
             {!isPickup && (
               <section className="rounded-xl border border-border p-5 space-y-4">
                 <h2 className="font-semibold">Endereço de entrega</h2>
+
+                {savedAddresses.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Usar um endereço salvo
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {savedAddresses.map((a, i) => {
+                        const active =
+                          address.cep.replace(/\D/g, '') === a.cep.replace(/\D/g, '') &&
+                          address.number === a.number &&
+                          address.street === a.street;
+                        return (
+                          <button
+                            type="button"
+                            key={`${a.cep}-${a.number}-${i}`}
+                            onClick={() => selectSavedAddress(a)}
+                            className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                              active
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:bg-muted'
+                            }`}
+                          >
+                            <p className="truncate font-medium text-foreground">{a.name}</p>
+                            <p className="truncate text-muted-foreground">
+                              {a.street}, {a.number}
+                            </p>
+                            <p className="truncate text-muted-foreground">
+                              {a.neighborhood} · {a.city}/{a.state}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="border-t border-border pt-2 text-xs text-muted-foreground">
+                      ou preencha um novo endereço abaixo
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="mb-1 block text-sm font-medium">Nome completo</label>
