@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { pixelPurchase } from '@/lib/pixel';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
@@ -174,6 +175,21 @@ export default function PaymentPage({ params }: PageProps) {
       </main>
     );
   }
+
+  // Fire Purchase once when payment is confirmed. purchasedRef prevents duplicate
+  // events if the component re-renders after polling returns APPROVED again.
+  const purchasedRef = useRef(false);
+  useEffect(() => {
+    if (purchasedRef.current) return;
+    if (payment?.status !== 'APPROVED' && payment?.status !== 'AUTHORIZED') return;
+    purchasedRef.current = true;
+    pixelPurchase({
+      content_ids: [orderId],
+      num_items: 1,
+      value: payment.amount,
+      currency: 'BRL',
+    });
+  }, [payment?.status, payment?.amount, orderId]);
 
   const showSuccess = payment?.status === 'APPROVED' || payment?.status === 'AUTHORIZED';
   const showRejected = payment && ['REJECTED', 'CANCELLED'].includes(payment.status);

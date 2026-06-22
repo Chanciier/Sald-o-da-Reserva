@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
+import { pixelInitiateCheckout } from '@/lib/pixel';
 
 function formatBRL(n: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
@@ -201,7 +202,15 @@ export default function CartPage() {
             </div>
 
             <button
-              onClick={() => router.push('/checkout')}
+              onClick={() => {
+                pixelInitiateCheckout({
+                  content_ids: cart.items.map((i) => i.productId),
+                  num_items: cart.items.reduce((s, i) => s + i.quantity, 0),
+                  value: cart.total,
+                  currency: 'BRL',
+                });
+                router.push('/checkout');
+              }}
               className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               Finalizar compra
