@@ -309,7 +309,19 @@
       "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\"; npx next build 2>&1 | Select-String \"teste-erro|Compiled|Export encountered|Failed|error|✓|✗\" | Select-Object -First 25; Write-Host \"---- build exit: $LASTEXITCODE ----\")",
       "Bash(node -e \"const {PrismaClient}=require\\('@prisma/client'\\); const p=new PrismaClient\\(\\); console.log\\('affiliate model:', typeof p.affiliate\\); console.log\\('commission model:', typeof p.commission\\); console.log\\('affiliateConfig model:', typeof p.affiliateConfig\\); process.exit\\(0\\)\")",
       "PowerShell(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\\\\apps\\\\web\"; npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 20; Write-Host \"---- web tsc exit: $LASTEXITCODE ----\")",
-      "Bash(git revert *)"
+      "Bash(git revert *)",
+      "Bash(npx vercel *)",
+      "Bash(sed -E 's/\\(DATABASE_URL=.{0,30}\\).*/\\\\1...[REDACTED]/')",
+      "Bash(npx --no-install railway --version)",
+      "Bash(git branch *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(curl -s -m 20 \"https://caring-purpose-production-8734.up.railway.app/api/v1/health\")",
+      "Bash(curl -s -m 20 \"https://caring-purpose-production-8734.up.railway.app/health\")",
+      "Bash(timeout 40 railway deployment list)",
+      "Bash(timeout 40 railway deployments)",
+      "Bash(echo \"TSC_EXIT:$?\")",
+      "Bash(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\")",
+      "Bash(DATABASE_URL=\"postgresql://x:x@localhost/x\" npx prisma generate)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Adrian\\.claude\\projects\\c--Users-Adrian-Desktop-Sald-o-da-Reserva\\memory",

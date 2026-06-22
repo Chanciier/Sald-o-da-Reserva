@@ -218,10 +218,7 @@ export class CheckoutService {
           orderId: order.id,
           value: order.total.toNumber(),
           contentIds: order.items.map((i: { productId: string }) => i.productId),
-          numItems: order.items.reduce(
-            (s: number, i: { quantity: number }) => s + i.quantity,
-            0,
-          ),
+          numItems: order.items.reduce((s: number, i: { quantity: number }) => s + i.quantity, 0),
           email: user?.email,
         });
       })

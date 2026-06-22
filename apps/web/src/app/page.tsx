@@ -12,8 +12,8 @@ export default function HomePage() {
     <main>
       <Hero />
       <SocialProof />
-      <Benefits />
       <FeaturedProducts />
+      <Benefits />
       <HowItWorks />
       <UrgencyBanner />
       <FinalCta />

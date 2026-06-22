@@ -22,6 +22,10 @@ export async function fetchCustomerStats(token: string) {
   return apiFetch<CustomerOverview>('/analytics/customer', token);
 }
 
+export async function fetchMarketingStats(token: string, days = 30) {
+  return apiFetch<MarketingOverview>(`/analytics/marketing?days=${days}`, token);
+}
+
 export interface AdminOverview {
   inventoryValue: number;
   revenueToday: number;
@@ -77,4 +81,35 @@ export interface ChartPoint {
   date: string;
   revenue: number;
   orders: number;
+}
+
+export interface MarketingChartPoint {
+  date: string;
+  revenue: number;
+  orders: number;
+  conversions: number;
+}
+
+export interface MarketingProduct {
+  productId: string;
+  name: string;
+  sold: number;
+  revenue: number;
+}
+
+export interface MarketingOverview {
+  period: { days: number; since: string; until: string };
+  purchases: number;
+  revenue: number;
+  avgTicket: number;
+  activeProducts: number;
+  topSelling: MarketingProduct[];
+  topByRevenue: MarketingProduct[];
+  meta: {
+    catalogSynced: number;
+    catalogErrors: number;
+    lastCatalogSync: string | null;
+    capiPurchases: number;
+  };
+  chart: MarketingChartPoint[];
 }

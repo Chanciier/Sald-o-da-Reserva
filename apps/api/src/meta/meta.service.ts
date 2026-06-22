@@ -68,7 +68,9 @@ export class MetaService {
     this.enabled = Boolean(this.pixelId && this.accessToken);
 
     if (!this.enabled) {
-      this.logger.warn('Meta CAPI desativado: META_PIXEL_ID ou META_CONVERSIONS_API_TOKEN ausentes');
+      this.logger.warn(
+        'Meta CAPI desativado: META_PIXEL_ID ou META_CONVERSIONS_API_TOKEN ausentes',
+      );
     }
   }
 

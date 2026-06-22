@@ -214,6 +214,140 @@ export class AnalyticsService {
     };
   }
 
+  async getMarketingOverview(days = 30) {
+    const now = new Date();
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const [
+      purchasesAgg,
+      revenueAgg,
+      avgTicketAgg,
+      activeProducts,
+      topSelling,
+      topRevenue,
+      chartOrders,
+      catalogSynced,
+      catalogErrors,
+      lastCatalogSync,
+      capiPurchases,
+      conversionsByDay,
+    ] = await Promise.all([
+      // Compras no período
+      this.prisma.order.count({ where: { status: { in: PAID }, createdAt: { gte: since } } }),
+      // Receita no período
+      this.prisma.order.aggregate({
+        where: { status: { in: PAID }, createdAt: { gte: since } },
+        _sum: { total: true },
+      }),
+      // Ticket médio
+      this.prisma.order.aggregate({
+        where: { status: { in: PAID }, createdAt: { gte: since } },
+        _avg: { total: true },
+      }),
+      // Produtos ativos
+      this.prisma.product.count({ where: { status: 'ACTIVE' } }),
+      // Top 10 mais vendidos (quantidade)
+      this.prisma.orderItem.groupBy({
+        by: ['productId', 'name'],
+        where: { order: { status: { in: PAID } } },
+        _sum: { quantity: true, subtotal: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 10,
+      }),
+      // Top 5 por receita
+      this.prisma.orderItem.groupBy({
+        by: ['productId', 'name'],
+        where: { order: { status: { in: PAID } } },
+        _sum: { quantity: true, subtotal: true },
+        orderBy: { _sum: { subtotal: 'desc' } },
+        take: 5,
+      }),
+      // Pedidos por dia (para gráficos)
+      this.prisma.order.findMany({
+        where: { status: { in: PAID }, createdAt: { gte: since } },
+        select: { createdAt: true, total: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      // Meta Catalog — sincronizados
+      this.prisma.metaCatalogSync.count({ where: { status: 'SYNCED' } }),
+      // Meta Catalog — erros
+      this.prisma.metaCatalogSync.count({ where: { status: 'ERROR' } }),
+      // Meta Catalog — última sync
+      this.prisma.metaCatalogSync.findFirst({
+        where: { status: 'SYNCED' },
+        orderBy: { syncedAt: 'desc' },
+        select: { syncedAt: true },
+      }),
+      // CAPI: pagamentos aprovados = Purchase enviados ao Meta
+      this.prisma.payment.count({
+        where: { status: 'APPROVED', updatedAt: { gte: since } },
+      }),
+      // Conversões por dia (pagamentos aprovados)
+      this.prisma.payment.findMany({
+        where: { status: 'APPROVED', updatedAt: { gte: since } },
+        select: { updatedAt: true, amount: true },
+        orderBy: { updatedAt: 'asc' },
+      }),
+    ]);
+
+    // Build chart data: revenue + orders + conversions per day
+    const revenueMap = new Map<string, { revenue: number; orders: number; conversions: number }>();
+    for (const o of chartOrders) {
+      const date = o.createdAt.toISOString().split('T')[0];
+      const prev = revenueMap.get(date) ?? { revenue: 0, orders: 0, conversions: 0 };
+      revenueMap.set(date, {
+        revenue: prev.revenue + o.total.toNumber(),
+        orders: prev.orders + 1,
+        conversions: prev.conversions,
+      });
+    }
+    for (const p of conversionsByDay) {
+      const date = p.updatedAt.toISOString().split('T')[0];
+      const prev = revenueMap.get(date) ?? { revenue: 0, orders: 0, conversions: 0 };
+      revenueMap.set(date, { ...prev, conversions: prev.conversions + 1 });
+    }
+
+    // Fill all days in range (so chart shows 0 days too)
+    const chartData: { date: string; revenue: number; orders: number; conversions: number }[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const date = d.toISOString().split('T')[0];
+      const entry = revenueMap.get(date) ?? { revenue: 0, orders: 0, conversions: 0 };
+      chartData.push({ date, ...entry });
+    }
+
+    return {
+      period: { days, since: since.toISOString(), until: now.toISOString() },
+      // Métricas principais
+      purchases: purchasesAgg,
+      revenue: revenueAgg._sum.total?.toNumber() ?? 0,
+      avgTicket: avgTicketAgg._avg.total?.toNumber() ?? 0,
+      activeProducts,
+      // Produtos
+      topSelling: topSelling.map((p) => ({
+        productId: p.productId,
+        name: p.name,
+        sold: p._sum.quantity ?? 0,
+        revenue: (p._sum.subtotal as unknown as { toNumber(): number } | null)?.toNumber() ?? 0,
+      })),
+      topByRevenue: topRevenue.map((p) => ({
+        productId: p.productId,
+        name: p.name,
+        sold: p._sum.quantity ?? 0,
+        revenue: (p._sum.subtotal as unknown as { toNumber(): number } | null)?.toNumber() ?? 0,
+      })),
+      // Meta
+      meta: {
+        catalogSynced,
+        catalogErrors,
+        lastCatalogSync: lastCatalogSync?.syncedAt ?? null,
+        capiPurchases,
+      },
+      // Gráfico
+      chart: chartData,
+    };
+  }
+
   async getCustomerOverview(userId: string) {
     const [totalOrders, totalSpentAgg, avgTicketAgg, pendingOrders, ordersByStatus, recentOrders] =
       await Promise.all([

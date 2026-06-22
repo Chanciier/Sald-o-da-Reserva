@@ -18,6 +18,9 @@ export class MetaCatalogController {
   @Post('sync')
   async syncAll() {
     const result = await this.catalog.syncAll();
-    return { ...result, message: `Sincronização concluída: ${result.synced} ok, ${result.errors} erros` };
+    return {
+      ...result,
+      message: `Sincronização concluída: ${result.synced} ok, ${result.errors} erros`,
+    };
   }
 }

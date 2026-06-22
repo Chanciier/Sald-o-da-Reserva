@@ -102,17 +102,28 @@ export class ProductsService {
   }
 
   private toCatalogProduct(p: {
-    id: string; name: string; slug: string;
-    price: Prisma.Decimal; salePrice: Prisma.Decimal | null;
-    description: string | null; shortDescription: string | null;
-    stock: number; brand: string | null;
+    id: string;
+    name: string;
+    slug: string;
+    price: Prisma.Decimal;
+    salePrice: Prisma.Decimal | null;
+    description: string | null;
+    shortDescription: string | null;
+    stock: number;
+    brand: string | null;
     images: { url: string }[];
   }): CatalogProduct {
     return {
-      id: p.id, name: p.name, slug: p.slug,
-      price: p.price.toNumber(), salePrice: p.salePrice?.toNumber() ?? null,
-      description: p.description, shortDescription: p.shortDescription,
-      stock: p.stock, brand: p.brand, images: p.images,
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      price: p.price.toNumber(),
+      salePrice: p.salePrice?.toNumber() ?? null,
+      description: p.description,
+      shortDescription: p.shortDescription,
+      stock: p.stock,
+      brand: p.brand,
+      images: p.images,
     };
   }
 

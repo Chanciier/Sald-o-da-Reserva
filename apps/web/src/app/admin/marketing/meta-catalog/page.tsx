@@ -3,14 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
-import {
-  CheckCircle2,
-  XCircle,
-  RefreshCw,
-  AlertTriangle,
-  Clock,
-  Package,
-} from 'lucide-react';
+import { CheckCircle2, XCircle, RefreshCw, AlertTriangle, Clock, Package } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -34,8 +27,11 @@ interface CatalogStats {
 function fmt(d: string | null) {
   if (!d) return '—';
   return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date(d));
 }
 
@@ -126,7 +122,8 @@ export default function MetaCatalogPage() {
         <div className="flex items-center gap-2 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>
-            Integração desativada. Configure <code className="font-mono text-xs">META_CATALOG_ID</code> e{' '}
+            Integração desativada. Configure{' '}
+            <code className="font-mono text-xs">META_CATALOG_ID</code> e{' '}
             <code className="font-mono text-xs">META_CATALOG_ACCESS_TOKEN</code> no Railway.
           </span>
         </div>
@@ -206,8 +203,9 @@ export default function MetaCatalogPage() {
           </li>
           <li>
             Gere um token em{' '}
-            <strong>Events Manager → Pixel → Configurações → Gerar token de acesso</strong> (ou
-            use um System User token com permissão <code className="font-mono text-xs">catalog_management</code>)
+            <strong>Events Manager → Pixel → Configurações → Gerar token de acesso</strong> (ou use
+            um System User token com permissão{' '}
+            <code className="font-mono text-xs">catalog_management</code>)
           </li>
           <li>
             No Railway, adicione as variáveis:
@@ -226,7 +224,11 @@ export default function MetaCatalogPage() {
 }
 
 function StatCard({
-  icon, label, value, highlight, small,
+  icon,
+  label,
+  value,
+  highlight,
+  small,
 }: {
   icon: React.ReactNode;
   label: string;
