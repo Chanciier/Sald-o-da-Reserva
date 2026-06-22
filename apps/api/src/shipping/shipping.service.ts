@@ -548,8 +548,11 @@ export class ShippingService {
   async fetchMeTrackingRaw(meOrderId: string): Promise<MeTracking | null> {
     if (!this.token) return null;
     try {
-      const res = await fetch(`${this.baseUrl}/me/shipment/tracking?orders[]=${meOrderId}`, {
+      // O endpoint de rastreio do ME é POST com body { orders: [...] }.
+      const res = await fetch(`${this.baseUrl}/me/shipment/tracking`, {
+        method: 'POST',
         headers: this.headers(),
+        body: JSON.stringify({ orders: [meOrderId] }),
       });
       if (!res.ok) return null;
       const data = (await res.json()) as Record<string, MeTracking>;
@@ -694,8 +697,12 @@ export class ShippingService {
     });
     if (!shipment || !shipment.meOrderId || !this.token) return;
 
-    const res = await fetch(`${this.baseUrl}/me/shipment/tracking?orders[]=${shipment.meOrderId}`, {
+    // O endpoint de rastreio do ME é POST com body { orders: [...] } — um GET
+    // nessa rota retorna a página HTML do site (quebra o JSON.parse).
+    const res = await fetch(`${this.baseUrl}/me/shipment/tracking`, {
+      method: 'POST',
       headers: this.headers(),
+      body: JSON.stringify({ orders: [shipment.meOrderId] }),
     });
     if (!res.ok) return;
 
