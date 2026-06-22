@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DeliveryMethod, Prisma, ProductStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
+import { MetaService } from '../meta/meta.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
 
 function round2(n: number) {
@@ -28,10 +29,13 @@ function serializeOrder(order: Record<string, unknown>) {
 
 @Injectable()
 export class CheckoutService {
+  private readonly logger = new Logger(CheckoutService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cartService: CartService,
     private readonly shippingService: ShippingService,
+    private readonly meta: MetaService,
   ) {}
 
   async getShippingOptions(_subtotal: number, cep?: string): Promise<ShippingQuoteOption[]> {
@@ -205,6 +209,25 @@ export class CheckoutService {
     if (dto.cpf) {
       await this.prisma.user.update({ where: { id: userId }, data: { cpf: dto.cpf } });
     }
+
+    // Fire Meta CAPI InitiateCheckout (fire-and-forget)
+    this.prisma.user
+      .findUnique({ where: { id: userId }, select: { email: true } })
+      .then((user) => {
+        this.meta.initiateCheckout({
+          orderId: order.id,
+          value: order.total.toNumber(),
+          contentIds: order.items.map((i: { productId: string }) => i.productId),
+          numItems: order.items.reduce(
+            (s: number, i: { quantity: number }) => s + i.quantity,
+            0,
+          ),
+          email: user?.email,
+        });
+      })
+      .catch((err) =>
+        this.logger.warn(`Meta CAPI InitiateCheckout skipped for order=${order.id}`, err),
+      );
 
     return serializeOrder(order as unknown as Record<string, unknown>);
   }

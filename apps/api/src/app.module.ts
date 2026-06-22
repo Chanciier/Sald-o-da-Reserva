@@ -26,6 +26,7 @@ import { MailModule } from './mail/mail.module';
 import { ContentModule } from './content/content.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { MetaModule } from './meta/meta.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -66,6 +67,7 @@ import { envValidation } from './config/env.validation';
     ContentModule,
     ReviewsModule,
     WhatsappModule,
+    MetaModule,
   ],
   controllers: [AppController],
   providers: [

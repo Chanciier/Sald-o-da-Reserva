@@ -7,6 +7,7 @@ import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { RedisService } from '../redis/redis.service';
 import { InvoiceService } from '../invoices/invoice.service';
 import { ShippingService } from '../shipping/shipping.service';
+import { MetaService } from '../meta/meta.service';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 
 // Payment statuses that trigger stock restoration and order cancellation
@@ -30,6 +31,7 @@ export class WebhooksService {
     private readonly redis: RedisService,
     private readonly invoiceService: InvoiceService,
     private readonly shippingService: ShippingService,
+    private readonly meta: MetaService,
     private readonly config: ConfigService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
@@ -85,7 +87,7 @@ export class WebhooksService {
     // ── Load payment from DB ──────────────────────────────────────────────────
     const payment = await this.prisma.payment.findUnique({
       where: { gatewayPaymentId: mpPaymentId },
-      include: { order: { include: { items: true } } },
+      include: { order: { include: { items: true, user: { select: { email: true } } } } },
     });
 
     if (!payment) {
@@ -207,6 +209,14 @@ export class WebhooksService {
             `Webhook MP: auto-shipping skipped for order=${payment.orderId} — ${(e as Error).message}`,
           ),
         );
+
+      this.meta.purchase({
+        orderId: payment.orderId,
+        amount: payment.amount.toNumber(),
+        contentIds: payment.order.items.map((i) => i.productId),
+        numItems: payment.order.items.reduce((s, i) => s + i.quantity, 0),
+        email: payment.order.user?.email,
+      });
     }
 
     this.logger.log(

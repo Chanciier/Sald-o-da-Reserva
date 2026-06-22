@@ -152,6 +152,14 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   EVOLUTION_INSTANCE: string = '';
+
+  @IsString()
+  @IsOptional()
+  META_PIXEL_ID: string = '';
+
+  @IsString()
+  @IsOptional()
+  META_CONVERSIONS_API_TOKEN: string = '';
 }
 
 export function envValidation(config: Record<string, unknown>) {
