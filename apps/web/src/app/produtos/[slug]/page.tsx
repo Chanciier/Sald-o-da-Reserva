@@ -97,7 +97,7 @@ export default async function ProductPage({ params }: PageProps) {
       {/* Two-column grid */}
       <div className="grid gap-6 pb-8 md:grid-cols-2 md:gap-10">
         {/* Image gallery */}
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-muted">
+        <div className="relative self-start">
           <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5">
             {badges.map((b) => (
               <ProductBadge key={b} type={b} />
