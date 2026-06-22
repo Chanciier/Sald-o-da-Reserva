@@ -160,6 +160,14 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   META_CONVERSIONS_API_TOKEN: string = '';
+
+  @IsString()
+  @IsOptional()
+  META_CATALOG_ID: string = '';
+
+  @IsString()
+  @IsOptional()
+  META_CATALOG_ACCESS_TOKEN: string = '';
 }
 
 export function envValidation(config: Record<string, unknown>) {

@@ -203,6 +203,7 @@ model Product {
   reviews      Review[]
   whatsappLogs    WhatsappMessageLog[]
   whatsappContent WhatsappContentHistory[]
+  metaCatalogSync MetaCatalogSync?
 
   @@index([categoryId])
   @@index([status])
@@ -560,4 +561,19 @@ model Review {
   @@unique([productId, userId])
   @@index([productId])
   @@map("reviews")
+}
+
+model MetaCatalogSync {
+  id           String    @id @default(cuid())
+  productId    String    @unique @map("product_id")
+  status       String    @default("PENDING")
+  errorMessage String?   @map("error_message") @db.Text
+  syncedAt     DateTime? @map("synced_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("meta_catalog_syncs")
 }
