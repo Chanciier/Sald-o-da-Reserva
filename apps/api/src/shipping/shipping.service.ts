@@ -284,7 +284,7 @@ export class ShippingService {
 
     if (shipment.meOrderId && this.token) {
       try {
-        await this.syncTracking(shipment.id, shipment.meOrderId, shipment.status);
+        await this.syncTracking(shipment.id);
       } catch (err) {
         this.logger.warn(`Sync tracking failed for shipment ${shipment.id}`, err);
       }
@@ -654,16 +654,53 @@ export class ShippingService {
     return { received: true };
   }
 
-  // ── Private: sync tracking from ME ───────────────────────────────────────
+  // ── Sync all active shipments (called by ShippingScheduler) ───────────────
+  // Melhor Envio webhooks são pouco confiáveis (e dependem de registro manual no
+  // painel). Para o rastreio "andar" sozinho, varremos periodicamente todos os
+  // envios que já têm etiqueta mas ainda não foram entregues/cancelados, puxando
+  // o status atual direto da API do ME.
+  async syncActiveShipments(): Promise<number> {
+    if (!this.token) return 0;
 
-  private async syncTracking(shipmentId: string, meOrderId: string, currentStatus: ShipmentStatus) {
-    const res = await fetch(`${this.baseUrl}/me/shipment/tracking?orders[]=${meOrderId}`, {
+    const active = await this.prisma.shipment.findMany({
+      where: {
+        meOrderId: { not: null },
+        status: { in: ['LABEL_PURCHASED', 'SHIPPED', 'IN_TRANSIT'] },
+      },
+      select: { id: true },
+    });
+
+    let synced = 0;
+    for (const s of active) {
+      try {
+        await this.syncTracking(s.id);
+        synced++;
+      } catch (err) {
+        this.logger.warn(`syncActiveShipments: falha ao sincronizar shipment ${s.id}`, err);
+      }
+    }
+    return synced;
+  }
+
+  // ── Private: sync tracking from ME ───────────────────────────────────────
+  // Puxa o rastreio do ME, registra novos eventos do histórico e — quando o
+  // status muda — atualiza o envio E o pedido (espelhando o webhook), além de
+  // disparar o e-mail de "pedido enviado". Assim o rastreio anda tanto pelo
+  // poller agendado quanto pela consulta sob demanda (getTracking).
+  private async syncTracking(shipmentId: string) {
+    const shipment = await this.prisma.shipment.findUnique({
+      where: { id: shipmentId },
+      include: { order: true },
+    });
+    if (!shipment || !shipment.meOrderId || !this.token) return;
+
+    const res = await fetch(`${this.baseUrl}/me/shipment/tracking?orders[]=${shipment.meOrderId}`, {
       headers: this.headers(),
     });
     if (!res.ok) return;
 
     const data = (await res.json()) as Record<string, MeTracking>;
-    const tracking = data[meOrderId];
+    const tracking = data[shipment.meOrderId];
     if (!tracking) return;
 
     const histories = tracking.histories ?? [];
@@ -698,17 +735,63 @@ export class ShippingService {
       });
     }
 
-    if (newStatus !== currentStatus) {
-      await this.prisma.shipment.update({
+    if (newStatus === shipment.status) return;
+
+    const newOrderStatus = this.toOrderStatus(newStatus);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.shipment.update({
         where: { id: shipmentId },
         data: {
           status: newStatus,
           ...(tracking.tracking ? { trackingCode: tracking.tracking } : {}),
-          ...(newStatus === 'SHIPPED' ? { shippedAt: new Date() } : {}),
-          ...(newStatus === 'DELIVERED' ? { deliveredAt: new Date() } : {}),
+          ...(newStatus === 'SHIPPED' && !shipment.shippedAt ? { shippedAt: new Date() } : {}),
+          ...(newStatus === 'DELIVERED' && !shipment.deliveredAt
+            ? { deliveredAt: new Date() }
+            : {}),
         },
       });
+
+      if (newOrderStatus && newOrderStatus !== shipment.order.status) {
+        await tx.order.update({
+          where: { id: shipment.orderId },
+          data: { status: newOrderStatus },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          action: `shipment.sync.${tracking.status}`,
+          metadata: {
+            shipmentId,
+            meOrderId: shipment.meOrderId,
+            orderId: shipment.orderId,
+            from: shipment.status,
+            to: newStatus,
+          },
+        },
+      });
+    });
+
+    // E-mail de "enviado" (fire-and-forget), só na transição para SHIPPED.
+    if (newOrderStatus === OrderStatus.SHIPPED && shipment.order.status !== OrderStatus.SHIPPED) {
+      this.prisma.order
+        .findUnique({ where: { id: shipment.orderId }, include: { user: true } })
+        .then((o) => {
+          if (o?.user)
+            this.mail
+              .sendOrderShippedEmail(
+                o.user.email,
+                o.user.name,
+                shipment.orderId,
+                tracking.tracking ?? undefined,
+              )
+              .catch((e) => this.logger.error('Order shipped email failed', e));
+        })
+        .catch(() => {});
     }
+
+    this.logger.log(`Sync tracking: shipment=${shipmentId} ${shipment.status}→${newStatus}`);
   }
 
   // ── Private: package dimensions ───────────────────────────────────────────
