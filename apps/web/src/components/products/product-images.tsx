@@ -28,8 +28,13 @@ export function ProductImages({ images, name }: Props) {
   return (
     <div className="space-y-3">
       <div
-        className="relative w-full overflow-hidden rounded-2xl border border-border bg-muted"
-        style={{ aspectRatio: ratio ?? 1 }}
+        className="relative mx-auto w-full overflow-hidden rounded-2xl border border-border bg-muted"
+        style={{
+          aspectRatio: ratio ?? 1,
+          // Caps the height (≈560px) without ever letterboxing: when the photo
+          // would exceed it, the width shrinks proportionally and the box centers.
+          maxWidth: ratio ? `${ratio * 560}px` : undefined,
+        }}
       >
         <Image
           src={main.url}
