@@ -12,7 +12,12 @@ const FEATURES = [
 export function Hero({ slugs }: { slugs: string[] }) {
   return (
     <section className="relative overflow-hidden border-b border-border bg-primary">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 py-10 sm:py-14 lg:grid-cols-2 lg:gap-6">
+      {/* Brilho no canto superior direito */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.8),rgba(255,255,255,0)_55%)]"
+        aria-hidden="true"
+      />
+      <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 py-10 sm:py-14 lg:grid-cols-2 lg:gap-6">
         {/* Copy */}
         <div className="flex flex-col gap-5">
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-foreground/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-foreground">
@@ -54,10 +59,6 @@ export function Hero({ slugs }: { slugs: string[] }) {
 
         {/* Image */}
         <div className="relative">
-          <div
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.55),rgba(255,255,255,0)_65%)] blur-2xl"
-            aria-hidden="true"
-          />
           <div className="relative mx-auto aspect-[3/2] w-full max-w-xl">
             <Image
               src="/banner-produtos.png"
