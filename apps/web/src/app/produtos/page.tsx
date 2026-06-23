@@ -115,6 +115,8 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
       <Hero slugs={slugs} />
       <LiveActivity products={products} />
 
+      <div id="destaques" className="scroll-mt-24" />
+
       {novos.length > 0 && (
         <ProductSection
           title="Acabou de chegar"

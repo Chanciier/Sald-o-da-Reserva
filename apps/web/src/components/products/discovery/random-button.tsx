@@ -1,14 +1,16 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Dices } from 'lucide-react';
+import { Dices, Package } from 'lucide-react';
 
 export function RandomButton({
   slugs,
   variant = 'default',
+  label,
 }: {
   slugs: string[];
-  variant?: 'default' | 'hero';
+  variant?: 'default' | 'hero' | 'hero-outline';
+  label?: string;
 }) {
   const router = useRouter();
 
@@ -17,6 +19,20 @@ export function RandomButton({
     const slug = slugs[Math.floor(Math.random() * slugs.length)];
     router.push(`/produtos/${slug}`);
   };
+
+  if (variant === 'hero-outline') {
+    return (
+      <button
+        type="button"
+        onClick={goRandom}
+        disabled={!slugs.length}
+        className="inline-flex items-center gap-2 rounded-full border border-foreground/30 px-6 py-3 text-sm font-bold text-foreground transition-colors hover:bg-foreground/5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <Package className="size-4" aria-hidden="true" />
+        {label ?? 'Me surpreenda'}
+      </button>
+    );
+  }
 
   if (variant === 'hero') {
     return (
