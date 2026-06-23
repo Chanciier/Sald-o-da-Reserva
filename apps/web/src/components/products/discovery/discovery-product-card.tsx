@@ -46,7 +46,7 @@ export function DiscoveryProductCard({
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             priority={priority}
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="object-contain transition-transform duration-300 group-hover:scale-105"
           />
           {/* Badges */}
           <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
