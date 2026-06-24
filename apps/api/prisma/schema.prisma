@@ -331,6 +331,7 @@ model Order {
   buyerName       String?  @map("buyer_name")
   pickupCode      String?  @unique @map("pickup_code")
   separatedItems  Json?    @map("separated_items")
+  stockApplied    Boolean  @default(false) @map("stock_applied")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 

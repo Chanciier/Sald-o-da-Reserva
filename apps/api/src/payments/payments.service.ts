@@ -9,8 +9,11 @@ import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercado
 import type { CreatePaymentDto } from './dto/create-payment.dto';
 import type { CreateCardPaymentDto } from './dto/create-card-payment.dto';
 import { InvoiceService } from '../invoices/invoice.service';
+import { StockService } from '../stock/stock.service';
 
 const TERMINAL: PaymentStatus[] = ['REJECTED', 'CANCELLED', 'REFUNDED', 'CHARGED_BACK'];
+// Statuses that release previously-applied stock back to the catalog.
+const RESTORE_ON: PaymentStatus[] = ['CANCELLED', 'REFUNDED', 'CHARGED_BACK'];
 
 @Injectable()
 export class PaymentsService {
@@ -23,6 +26,7 @@ export class PaymentsService {
     private readonly config: ConfigService,
     private readonly invoiceService: InvoiceService,
     private readonly mail: MailService,
+    private readonly stock: StockService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
   }
@@ -323,6 +327,10 @@ export class PaymentsService {
       })
       .then(async (p) => {
         if (p.status === 'APPROVED') {
+          // Decrement stock now that the payment is approved (idempotent).
+          await this.stock.applyForOrder(orderId).catch((e) => {
+            this.logger.error(`Stock apply failed for order=${orderId}`, e);
+          });
           this.prisma.order
             .findUnique({ where: { id: orderId }, include: { user: true } })
             .then((o) => {
@@ -397,6 +405,19 @@ export class PaymentsService {
 
       return p;
     });
+
+    // Stock side effects (idempotent via order.stockApplied flag).
+    const becomingApproved = newStatus === 'APPROVED' && payment.status !== 'APPROVED';
+    const becomingRestored = RESTORE_ON.includes(newStatus) && !RESTORE_ON.includes(payment.status);
+    if (becomingApproved) {
+      await this.stock
+        .applyForOrder(payment.orderId)
+        .catch((e) => this.logger.error(`Stock apply failed for order=${payment.orderId}`, e));
+    } else if (becomingRestored) {
+      await this.stock
+        .restoreForOrder(payment.orderId)
+        .catch((e) => this.logger.error(`Stock restore failed for order=${payment.orderId}`, e));
+    }
 
     if (newStatus === 'APPROVED') {
       this.prisma.order

@@ -8,6 +8,7 @@ import { RedisService } from '../redis/redis.service';
 import { InvoiceService } from '../invoices/invoice.service';
 import { ShippingService } from '../shipping/shipping.service';
 import { MetaService } from '../meta/meta.service';
+import { StockService } from '../stock/stock.service';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 
 // Payment statuses that trigger stock restoration and order cancellation
@@ -18,7 +19,6 @@ const RESTORE_ON: PaymentStatus[] = [
 ];
 
 const IDEMPOTENCY_TTL = 86_400; // 24h — covers MP retry window
-const STOCK_RESTORE_TTL = 86_400 * 30; // 30d — idempotency for stock ops
 
 @Injectable()
 export class WebhooksService {
@@ -32,6 +32,7 @@ export class WebhooksService {
     private readonly invoiceService: InvoiceService,
     private readonly shippingService: ShippingService,
     private readonly meta: MetaService,
+    private readonly stock: StockService,
     private readonly config: ConfigService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
@@ -104,12 +105,12 @@ export class WebhooksService {
     }
 
     // ── Determine side effects ────────────────────────────────────────────────
-    const shouldRestoreStock =
-      RESTORE_ON.includes(newStatus) && !RESTORE_ON.includes(payment.status);
-
-    const stockKey = `webhook:stock:restored:${payment.orderId}`;
-    const stockAlreadyRestored = shouldRestoreStock ? await this.redis.exists(stockKey) : false;
-    const actuallyRestoreStock = shouldRestoreStock && !stockAlreadyRestored;
+    // Stock is decremented when the payment becomes approved and restored when it
+    // leaves an approved state (refund/chargeback/cancel). StockService is
+    // idempotent via order.stockApplied, so this is safe across all webhook paths.
+    const becomingApproved =
+      newStatus === PaymentStatus.APPROVED && payment.status !== PaymentStatus.APPROVED;
+    const becomingRestored = RESTORE_ON.includes(newStatus) && !RESTORE_ON.includes(payment.status);
 
     const newOrderStatus = mapToOrderStatus(newStatus);
 
@@ -122,7 +123,7 @@ export class WebhooksService {
           : {};
 
     // ── DB Transaction ────────────────────────────────────────────────────────
-    const restoredItems = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
         data: {
@@ -149,27 +150,6 @@ export class WebhooksService {
         });
       }
 
-      let itemsRestored: Array<{ productId: string; quantity: number }> = [];
-      if (actuallyRestoreStock) {
-        itemsRestored = payment.order.items.map((i) => ({
-          productId: i.productId,
-          quantity: i.quantity,
-        }));
-        for (const item of itemsRestored) {
-          const updated = await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: item.quantity } },
-            select: { stock: true, status: true },
-          });
-          if (updated.stock > 0 && updated.status === 'INACTIVE') {
-            await tx.product.update({
-              where: { id: item.productId },
-              data: { status: 'ACTIVE' },
-            });
-          }
-        }
-      }
-
       await tx.auditLog.create({
         data: {
           action: 'webhook.payment.updated',
@@ -182,24 +162,23 @@ export class WebhooksService {
             newStatus,
             action: action ?? null,
             orderStatusChanged: newOrderStatus ?? null,
-            stockRestored: actuallyRestoreStock,
-            itemsRestored,
           } as Prisma.InputJsonValue,
         },
       });
-
-      return itemsRestored;
     });
 
-    // ── Post-commit: Redis + Invoice ──────────────────────────────────────────
-    await this.redis.set(idempotencyKey, '1', IDEMPOTENCY_TTL);
-
-    if (actuallyRestoreStock && restoredItems.length) {
-      await this.redis.set(stockKey, '1', STOCK_RESTORE_TTL);
-      this.logger.log(
-        `Webhook MP: stock restored for order=${payment.orderId} (${restoredItems.length} SKUs)`,
-      );
+    // ── Post-commit: stock, Redis, Invoice ────────────────────────────────────
+    let stockChanged = false;
+    if (becomingApproved) {
+      stockChanged = await this.stock.applyForOrder(payment.orderId);
+    } else if (becomingRestored) {
+      stockChanged = await this.stock.restoreForOrder(payment.orderId);
     }
+    if (stockChanged) {
+      await this.redis.delPattern('products:*'); // refresh storefront availability
+    }
+
+    await this.redis.set(idempotencyKey, '1', IDEMPOTENCY_TTL);
 
     if (newStatus === PaymentStatus.APPROVED) {
       this.shippingService
