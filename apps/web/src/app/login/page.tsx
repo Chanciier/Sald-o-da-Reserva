@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
@@ -27,6 +27,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
 
   const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
@@ -38,17 +40,64 @@ export default function LoginPage() {
     }
   }, [mode]);
 
+  // Explicit Turnstile render: render once into a ref'd container so React never
+  // reconciles (and wipes) the injected widget. The implicit `.cf-turnstile`
+  // auto-render breaks on every re-render ("Cannot find Widget").
   useEffect(() => {
     if (!turnstileSiteKey) return;
-    (window as unknown as Record<string, unknown>).__tsCallback = (token: string) =>
-      setTurnstileToken(token);
-    (window as unknown as Record<string, unknown>).__tsExpired = () => setTurnstileToken('');
-    if (document.getElementById('cf-ts-script')) return;
-    const script = document.createElement('script');
-    script.id = 'cf-ts-script';
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-    script.async = true;
-    document.head.appendChild(script);
+
+    type TS = {
+      render: (el: HTMLElement, opts: Record<string, unknown>) => string;
+      reset: (id: string) => void;
+      remove: (id: string) => void;
+    };
+    const getTs = () => (window as unknown as { turnstile?: TS }).turnstile;
+
+    function renderWidget() {
+      const ts = getTs();
+      if (!ts || !turnstileRef.current || widgetIdRef.current) return;
+      widgetIdRef.current = ts.render(turnstileRef.current, {
+        sitekey: turnstileSiteKey,
+        callback: (token: string) => setTurnstileToken(token),
+        // Token expira em ~5 min. Em vez de só limpar, pega um novo na hora —
+        // evita "token obrigatório" para quem demora a preencher o cadastro.
+        'expired-callback': () => {
+          setTurnstileToken('');
+          const t = getTs();
+          if (t && widgetIdRef.current) t.reset(widgetIdRef.current);
+        },
+        'error-callback': () => setTurnstileToken(''),
+        'refresh-expired': 'auto',
+        retry: 'auto',
+        'retry-interval': 8000,
+        theme: 'auto',
+      });
+    }
+
+    (window as unknown as Record<string, unknown>).__tsRender = renderWidget;
+
+    if (getTs()) {
+      renderWidget();
+    } else if (!document.getElementById('cf-ts-script')) {
+      const script = document.createElement('script');
+      script.id = 'cf-ts-script';
+      script.src =
+        'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=__tsRender';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      const ts = getTs();
+      if (ts && widgetIdRef.current) {
+        try {
+          ts.remove(widgetIdRef.current);
+        } catch {
+          /* widget já removido */
+        }
+        widgetIdRef.current = null;
+      }
+    };
   }, [turnstileSiteKey]);
 
   const passwordMismatch =
@@ -69,6 +118,11 @@ export default function LoginPage() {
         setCaptchaInput('');
         return;
       }
+    }
+
+    if (turnstileSiteKey && !turnstileToken) {
+      setError('Complete a verificação de segurança e tente novamente.');
+      return;
     }
 
     setLoading(true);
@@ -225,15 +279,7 @@ export default function LoginPage() {
               </p>
             )}
 
-            {turnstileSiteKey && (
-              <div
-                className="cf-turnstile"
-                data-sitekey={turnstileSiteKey}
-                data-callback="__tsCallback"
-                data-expired-callback="__tsExpired"
-                data-theme="auto"
-              />
-            )}
+            {turnstileSiteKey && <div ref={turnstileRef} className="flex justify-center" />}
 
             <button
               type="submit"
