@@ -45,6 +45,7 @@ export default function AdminProdutos() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['admin-products', page, statusFilter, search],
@@ -60,9 +61,20 @@ export default function AdminProdutos() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteProduct(token!, id),
-    onSuccess: () => {
+    onSuccess: (result) => {
       setDeletingId(null);
+      setFeedback({
+        type: 'success',
+        msg: result.archived
+          ? 'Produto arquivado (possui pedidos) e removido da loja.'
+          : 'Produto excluído com sucesso.',
+      });
       qc.invalidateQueries({ queryKey: ['admin-products'] });
+      setTimeout(() => setFeedback(null), 6000);
+    },
+    onError: (err: Error) => {
+      setDeletingId(null);
+      setFeedback({ type: 'error', msg: err.message || 'Erro ao excluir produto.' });
     },
   });
 
@@ -105,6 +117,18 @@ export default function AdminProdutos() {
           </Link>
         </div>
       </div>
+
+      {feedback && (
+        <div
+          className={`rounded-lg border px-4 py-2.5 text-sm ${
+            feedback.type === 'success'
+              ? 'border-green-200 bg-green-50 text-green-800'
+              : 'border-destructive/30 bg-destructive/10 text-destructive'
+          }`}
+        >
+          {feedback.msg}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">

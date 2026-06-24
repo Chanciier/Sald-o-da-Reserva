@@ -420,12 +420,30 @@ export class ProductsService {
   async remove(id: string, user: AuthenticatedUser) {
     const existing = await this.prisma.product.findUnique({
       where: { id },
-      include: { images: { select: { key: true } } },
+      include: {
+        images: { select: { key: true } },
+        _count: { select: { orderItems: true } },
+      },
     });
     if (!existing) throw new NotFoundException('Produto não encontrado.');
 
     if (user.role === Role.VENDEDOR && existing.createdById !== user.id) {
       throw new ForbiddenException('Você não pode excluir produtos de outros usuários.');
+    }
+
+    // Produtos vinculados a pedidos não podem ser apagados — a FK de OrderItem é
+    // Restrict para preservar o histórico. Nesse caso fazemos soft-delete (arquiva),
+    // removendo da loja sem corromper pedidos passados.
+    if (existing._count.orderItems > 0) {
+      await this.prisma.product.update({
+        where: { id },
+        data: { status: 'ARCHIVED' as const, stock: 0 },
+      });
+      await this.redis.delPattern('products:*');
+      await this.auditLog('PRODUCT_ARCHIVED', user.id, { productId: id, name: existing.name });
+
+      this.metaCatalog.remove(id, existing.name);
+      return { archived: true };
     }
 
     const keys = existing.images.map((i) => i.key);
@@ -436,5 +454,6 @@ export class ProductsService {
     await this.auditLog('PRODUCT_DELETED', user.id, { productId: id, name: existing.name });
 
     this.metaCatalog.remove(id, existing.name);
+    return { archived: false };
   }
 }

@@ -131,7 +131,7 @@ export async function updateProduct(
   return json;
 }
 
-export async function deleteProduct(token: string, id: string): Promise<void> {
+export async function deleteProduct(token: string, id: string): Promise<{ archived: boolean }> {
   const res = await fetch(`${BASE}/api/v1/products/${id}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
@@ -141,6 +141,8 @@ export async function deleteProduct(token: string, id: string): Promise<void> {
     const json = await res.json().catch(() => ({}));
     throw new Error((json as { message?: string }).message ?? 'Erro ao excluir produto');
   }
+  const json = await res.json().catch(() => ({ archived: false }));
+  return json as { archived: boolean };
 }
 
 export async function fetchCategories(): Promise<{ data: CategoryItem[] }> {

@@ -86,7 +86,7 @@ export class ProductsController {
 
   @Delete(':id')
   @Roles(Role.ADMIN, Role.VENDEDOR)
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.productsService.remove(id, user);
   }
