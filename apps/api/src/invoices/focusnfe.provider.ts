@@ -320,6 +320,15 @@ export class FocusNfeProvider implements InvoiceProvider {
     return dest && dest !== emit ? '6102' : '5102';
   }
 
+  // NCM must be exactly 8 digits. A partial code (e.g. "9404") is invalid and the
+  // SEFAZ rejects it ("NCM inexistente"). We never left-pad — that would turn
+  // "9404" into "00009404" (a non-existent code). If the product's NCM isn't a
+  // clean 8-digit value, fall back to the configured default.
+  private resolveNcm(ncm?: string | null): string {
+    const digits = (ncm ?? '').replace(/\D/g, '');
+    return digits.length === 8 ? digits : this.defaultNcm;
+  }
+
   private buildNfePayload(payload: InvoicePayload, isoDt: string): Record<string, unknown> {
     const {
       customer,
@@ -415,7 +424,7 @@ export class FocusNfeProvider implements InvoiceProvider {
         codigo_produto: item.sku,
         descricao: item.name,
         cfop: this.resolveCfop(item, isPickup, customerState),
-        codigo_ncm: (item.ncm?.replace(/\D/g, '') || this.defaultNcm).padStart(8, '0').slice(0, 8),
+        codigo_ncm: this.resolveNcm(item.ncm),
         unidade_comercial: item.unit ?? 'UN',
         quantidade_comercial: item.quantity,
         valor_unitario_comercial: item.unitPrice,

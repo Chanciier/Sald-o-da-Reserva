@@ -7,6 +7,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
   MinLength,
@@ -119,8 +120,12 @@ export class CreateProductDto {
   metaDescription?: string;
 
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @IsString()
   @MaxLength(20)
+  @Matches(/^(\d{8}|\d{4}\.\d{2}\.\d{2})$/, {
+    message: 'NCM deve ter 8 dígitos (ex.: 9404.90.00 ou 94049000).',
+  })
   ncm?: string;
 
   @IsOptional()
