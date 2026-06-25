@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@google/generative-ai';
 
 interface GeminiResult {
   nome: string;
@@ -47,16 +46,15 @@ Regras para condicao:
 - DANIFICADO: defeito, quebra ou dano visível`;
 
 const VALID_CONDITIONS = new Set(['NOVO', 'USADO_BOM', 'USADO_REGULAR', 'DANIFICADO']);
-const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 
 @Injectable()
 export class AnalyzeImageService {
   private readonly logger = new Logger(AnalyzeImageService.name);
-  private readonly genai: GoogleGenerativeAI | null;
+  private readonly apiKey: string | null;
 
   constructor() {
-    const key = process.env.GEMINI_API_KEY;
-    this.genai = key ? new GoogleGenerativeAI(key) : null;
+    this.apiKey = process.env.GEMINI_API_KEY ?? null;
   }
 
   async analyze(imageUrl: string): Promise<AnalyzeResult> {
@@ -68,8 +66,6 @@ export class AnalyzeImageService {
     }
 
     const suggestedPrice = mlPrices ? this.suggestPrice(mlPrices, geminiResult?.condicao) : null;
-
-    // Extract brand as first word of descricao_busca if it looks like a proper noun
     const brand = geminiResult ? this.extractBrand(geminiResult.descricao_busca) : null;
 
     return {
@@ -85,40 +81,52 @@ export class AnalyzeImageService {
   }
 
   private async callGemini(imageUrl: string): Promise<GeminiResult | null> {
-    if (!this.genai) {
+    if (!this.apiKey) {
       this.logger.warn('GEMINI_API_KEY não configurada.');
       return null;
     }
 
-    // Fetch image and convert to base64
     const res = await fetch(imageUrl);
     if (!res.ok) throw new Error(`Falha ao buscar imagem: ${res.status}`);
     const buf = await res.arrayBuffer();
     const b64 = Buffer.from(buf).toString('base64');
-    const mimeType = (res.headers.get('content-type') ?? 'image/jpeg') as string;
+    const mimeType = (res.headers.get('content-type') ?? 'image/jpeg').split(';')[0];
 
-    for (const modelName of MODELS) {
+    for (const model of MODELS) {
       try {
-        const model = this.genai.getGenerativeModel({
-          model: modelName,
-          safetySettings: [
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+        const body = {
+          contents: [
             {
-              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-              threshold: HarmBlockThreshold.BLOCK_NONE,
+              parts: [{ inline_data: { mime_type: mimeType, data: b64 } }, { text: GEMINI_PROMPT }],
             },
           ],
+          generationConfig: { temperature: 0.2 },
+        };
+
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(30000),
         });
-        const result = await model.generateContent([
-          { inlineData: { data: b64, mimeType } },
-          GEMINI_PROMPT,
-        ]);
-        const text = result.response.text().trim();
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          this.logger.warn(`Gemini ${model} HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+          if (resp.status === 429) break;
+          continue;
+        }
+
+        const data = (await resp.json()) as {
+          candidates?: { content: { parts: { text: string }[] } }[];
+        };
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+        if (!text) continue;
         return this.parseGeminiJson(text);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        this.logger.warn(`Gemini ${modelName} falhou: ${msg.slice(0, 120)}`);
-        // rate limit → stop; overload → try next model
-        if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) break;
+        this.logger.warn(`Gemini ${model} falhou: ${msg.slice(0, 120)}`);
       }
     }
     return null;
@@ -177,19 +185,16 @@ export class AnalyzeImageService {
   }
 
   private suggestPrice(ml: MlPrice, condition?: string): number {
-    // Use median as base; apply condition discount
     let base = ml.median;
     if (condition === 'USADO_BOM') base *= 0.7;
     else if (condition === 'USADO_REGULAR') base *= 0.5;
     else if (condition === 'DANIFICADO') base *= 0.3;
-    // Round to nearest R$ 0.99
     return Math.ceil(base) - 0.01;
   }
 
   private extractBrand(descricao: string): string | null {
     if (!descricao) return null;
     const first = descricao.split(' ')[0];
-    // Looks like a brand if it's 2-20 chars, not a common Portuguese word
     const COMMON = new Set(['kit', 'par', 'caixa', 'conjunto', 'trio', 'jogo', 'pacote']);
     if (first.length >= 2 && first.length <= 20 && !COMMON.has(first.toLowerCase())) {
       return first.charAt(0).toUpperCase() + first.slice(1);
