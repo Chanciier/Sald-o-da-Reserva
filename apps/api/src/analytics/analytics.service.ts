@@ -12,7 +12,18 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-const PAID = [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED];
+// Statuses that represent a paid sale (counted as revenue). Covers the whole
+// post-payment pipeline — once a payment is approved the order moves through the
+// fulfillment flow (PAID → SEPARATING → SEPARATED → READY_TO_SHIP → SHIPPED →
+// DELIVERED), all of which are real sales. Only PENDING/CANCELLED/REFUNDED are out.
+const PAID = [
+  OrderStatus.PAID,
+  OrderStatus.SEPARATING,
+  OrderStatus.SEPARATED,
+  OrderStatus.READY_TO_SHIP,
+  OrderStatus.SHIPPED,
+  OrderStatus.DELIVERED,
+];
 
 @Injectable()
 export class AnalyticsService {
