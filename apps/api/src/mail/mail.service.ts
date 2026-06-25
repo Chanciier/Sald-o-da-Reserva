@@ -20,7 +20,9 @@ export class MailService {
       'SMTP_FROM',
       this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@saldaodareserva.com.br'),
     );
-    this.frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    this.frontendUrl = (this.config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
+      .split(',')[0]
+      .trim();
 
     this.resend = resendKey && !resendKey.startsWith('re_REPLACE') ? new Resend(resendKey) : null;
 

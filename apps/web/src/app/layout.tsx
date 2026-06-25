@@ -12,7 +12,7 @@ import { PixelProvider } from '@/components/pixel-provider';
 
 const inter = Inter({ subsets: ['latin'] });
 
-const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://saldaodareserva.com.br';
+const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://saldaodareversa.com';
 
 export const metadata: Metadata = {
   title: { default: 'Saldão da Reserva', template: '%s — Saldão da Reserva' },
