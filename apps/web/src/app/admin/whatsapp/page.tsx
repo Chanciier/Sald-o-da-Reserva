@@ -4,7 +4,18 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Plus, Pencil, Trash2, Check, X, Sparkles, RefreshCw, Clock } from 'lucide-react';
+import {
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  Sparkles,
+  RefreshCw,
+  Clock,
+  Send,
+} from 'lucide-react';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -117,6 +128,9 @@ export default function AdminWhatsappPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [groupError, setGroupError] = useState('');
   const [showWaGroups, setShowWaGroups] = useState(false);
+
+  // --- Broadcast state ---
+  const [broadcastResult, setBroadcastResult] = useState<string | null>(null);
 
   // --- Conteúdo state ---
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -252,6 +266,25 @@ export default function AdminWhatsappPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['whatsapp-content', selectedProductId] }),
   });
 
+  const broadcastActive = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${BASE}/api/v1/whatsapp/broadcast-active`, {
+        method: 'POST',
+        headers: headers(),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? 'Erro ao iniciar repostagem');
+      }
+      return res.json() as Promise<{ message: string }>;
+    },
+    onSuccess: () =>
+      setBroadcastResult(
+        'Repostagem iniciada! Os produtos serão enviados aos grupos em segundo plano.',
+      ),
+    onError: (e: Error) => setBroadcastResult(`Erro: ${e.message}`),
+  });
+
   const saveContent = useMutation({
     mutationFn: async ({ id, content }: { id: string; content: string }) => {
       const res = await fetch(`${BASE}/api/v1/whatsapp/content/${id}`, {
@@ -313,6 +346,38 @@ export default function AdminWhatsappPage() {
       {/* === TAB GRUPOS === */}
       {tab === 'grupos' && (
         <>
+          {/* Repostagem em massa */}
+          <div className="rounded-xl border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold">Repostar produtos ativos</p>
+              <p className="text-xs text-muted-foreground">
+                Envia todos os produtos ativos em estoque para todos os grupos ativos.
+              </p>
+              {broadcastResult && (
+                <p
+                  className={`mt-1 text-xs ${broadcastResult.startsWith('Erro') ? 'text-destructive' : 'text-green-600'}`}
+                >
+                  {broadcastResult}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                setBroadcastResult(null);
+                broadcastActive.mutate();
+              }}
+              disabled={broadcastActive.isPending}
+              className="flex shrink-0 items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60 transition-colors"
+            >
+              {broadcastActive.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Repostar Ativos
+            </button>
+          </div>
+
           <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">
             <h2 className="text-sm font-semibold">
               {editingId ? 'Editar Grupo' : 'Adicionar Grupo'}

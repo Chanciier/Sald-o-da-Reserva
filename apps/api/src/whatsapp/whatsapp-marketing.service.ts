@@ -40,7 +40,9 @@ export class WhatsappMarketingService {
 
     if (!groups.length) return;
 
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000')
+      .split(',')[0]
+      .trim();
     const productUrl = `${frontendUrl}/produtos/${product.slug}`;
 
     // Usa conteúdo editado manualmente se houver; senão gera via IA
@@ -106,5 +108,83 @@ export class WhatsappMarketingService {
     });
 
     await this.publishProduct(product, product.whatsappGroupIds);
+  }
+
+  async broadcastActiveProducts(): Promise<{ total: number; sent: number; failed: number }> {
+    const products = await this.prisma.product.findMany({
+      where: { status: 'ACTIVE', stock: { gt: 0 } },
+      include: {
+        images: { orderBy: { position: 'asc' } },
+        category: { select: { name: true } },
+      },
+      take: 50,
+    });
+
+    const groups = await this.prisma.whatsappGroup.findMany({ where: { active: true } });
+    if (!groups.length) return { total: products.length, sent: 0, failed: 0 };
+
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000')
+      .split(',')[0]
+      .trim();
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const product of products) {
+      const productUrl = `${frontendUrl}/produtos/${product.slug}`;
+
+      const existing = await this.prisma.whatsappContentHistory.findFirst({
+        where: { productId: product.id },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      let message: string;
+      try {
+        if (existing) {
+          message = existing.content;
+        } else {
+          message = await this.ai.generateAdCopy({
+            name: product.name,
+            category: product.category?.name,
+            brand: product.brand ?? undefined,
+            price: product.price.toNumber(),
+            salePrice: product.salePrice?.toNumber(),
+            stock: product.stock,
+            description: product.description ?? undefined,
+            productUrl,
+          });
+          await this.prisma.whatsappContentHistory
+            .create({ data: { productId: product.id, content: message, sent: false } })
+            .catch(() => {});
+        }
+      } catch {
+        failed++;
+        continue;
+      }
+
+      const imageUrl = product.images?.[0]?.url;
+      for (const group of groups) {
+        try {
+          if (imageUrl) {
+            await this.whatsapp.sendMedia(group.groupId, imageUrl, message);
+          } else {
+            await this.whatsapp.sendMessage(group.groupId, message);
+          }
+          await this.prisma.whatsappMessageLog
+            .create({ data: { productId: product.id, groupId: group.id, success: true } })
+            .catch(() => {});
+        } catch (e) {
+          const error = (e as Error).message;
+          this.logger.error(`Broadcast ${product.name} → ${group.name}: ${error}`);
+          await this.prisma.whatsappMessageLog
+            .create({ data: { productId: product.id, groupId: group.id, success: false, error } })
+            .catch(() => {});
+        }
+      }
+      sent++;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+
+    return { total: products.length, sent, failed };
   }
 }

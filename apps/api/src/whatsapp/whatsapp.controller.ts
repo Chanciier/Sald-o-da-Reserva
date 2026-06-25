@@ -73,6 +73,13 @@ export class WhatsappController {
     return this.marketing.resendProduct(productId);
   }
 
+  @Post('broadcast-active')
+  @HttpCode(HttpStatus.ACCEPTED)
+  broadcastActive() {
+    void this.marketing.broadcastActiveProducts();
+    return { message: 'Repostagem iniciada em segundo plano.' };
+  }
+
   @Get('logs')
   logs(@Query('productId') productId?: string) {
     return this.prisma.whatsappMessageLog.findMany({
@@ -86,7 +93,7 @@ export class WhatsappController {
   // Content generation
   @Post('content/generate')
   async generateContent(@Body() dto: GenerateContentDto) {
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').split(',')[0].trim();
     const product = await this.prisma.product.findUniqueOrThrow({
       where: { id: dto.productId },
       select: { slug: true },

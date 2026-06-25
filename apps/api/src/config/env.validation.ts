@@ -33,7 +33,7 @@ class EnvironmentVariables {
   @IsNotEmpty()
   REDIS_URL: string;
 
-  @IsUrl({ require_tld: false })
+  @IsString()
   @IsOptional()
   FRONTEND_URL: string = 'http://localhost:3000';
 
