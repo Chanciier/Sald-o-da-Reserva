@@ -17,6 +17,7 @@ import {
   Camera,
   Search,
   Send,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import type { Product, ProductImage, CategoryItem } from '@/actions/products';
@@ -109,6 +110,8 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
     initialData?.whatsappGroupIds ?? [],
   );
   const [resending, setResending] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeMsg, setAnalyzeMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const { data: whatsappGroups = [] } = useQuery<{ id: string; name: string; active: boolean }[]>({
     queryKey: ['whatsapp-groups'],
@@ -303,6 +306,40 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       [next[index], next[swap]] = [next[swap], next[index]];
       return next;
     });
+  }
+
+  async function handleAnalyzeImage() {
+    if (!images.length || !token) return;
+    setAnalyzing(true);
+    setAnalyzeMsg(null);
+    try {
+      const res = await fetch(`${BASE}/api/v1/products/analyze-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ imageUrl: images[0].url }),
+      });
+      if (!res.ok) throw new Error('Erro na análise');
+      const data = await res.json();
+
+      if (data.name && data.name !== 'Produto não identificado') {
+        setValue('name', data.name, { shouldDirty: true });
+        setSlugManual(false);
+      }
+      if (data.shortDescription)
+        setValue('shortDescription', data.shortDescription, { shouldDirty: true });
+      if (data.brand) setValue('brand', data.brand, { shouldDirty: true });
+      if (data.suggestedPrice) setValue('price', data.suggestedPrice, { shouldDirty: true });
+
+      const confPct = Math.round((data.confidence ?? 0) * 100);
+      const priceText = data.priceRange
+        ? ` · Preço sugerido: R$ ${data.suggestedPrice?.toFixed(2)} (ML: R$ ${data.priceRange.min}–${data.priceRange.max})`
+        : '';
+      setAnalyzeMsg({ type: 'ok', text: `Preenchido com ${confPct}% de confiança${priceText}` });
+    } catch {
+      setAnalyzeMsg({ type: 'err', text: 'Não foi possível analisar a imagem. Tente novamente.' });
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   async function onFormSubmit(data: FormData) {
@@ -576,6 +613,30 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               Formatos: JPEG, PNG, WebP · Máx. 10 MB por imagem · Convertidas automaticamente para
               WebP
             </p>
+            {images.length > 0 && (
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleAnalyzeImage}
+                  disabled={analyzing}
+                  className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                >
+                  {analyzing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {analyzing ? 'Analisando...' : 'Analisar com IA'}
+                </button>
+                {analyzeMsg && (
+                  <p
+                    className={`text-xs ${analyzeMsg.type === 'ok' ? 'text-green-600' : 'text-destructive'}`}
+                  >
+                    {analyzeMsg.text}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Preço */}

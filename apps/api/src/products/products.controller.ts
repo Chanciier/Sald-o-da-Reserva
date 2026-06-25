@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { ProductsService } from './products.service';
+import { AnalyzeImageService } from './analyze-image.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateStockDto } from './dto/update-stock.dto';
@@ -25,7 +26,16 @@ import { AuthenticatedUser } from '../auth/types/auth.types';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly analyzeImageService: AnalyzeImageService,
+  ) {}
+
+  @Post('analyze-image')
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  analyzeImage(@Body() body: { imageUrl: string }) {
+    return this.analyzeImageService.analyze(body.imageUrl);
+  }
 
   @Post()
   @Roles(Role.ADMIN, Role.VENDEDOR)
