@@ -396,7 +396,9 @@ export class ProductsService {
     return serializeProduct(updated);
   }
 
-  async getMinOfferDiscount(): Promise<{ discountPct: number }> {
+  // Returns the HIGHEST discount among featured offers — used for the "Até X% OFF"
+  // headline on the landing page ("até" = up to, so it must be the ceiling).
+  async getMaxOfferDiscount(): Promise<{ discountPct: number }> {
     const offers = await this.prisma.product.findMany({
       where: { featuredOffer: true, status: 'ACTIVE', salePrice: { not: null } },
       select: { price: true, salePrice: true },
@@ -414,7 +416,7 @@ export class ProductsService {
       .filter((d) => d > 0);
 
     if (!discounts.length) return { discountPct: 0 };
-    return { discountPct: Math.min(...discounts) };
+    return { discountPct: Math.max(...discounts) };
   }
 
   async remove(id: string, user: AuthenticatedUser) {

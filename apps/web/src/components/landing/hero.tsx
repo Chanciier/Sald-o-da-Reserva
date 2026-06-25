@@ -56,13 +56,13 @@ function formatBRL(value: number) {
 export function Hero() {
   const { hours, minutes, seconds } = useCountdown(5);
   const [stock, setStock] = useState(143);
-  const [minDiscount, setMinDiscount] = useState<number | null>(null);
+  const [maxDiscount, setMaxDiscount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`${API}/api/v1/products/offers-discount`)
       .then((r) => r.json())
       .then((d: { discountPct: number }) => {
-        if (d.discountPct > 0) setMinDiscount(d.discountPct);
+        if (d.discountPct > 0) setMaxDiscount(d.discountPct);
       })
       .catch(() => {});
   }, []);
@@ -104,7 +104,7 @@ export function Hero() {
           >
             Produtos de Grandes Marcas com{' '}
             <span className="relative whitespace-nowrap text-secondary">
-              <span className="relative z-10">Até {minDiscount ?? 80}% OFF</span>
+              <span className="relative z-10">Até {maxDiscount ?? 80}% OFF</span>
               <span
                 aria-hidden="true"
                 className="absolute inset-x-0 bottom-1 z-0 h-4 bg-primary sm:h-5"
@@ -219,7 +219,7 @@ export function Hero() {
             <div className="flex h-full flex-col justify-between text-secondary">
               <div>
                 <p className="text-sm font-bold uppercase tracking-wide">Saldão da Reversa</p>
-                <p className="mt-2 text-5xl font-black leading-none">{minDiscount ?? 80}%</p>
+                <p className="mt-2 text-5xl font-black leading-none">{maxDiscount ?? 80}%</p>
                 <p className="text-2xl font-extrabold">de desconto</p>
               </div>
               <p className="text-sm font-semibold opacity-80">

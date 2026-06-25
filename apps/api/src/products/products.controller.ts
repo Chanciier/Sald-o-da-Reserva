@@ -48,8 +48,8 @@ export class ProductsController {
   // Must be declared BEFORE :slug to avoid route conflict
   @Get('offers-discount')
   @Public()
-  getMinOfferDiscount() {
-    return this.productsService.getMinOfferDiscount();
+  getMaxOfferDiscount() {
+    return this.productsService.getMaxOfferDiscount();
   }
 
   @Get('id/:id')
