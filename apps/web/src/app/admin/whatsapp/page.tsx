@@ -54,6 +54,22 @@ interface Product {
   category?: { name: string };
 }
 
+interface BroadcastStatus {
+  running: boolean;
+  total: number;
+  sent: number;
+  failed: number;
+  remaining: number;
+  nextAt: string | null;
+  lastProductName: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+function minutesUntil(iso: string): number {
+  return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 60_000));
+}
+
 const emptyForm: GroupForm = { name: '', groupId: '', active: true };
 
 function WhatsappStatusBanner({ token }: { token: string }) {
@@ -266,6 +282,23 @@ export default function AdminWhatsappPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['whatsapp-content', selectedProductId] }),
   });
 
+  // Status da campanha de disparo (1 produto a cada 10 min). Faz polling para
+  // a barra de progresso andar sozinha enquanto o ciclo roda em segundo plano.
+  const { data: broadcastStatus } = useQuery<BroadcastStatus | null>({
+    queryKey: ['whatsapp-broadcast-status'],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/v1/whatsapp/broadcast-active/status`, {
+        headers: headers(),
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!token,
+    refetchInterval: 15000,
+  });
+
+  const broadcastRunning = !!broadcastStatus?.running;
+
   const broadcastActive = useMutation({
     mutationFn: async () => {
       const res = await fetch(`${BASE}/api/v1/whatsapp/broadcast-active`, {
@@ -276,12 +309,28 @@ export default function AdminWhatsappPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.message ?? 'Erro ao iniciar repostagem');
       }
-      return res.json() as Promise<{ message: string }>;
+      return res.json();
     },
-    onSuccess: () =>
-      setBroadcastResult(
-        'Repostagem iniciada! Os produtos serão enviados aos grupos em segundo plano.',
-      ),
+    onSuccess: () => {
+      setBroadcastResult('Disparo iniciado! 1 produto a cada 10 min, em ordem aleatória.');
+      qc.invalidateQueries({ queryKey: ['whatsapp-broadcast-status'] });
+    },
+    onError: (e: Error) => setBroadcastResult(`Erro: ${e.message}`),
+  });
+
+  const cancelBroadcast = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${BASE}/api/v1/whatsapp/broadcast-active/cancel`, {
+        method: 'POST',
+        headers: headers(),
+      });
+      if (!res.ok) throw new Error('Erro ao cancelar disparo');
+      return res.json();
+    },
+    onSuccess: () => {
+      setBroadcastResult('Disparo cancelado.');
+      qc.invalidateQueries({ queryKey: ['whatsapp-broadcast-status'] });
+    },
     onError: (e: Error) => setBroadcastResult(`Erro: ${e.message}`),
   });
 
@@ -346,36 +395,80 @@ export default function AdminWhatsappPage() {
       {/* === TAB GRUPOS === */}
       {tab === 'grupos' && (
         <>
-          {/* Repostagem em massa */}
-          <div className="rounded-xl border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold">Repostar produtos ativos</p>
-              <p className="text-xs text-muted-foreground">
-                Envia todos os produtos ativos em estoque para todos os grupos ativos.
-              </p>
-              {broadcastResult && (
-                <p
-                  className={`mt-1 text-xs ${broadcastResult.startsWith('Erro') ? 'text-destructive' : 'text-green-600'}`}
-                >
-                  {broadcastResult}
+          {/* Repostagem em massa (espaçada: 1 produto a cada 10 min) */}
+          <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold">Repostar produtos ativos</p>
+                <p className="text-xs text-muted-foreground">
+                  Dispara 1 produto a cada 10 min, em ordem aleatória (sem repetir), até enviar
+                  todos os ativos em estoque para os grupos.
                 </p>
+                {broadcastResult && !broadcastRunning && (
+                  <p
+                    className={`mt-1 text-xs ${broadcastResult.startsWith('Erro') ? 'text-destructive' : 'text-green-600'}`}
+                  >
+                    {broadcastResult}
+                  </p>
+                )}
+              </div>
+              {broadcastRunning ? (
+                <button
+                  onClick={() => cancelBroadcast.mutate()}
+                  disabled={cancelBroadcast.isPending}
+                  className="flex shrink-0 items-center gap-2 rounded-lg border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/5 disabled:opacity-60 transition-colors"
+                >
+                  {cancelBroadcast.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
+                  Cancelar disparo
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setBroadcastResult(null);
+                    broadcastActive.mutate();
+                  }}
+                  disabled={broadcastActive.isPending}
+                  className="flex shrink-0 items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60 transition-colors"
+                >
+                  {broadcastActive.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  Repostar Ativos
+                </button>
               )}
             </div>
-            <button
-              onClick={() => {
-                setBroadcastResult(null);
-                broadcastActive.mutate();
-              }}
-              disabled={broadcastActive.isPending}
-              className="flex shrink-0 items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60 transition-colors"
-            >
-              {broadcastActive.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              Repostar Ativos
-            </button>
+
+            {/* Barra de progresso do ciclo */}
+            {broadcastStatus && broadcastStatus.total > 0 && (
+              <div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-green-600 transition-all duration-500"
+                    style={{
+                      width: `${Math.round(((broadcastStatus.sent + broadcastStatus.failed) / broadcastStatus.total) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {broadcastStatus.sent + broadcastStatus.failed} de {broadcastStatus.total}{' '}
+                    enviados
+                    {broadcastStatus.failed > 0 && ` · ${broadcastStatus.failed} falha(s)`}
+                  </span>
+                  {broadcastRunning && broadcastStatus.nextAt ? (
+                    <span>próximo em ~{minutesUntil(broadcastStatus.nextAt)} min</span>
+                  ) : (
+                    <span className="text-green-600">✓ ciclo concluído</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">

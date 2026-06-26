@@ -15,6 +15,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { BaileysService } from './baileys.service';
 import { WhatsappMarketingService } from './whatsapp-marketing.service';
+import { WhatsappBroadcastService } from './whatsapp-broadcast.service';
 import { AIContentService } from './ai-content.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
@@ -26,6 +27,7 @@ export class WhatsappController {
   constructor(
     private readonly baileys: BaileysService,
     private readonly marketing: WhatsappMarketingService,
+    private readonly broadcast: WhatsappBroadcastService,
     private readonly ai: AIContentService,
     private readonly prisma: PrismaService,
   ) {}
@@ -73,11 +75,23 @@ export class WhatsappController {
     return this.marketing.resendProduct(productId);
   }
 
+  // Inicia a campanha espaçada: 1 produto a cada 10 min, ordem aleatória, sem
+  // repetir, até completar o ciclo. Retorna o estado inicial (com o 1º já enviado).
   @Post('broadcast-active')
   @HttpCode(HttpStatus.ACCEPTED)
   broadcastActive() {
-    void this.marketing.broadcastActiveProducts();
-    return { message: 'Repostagem iniciada em segundo plano.' };
+    return this.broadcast.start();
+  }
+
+  @Get('broadcast-active/status')
+  broadcastStatus() {
+    return this.broadcast.getState();
+  }
+
+  @Post('broadcast-active/cancel')
+  @HttpCode(HttpStatus.OK)
+  broadcastCancel() {
+    return this.broadcast.cancel();
   }
 
   @Get('logs')
