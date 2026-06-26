@@ -40,6 +40,14 @@ const securityHeaders = [
 const nextConfig = {
   // standalone output only for Docker; Vercel manages its own output format
   ...(process.env.VERCEL ? {} : { output: 'standalone' }),
+  // isomorphic-dompurify cria um jsdom (new JSDOM()) já no import do módulo. Se o
+  // webpack tentar empacotar jsdom na função serverless, os requires dinâmicos do
+  // jsdom quebram e o import lança em runtime — derrubando QUALQUER rota dinâmica
+  // que importe o sanitizer (ex.: /produtos/[slug]) com 500, mesmo sem descrição.
+  // Marcar como external faz o jsdom ser carregado do node_modules em runtime.
+  experimental: {
+    serverComponentsExternalPackages: ['isomorphic-dompurify', 'jsdom'],
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.amazonaws.com' },
