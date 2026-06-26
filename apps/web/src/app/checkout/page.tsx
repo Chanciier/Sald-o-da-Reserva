@@ -39,6 +39,14 @@ function formatCpf(v: string) {
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
+function formatPhone(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : '';
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 interface AddressForm {
   name: string;
   cep: string;
@@ -121,6 +129,7 @@ export default function CheckoutPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [returnsAccepted, setReturnsAccepted] = useState(false);
   const [cpf, setCpf] = useState('');
+  const [phone, setPhone] = useState('');
   const [buyerName, setBuyerName] = useState(user?.name ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -226,9 +235,17 @@ export default function CheckoutPage() {
         return;
       }
 
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+        setError('Informe um telefone válido com DDD.');
+        setSubmitting(false);
+        return;
+      }
+
       const order = await createOrder(token, {
         deliveryMethod,
         cpf: cleanCpf,
+        customerPhone: cleanPhone,
         buyerName: buyerName.trim() || undefined,
         ...(isPickup
           ? {}
@@ -363,6 +380,21 @@ export default function CheckoutPage() {
                   maxLength={150}
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Celular / WhatsApp</label>
+                <input
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(formatPhone(e.target.value))}
+                  placeholder="(11) 91234-5678"
+                  maxLength={16}
+                  inputMode="tel"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enviaremos os avisos do seu pedido por aqui.
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">CPF do titular da compra</label>

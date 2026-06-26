@@ -1,11 +1,80 @@
 const API = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
+export interface EnvioStats {
+  aguardandoSeparacao: number;
+  emSeparacao: number;
+  prontos: number;
+  emTransito: number;
+  entreguesHoje: number;
+}
+
+export interface RetiradaStats {
+  aguardandoSeparacao: number;
+  emSeparacao: number;
+  aguardandoRetirada: number;
+  retiradosHoje: number;
+}
+
 export interface ExpedicaoStats {
   aguardandoSeparacao: number;
   aguardandoNFe: number;
   aguardandoEtiqueta: number;
   enviadosHoje: number;
   retiradosHoje: number;
+  envio: EnvioStats;
+  retirada: RetiradaStats;
+}
+
+export interface TimelineEvent {
+  id: string;
+  status: string;
+  title: string;
+  description: string | null;
+  actor: string | null;
+  createdAt: string;
+}
+
+export interface OrderDetailItem {
+  id: string;
+  productId: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+  image: string | null;
+}
+
+export interface ExpedicaoOrderDetail {
+  id: string;
+  status: string;
+  deliveryMethod: 'SHIPPING' | 'PICKUP';
+  pickupCode: string | null;
+  customerPhone: string | null;
+  buyerName: string | null;
+  separatedItems: string[] | null;
+  separationNotes: string | null;
+  notes: string | null;
+  total: number;
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  shippingMethod: string;
+  shippingAddress: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  user: { id: string; name: string | null; email: string };
+  items: OrderDetailItem[];
+  shipment: {
+    carrier: string;
+    service: string;
+    trackingCode: string | null;
+    status: string;
+    labelUrl: string | null;
+    deliveryMin: number | null;
+    deliveryMax: number | null;
+  } | null;
+  statusEvents: TimelineEvent[];
 }
 
 export interface OrderSummary {
@@ -126,6 +195,13 @@ export async function iniciarSeparacao(
   }
 }
 
+export async function fetchExpedicaoOrder(
+  token: string,
+  orderId: string,
+): Promise<ExpedicaoOrderDetail> {
+  return apiFetch<ExpedicaoOrderDetail>(token, `/expedicao/${orderId}`);
+}
+
 export async function atualizarItensSeparados(
   token: string,
   orderId: string,
@@ -134,6 +210,13 @@ export async function atualizarItensSeparados(
   return apiFetch(token, `/expedicao/${orderId}/itens-separados`, {
     method: 'PATCH',
     body: JSON.stringify({ separatedItems }),
+  });
+}
+
+export async function salvarObservacao(token: string, orderId: string, separationNotes: string) {
+  return apiFetch(token, `/expedicao/${orderId}/observacao`, {
+    method: 'PATCH',
+    body: JSON.stringify({ separationNotes }),
   });
 }
 

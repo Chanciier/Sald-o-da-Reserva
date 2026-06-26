@@ -5,6 +5,7 @@ import { WhatsappProvider } from './whatsapp.provider';
 import { WhatsappMarketingService } from './whatsapp-marketing.service';
 import { WhatsappBroadcastService } from './whatsapp-broadcast.service';
 import { AIContentService } from './ai-content.service';
+import { OrderWhatsappService } from './order-whatsapp.service';
 import { WhatsappController } from './whatsapp.controller';
 
 @Global()
@@ -17,7 +18,8 @@ import { WhatsappController } from './whatsapp.controller';
     WhatsappMarketingService,
     WhatsappBroadcastService,
     AIContentService,
+    OrderWhatsappService,
   ],
-  exports: [WhatsappMarketingService, AIContentService],
+  exports: [WhatsappMarketingService, AIContentService, OrderWhatsappService],
 })
 export class WhatsappModule {}

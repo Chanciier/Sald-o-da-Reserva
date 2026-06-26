@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { DeliveryMethod, OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { InvoiceService } from '../invoices/invoice.service';
+import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
+import { recordOrderEvent } from '../common/order-timeline';
 
 const CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.PAID,
@@ -18,6 +21,24 @@ function serializeOrder(order: Record<string, unknown>) {
     discount: (order.discount as { toNumber(): number }).toNumber(),
     shipping: (order.shipping as { toNumber(): number }).toNumber(),
     total: (order.total as { toNumber(): number }).toNumber(),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serializeOrderDetail(order: any) {
+  return {
+    ...serializeOrder(order as Record<string, unknown>),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: (order.items ?? []).map((it: any) => ({
+      id: it.id,
+      productId: it.productId,
+      name: it.name,
+      sku: it.sku,
+      quantity: it.quantity,
+      price: it.price.toNumber(),
+      subtotal: it.subtotal.toNumber(),
+      image: it.product?.images?.[0]?.url ?? null,
+    })),
   };
 }
 
@@ -59,6 +80,7 @@ export class ExpedicaoService {
     private readonly prisma: PrismaService,
     private readonly mp: MercadoPagoService,
     private readonly invoiceService: InvoiceService,
+    private readonly orderWa: OrderWhatsappService,
   ) {}
 
   async getStats(userId: string | null) {
@@ -69,33 +91,50 @@ export class ExpedicaoService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [aguardandoSeparacao, separatedOrders, enviadosHoje, retiradosHoje] = await Promise.all([
-      this.prisma.order.count({
-        where: { status: OrderStatus.PAID, ...userFilter },
-      }),
-      this.prisma.order.findMany({
-        where: { status: OrderStatus.SEPARATED, ...userFilter },
-        include: {
-          invoices: { select: { status: true } },
-          shipment: { select: { status: true, labelUrl: true } },
-        },
-      }),
-      this.prisma.order.count({
-        where: {
-          status: OrderStatus.SHIPPED,
-          updatedAt: { gte: today, lt: tomorrow },
-          ...userFilter,
-        },
-      }),
-      this.prisma.order.count({
-        where: {
-          status: OrderStatus.DELIVERED,
-          deliveryMethod: DeliveryMethod.PICKUP,
-          updatedAt: { gte: today, lt: tomorrow },
-          ...userFilter,
-        },
-      }),
-    ]);
+    const [grouped, separatedOrders, enviadosHoje, retiradosHoje, entreguesEnvioHoje] =
+      await Promise.all([
+        this.prisma.order.groupBy({
+          by: ['deliveryMethod', 'status'],
+          where: userFilter,
+          _count: { _all: true },
+        }),
+        this.prisma.order.findMany({
+          where: { status: OrderStatus.SEPARATED, ...userFilter },
+          include: {
+            invoices: { select: { status: true } },
+            shipment: { select: { status: true, labelUrl: true } },
+          },
+        }),
+        this.prisma.order.count({
+          where: {
+            status: OrderStatus.SHIPPED,
+            updatedAt: { gte: today, lt: tomorrow },
+            ...userFilter,
+          },
+        }),
+        this.prisma.order.count({
+          where: {
+            status: OrderStatus.DELIVERED,
+            deliveryMethod: DeliveryMethod.PICKUP,
+            updatedAt: { gte: today, lt: tomorrow },
+            ...userFilter,
+          },
+        }),
+        this.prisma.order.count({
+          where: {
+            status: OrderStatus.DELIVERED,
+            deliveryMethod: DeliveryMethod.SHIPPING,
+            updatedAt: { gte: today, lt: tomorrow },
+            ...userFilter,
+          },
+        }),
+      ]);
+
+    // Soma as contagens do groupBy por método de entrega + lista de status.
+    const count = (dm: DeliveryMethod, ...statuses: OrderStatus[]): number =>
+      grouped
+        .filter((g) => g.deliveryMethod === dm && statuses.includes(g.status))
+        .reduce((sum, g) => sum + g._count._all, 0);
 
     const aguardandoNFe = separatedOrders.filter(
       (o) => !o.invoices.some((inv) => inv.status === 'AUTHORIZED'),
@@ -105,12 +144,35 @@ export class ExpedicaoService {
       (o) => o.deliveryMethod === DeliveryMethod.SHIPPING && (!o.shipment || !o.shipment.labelUrl),
     ).length;
 
+    const envio = {
+      aguardandoSeparacao: count(DeliveryMethod.SHIPPING, OrderStatus.PAID),
+      emSeparacao: count(DeliveryMethod.SHIPPING, OrderStatus.SEPARATING),
+      prontos: count(DeliveryMethod.SHIPPING, OrderStatus.SEPARATED, OrderStatus.READY_TO_SHIP),
+      emTransito: count(DeliveryMethod.SHIPPING, OrderStatus.SHIPPED),
+      entreguesHoje: entreguesEnvioHoje,
+    };
+
+    const retirada = {
+      aguardandoSeparacao: count(DeliveryMethod.PICKUP, OrderStatus.PAID),
+      emSeparacao: count(DeliveryMethod.PICKUP, OrderStatus.SEPARATING),
+      aguardandoRetirada: count(
+        DeliveryMethod.PICKUP,
+        OrderStatus.SEPARATED,
+        OrderStatus.READY_TO_SHIP,
+      ),
+      retiradosHoje,
+    };
+
     return {
-      aguardandoSeparacao,
+      // Campos legados (compatibilidade com versões anteriores do dashboard)
+      aguardandoSeparacao: envio.aguardandoSeparacao + retirada.aguardandoSeparacao,
       aguardandoNFe,
       aguardandoEtiqueta,
       enviadosHoje,
       retiradosHoje,
+      // Visão separada por tipo de entrega
+      envio,
+      retirada,
     };
   }
 
@@ -306,7 +368,7 @@ export class ExpedicaoService {
     );
   }
 
-  async iniciarSeparacao(orderId: string) {
+  async iniciarSeparacao(orderId: string, actor?: string | null) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
     if (order.status !== OrderStatus.PAID) {
@@ -320,7 +382,9 @@ export class ExpedicaoService {
       data.pickupCode = await generatePickupCode(this.prisma);
     }
 
-    return this.prisma.order.update({ where: { id: orderId }, data });
+    const updated = await this.prisma.order.update({ where: { id: orderId }, data });
+    await recordOrderEvent(this.prisma, { orderId, status: OrderStatus.SEPARATING, actor });
+    return updated;
   }
 
   async atualizarItensSeparados(orderId: string, separatedItems: string[]) {
@@ -338,7 +402,88 @@ export class ExpedicaoService {
     });
   }
 
-  async finalizarSeparacao(orderId: string) {
+  async atualizarObservacao(orderId: string, separationNotes: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { separationNotes: separationNotes.slice(0, 1000) },
+    });
+  }
+
+  // Detalhe completo de um pedido para a tela de separação/expedição: itens com
+  // imagem do produto, linha do tempo de status, remessa e dados do cliente.
+  async getOrderDetail(orderId: string, userId?: string | null) {
+    const where: Record<string, unknown> = { id: orderId };
+    if (userId) where.userId = userId;
+
+    const order = await this.prisma.order.findFirst({
+      where,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        items: {
+          include: { product: { include: { images: { take: 1, orderBy: { position: 'asc' } } } } },
+        },
+        shipment: {
+          select: {
+            carrier: true,
+            service: true,
+            trackingCode: true,
+            status: true,
+            labelUrl: true,
+            deliveryMin: true,
+            deliveryMax: true,
+          },
+        },
+        statusEvents: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    return serializeOrderDetail(order);
+  }
+
+  // Lembrete automático de retirada: pedidos PICKUP prontos há mais de 72h que
+  // ainda não foram retirados nem lembrados. Roda de hora em hora; só marca como
+  // lembrado quando o WhatsApp realmente saiu (senão tenta de novo na próxima).
+  @Cron(CronExpression.EVERY_HOUR)
+  async remindPendingPickups() {
+    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    const orders = await this.prisma.order.findMany({
+      where: {
+        deliveryMethod: DeliveryMethod.PICKUP,
+        status: OrderStatus.READY_TO_SHIP,
+        pickupRemindedAt: null,
+        updatedAt: { lte: cutoff },
+      },
+      select: { id: true, customerPhone: true, buyerName: true, pickupCode: true },
+      take: 50,
+    });
+    if (!orders.length) return;
+
+    let sentCount = 0;
+    for (const o of orders) {
+      const sent = await this.orderWa.notifyPickupReminder(
+        { phone: o.customerPhone, name: o.buyerName, orderId: o.id },
+        o.pickupCode,
+      );
+      if (sent) {
+        sentCount++;
+        await this.prisma.order.update({
+          where: { id: o.id },
+          data: { pickupRemindedAt: new Date() },
+        });
+        await recordOrderEvent(this.prisma, {
+          orderId: o.id,
+          status: OrderStatus.READY_TO_SHIP,
+          title: 'Lembrete de retirada enviado',
+        });
+      }
+    }
+    this.logger.log(`Lembretes de retirada: ${sentCount}/${orders.length} enviados`);
+  }
+
+  async finalizarSeparacao(orderId: string, actor?: string | null) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
     if (order.status !== OrderStatus.SEPARATING) {
@@ -347,13 +492,15 @@ export class ExpedicaoService {
       );
     }
 
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.SEPARATED },
     });
+    await recordOrderEvent(this.prisma, { orderId, status: OrderStatus.SEPARATED, actor });
+    return updated;
   }
 
-  async marcarPronto(orderId: string) {
+  async marcarPronto(orderId: string, actor?: string | null) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
     if (order.status !== OrderStatus.SEPARATED) {
@@ -367,6 +514,22 @@ export class ExpedicaoService {
       data: { status: OrderStatus.READY_TO_SHIP },
     });
 
+    const isPickup = order.deliveryMethod === DeliveryMethod.PICKUP;
+    await recordOrderEvent(this.prisma, {
+      orderId,
+      status: OrderStatus.READY_TO_SHIP,
+      title: isPickup ? 'Pronto para retirada' : 'Pronto para envio',
+      actor,
+    });
+
+    // Aviso ao cliente (fire-and-forget; o service nunca lança)
+    const target = { phone: order.customerPhone, name: order.buyerName, orderId };
+    if (isPickup) {
+      void this.orderWa.notifyPickupReady(target, order.pickupCode);
+    } else {
+      void this.orderWa.notifyReadyToShip(target);
+    }
+
     this.invoiceService
       .emitForOrder(orderId)
       .catch((e) => this.logger.warn(`NF-e emission failed for order ${orderId}`, e));
@@ -374,7 +537,7 @@ export class ExpedicaoService {
     return updated;
   }
 
-  async confirmarRetirada(orderId: string) {
+  async confirmarRetirada(orderId: string, actor?: string | null) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
@@ -392,6 +555,17 @@ export class ExpedicaoService {
       where: { id: orderId },
       data: { status: OrderStatus.DELIVERED },
     });
+    await recordOrderEvent(this.prisma, {
+      orderId,
+      status: OrderStatus.DELIVERED,
+      title: 'Retirada confirmada',
+      actor,
+    });
+    void this.orderWa.notifyPickupConfirmed({
+      phone: order.customerPhone,
+      name: order.buyerName,
+      orderId,
+    });
 
     // Emit NF-e now if not already emitted (handles PICKUP orders that skipped marcarPronto)
     this.invoiceService
@@ -401,7 +575,10 @@ export class ExpedicaoService {
     return updated;
   }
 
-  async cancelarPedido(orderId: string): Promise<{ ok: true; refundError?: string }> {
+  async cancelarPedido(
+    orderId: string,
+    actor?: string | null,
+  ): Promise<{ ok: true; refundError?: string }> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -467,26 +644,33 @@ export class ExpedicaoService {
       }
     });
 
+    await recordOrderEvent(this.prisma, {
+      orderId,
+      status: OrderStatus.CANCELLED,
+      actor,
+      description: refundError ? `Reembolso não concluído: ${refundError}` : undefined,
+    });
+
     return refundError ? { ok: true, refundError } : { ok: true };
   }
 
-  async batchAction(ids: string[], action: string) {
+  async batchAction(ids: string[], action: string, actor?: string | null) {
     const results: { id: string; success: boolean; error?: string }[] = [];
 
     for (const id of ids) {
       try {
         switch (action) {
           case 'iniciar-separacao':
-            await this.iniciarSeparacao(id);
+            await this.iniciarSeparacao(id, actor);
             break;
           case 'finalizar-separacao':
-            await this.finalizarSeparacao(id);
+            await this.finalizarSeparacao(id, actor);
             break;
           case 'marcar-pronto':
-            await this.marcarPronto(id);
+            await this.marcarPronto(id, actor);
             break;
           case 'confirmar-retirada':
-            await this.confirmarRetirada(id);
+            await this.confirmarRetirada(id, actor);
             break;
           default:
             throw new BadRequestException(`Ação desconhecida: ${action}`);

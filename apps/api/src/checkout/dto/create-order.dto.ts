@@ -114,6 +114,14 @@ export class CreateOrderDto {
   @MaxLength(150)
   buyerName?: string;
 
+  // Telefone/WhatsApp do cliente — obrigatório para os avisos de expedição.
+  // Espera-se apenas dígitos (DDD + número): 10 (fixo) ou 11 (celular).
+  @IsString()
+  @Matches(/^\d{10,11}$/, {
+    message: 'Telefone deve conter DDD + número (10 ou 11 dígitos).',
+  })
+  customerPhone: string;
+
   @IsOptional()
   @IsString()
   @Matches(/^\d{11}$/, { message: 'CPF deve conter 11 dígitos numéricos.' })

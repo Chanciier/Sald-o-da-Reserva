@@ -10,6 +10,7 @@ import type { CreatePaymentDto } from './dto/create-payment.dto';
 import type { CreateCardPaymentDto } from './dto/create-card-payment.dto';
 import { InvoiceService } from '../invoices/invoice.service';
 import { StockService } from '../stock/stock.service';
+import { recordOrderEvent } from '../common/order-timeline';
 
 const TERMINAL: PaymentStatus[] = ['REJECTED', 'CANCELLED', 'REFUNDED', 'CHARGED_BACK'];
 // Statuses that release previously-applied stock back to the catalog.
@@ -331,6 +332,11 @@ export class PaymentsService {
           await this.stock.applyForOrder(orderId).catch((e) => {
             this.logger.error(`Stock apply failed for order=${orderId}`, e);
           });
+          await recordOrderEvent(this.prisma, {
+            orderId,
+            status: OrderStatus.PAID,
+            dedupe: true,
+          });
           this.prisma.order
             .findUnique({ where: { id: orderId }, include: { user: true } })
             .then((o) => {
@@ -417,6 +423,14 @@ export class PaymentsService {
       await this.stock
         .restoreForOrder(payment.orderId)
         .catch((e) => this.logger.error(`Stock restore failed for order=${payment.orderId}`, e));
+    }
+
+    if (becomingApproved) {
+      await recordOrderEvent(this.prisma, {
+        orderId: payment.orderId,
+        status: OrderStatus.PAID,
+        dedupe: true,
+      });
     }
 
     if (newStatus === 'APPROVED') {

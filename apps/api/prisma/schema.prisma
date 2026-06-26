@@ -329,22 +329,44 @@ model Order {
   shippingMethod  String         @map("shipping_method")
   notes           String?
   buyerName       String?  @map("buyer_name")
+  customerPhone   String?  @map("customer_phone")
   pickupCode      String?  @unique @map("pickup_code")
   separatedItems  Json?    @map("separated_items")
+  separationNotes String?  @map("separation_notes")
+  pickupRemindedAt DateTime? @map("pickup_reminded_at")
   stockApplied    Boolean  @default(false) @map("stock_applied")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coupon         Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon         Coupon?          @relation(fields: [couponId], references: [id], onDelete: SetNull)
   items          OrderItem[]
   payment        Payment?
   shipment       Shipment?
   invoices       Invoice[]
   returnRequests ReturnRequest[]
+  statusEvents   OrderStatusEvent[]
 
   @@index([userId])
   @@map("orders")
+}
+
+// Linha do tempo de alto nível do pedido (estados visíveis ao cliente/admin).
+// Diferente de ShipmentEvent (eventos da transportadora) — aqui registramos cada
+// transição do pedido com título legível e quem executou.
+model OrderStatusEvent {
+  id          String      @id @default(cuid())
+  orderId     String      @map("order_id")
+  status      OrderStatus
+  title       String
+  description String?
+  actor       String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_status_events")
 }
 
 model OrderItem {

@@ -9,6 +9,8 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
+import { recordOrderEvent } from '../common/order-timeline';
 
 type ShipmentStatus =
   | 'PENDING'
@@ -77,6 +79,7 @@ export class ShippingService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly mail: MailService,
+    private readonly orderWa: OrderWhatsappService,
   ) {
     const sandbox = this.config.get<string>('MELHOR_ENVIO_SANDBOX', 'true') !== 'false';
     this.token = this.config.get<string>('MELHOR_ENVIO_TOKEN', '');
@@ -683,6 +686,10 @@ export class ShippingService {
       });
     });
 
+    if (newOrderStatus && newOrderStatus !== shipment.order.status) {
+      void this.onShipmentOrderStatusChange(shipment.orderId, newOrderStatus, tracking);
+    }
+
     this.logger.log(`ME webhook: shipment=${shipment.id} ${shipment.status}→${newStatus}`);
     return { received: true };
   }
@@ -828,6 +835,10 @@ export class ShippingService {
         .catch(() => {});
     }
 
+    if (newOrderStatus && newOrderStatus !== shipment.order.status) {
+      void this.onShipmentOrderStatusChange(shipment.orderId, newOrderStatus, tracking.tracking);
+    }
+
     this.logger.log(`Sync tracking: shipment=${shipmentId} ${shipment.status}→${newStatus}`);
   }
 
@@ -882,6 +893,42 @@ export class ShippingService {
       in_transit: 'IN_TRANSIT',
     };
     return map[status.toLowerCase()] ?? 'IN_TRANSIT';
+  }
+
+  // Aviso ao cliente + linha do tempo quando o status do PEDIDO muda por causa da
+  // remessa (postado/entregue). Best-effort: nunca lança. E-mail continua sendo
+  // disparado separadamente (mantido como estava).
+  private async onShipmentOrderStatusChange(
+    orderId: string,
+    status: OrderStatus,
+    tracking?: string | null,
+  ): Promise<void> {
+    await recordOrderEvent(this.prisma, {
+      orderId,
+      status,
+      description: tracking ? `Rastreio: ${tracking}` : undefined,
+    });
+
+    if (status !== OrderStatus.SHIPPED && status !== OrderStatus.DELIVERED) return;
+
+    const order = await this.prisma.order
+      .findUnique({
+        where: { id: orderId },
+        select: {
+          customerPhone: true,
+          buyerName: true,
+          shipment: { select: { carrier: true } },
+        },
+      })
+      .catch(() => null);
+    if (!order) return;
+
+    const target = { phone: order.customerPhone, name: order.buyerName, orderId };
+    if (status === OrderStatus.SHIPPED) {
+      void this.orderWa.notifyShipped(target, tracking, order.shipment?.carrier);
+    } else {
+      void this.orderWa.notifyDelivered(target);
+    }
   }
 
   private toOrderStatus(s: ShipmentStatus): OrderStatus | null {

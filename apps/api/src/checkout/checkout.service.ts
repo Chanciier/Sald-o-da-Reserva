@@ -5,6 +5,7 @@ import { CartService } from '../cart/cart.service';
 import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
 import { MetaService } from '../meta/meta.service';
 import { StockService } from '../stock/stock.service';
+import { recordOrderEvent } from '../common/order-timeline';
 import type { CreateOrderDto } from './dto/create-order.dto';
 
 function round2(n: number) {
@@ -154,6 +155,7 @@ export class CheckoutService {
           shippingMethod: isPickup ? 'PICKUP' : (dto.shippingMethod ?? 'N/A'),
           notes: dto.notes,
           buyerName: dto.buyerName ?? null,
+          customerPhone: dto.customerPhone ?? null,
           items: {
             create: cart.items.map((item) => {
               const unitPrice = item.salePrice ?? item.price;
@@ -206,6 +208,12 @@ export class CheckoutService {
     });
 
     await this.cartService.clearCart(userId);
+
+    await recordOrderEvent(this.prisma, {
+      orderId: order.id,
+      status: OrderStatus.PENDING,
+      title: 'Pedido criado',
+    });
 
     if (dto.cpf) {
       await this.prisma.user.update({ where: { id: userId }, data: { cpf: dto.cpf } });

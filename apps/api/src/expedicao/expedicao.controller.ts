@@ -89,9 +89,16 @@ export class ExpedicaoController {
     });
   }
 
+  // Detalhe de um pedido (itens + imagens, linha do tempo, remessa). Declarado
+  // após as rotas literais acima para não capturá-las como :id.
+  @Get(':id')
+  getOrderDetail(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.expedicaoService.getOrderDetail(id, this.resolveUserId(user));
+  }
+
   @Patch(':id/iniciar-separacao')
-  iniciarSeparacao(@Param('id') id: string) {
-    return this.expedicaoService.iniciarSeparacao(id);
+  iniciarSeparacao(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.expedicaoService.iniciarSeparacao(id, user.email);
   }
 
   @Patch(':id/itens-separados')
@@ -99,28 +106,36 @@ export class ExpedicaoController {
     return this.expedicaoService.atualizarItensSeparados(id, body.separatedItems);
   }
 
+  @Patch(':id/observacao')
+  atualizarObservacao(@Param('id') id: string, @Body() body: { separationNotes: string }) {
+    return this.expedicaoService.atualizarObservacao(id, body.separationNotes ?? '');
+  }
+
   @Patch(':id/finalizar-separacao')
-  finalizarSeparacao(@Param('id') id: string) {
-    return this.expedicaoService.finalizarSeparacao(id);
+  finalizarSeparacao(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.expedicaoService.finalizarSeparacao(id, user.email);
   }
 
   @Patch(':id/marcar-pronto')
-  marcarPronto(@Param('id') id: string) {
-    return this.expedicaoService.marcarPronto(id);
+  marcarPronto(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.expedicaoService.marcarPronto(id, user.email);
   }
 
   @Patch(':id/confirmar-retirada')
-  confirmarRetirada(@Param('id') id: string) {
-    return this.expedicaoService.confirmarRetirada(id);
+  confirmarRetirada(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.expedicaoService.confirmarRetirada(id, user.email);
   }
 
   @Patch(':id/cancelar')
-  cancelarPedido(@Param('id') id: string) {
-    return this.expedicaoService.cancelarPedido(id);
+  cancelarPedido(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.expedicaoService.cancelarPedido(id, user.email);
   }
 
   @Post('batch')
-  batchAction(@Body() body: { ids: string[]; action: string }) {
-    return this.expedicaoService.batchAction(body.ids, body.action);
+  batchAction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { ids: string[]; action: string },
+  ) {
+    return this.expedicaoService.batchAction(body.ids, body.action, user.email);
   }
 }

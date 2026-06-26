@@ -9,6 +9,7 @@ import { InvoiceService } from '../invoices/invoice.service';
 import { ShippingService } from '../shipping/shipping.service';
 import { MetaService } from '../meta/meta.service';
 import { StockService } from '../stock/stock.service';
+import { recordOrderEvent } from '../common/order-timeline';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 
 // Payment statuses that trigger stock restoration and order cancellation
@@ -169,7 +170,15 @@ export class WebhooksService {
       });
     });
 
-    // ── Post-commit: stock, Redis, Invoice ────────────────────────────────────
+    // ── Post-commit: timeline, stock, Redis, Invoice ──────────────────────────
+    if (newOrderStatus) {
+      await recordOrderEvent(this.prisma, {
+        orderId: payment.orderId,
+        status: newOrderStatus,
+        dedupe: true,
+      });
+    }
+
     let stockChanged = false;
     if (becomingApproved) {
       stockChanged = await this.stock.applyForOrder(payment.orderId);

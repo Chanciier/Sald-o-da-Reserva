@@ -2,12 +2,24 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ClipboardList, Package, FileText, Tag, Truck, Store, ArrowRight } from 'lucide-react';
+import {
+  Package,
+  FileText,
+  Tag,
+  Truck,
+  Store,
+  ArrowRight,
+  ClipboardList,
+  PackageCheck,
+  Send,
+  CheckCircle2,
+  Clock,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchExpedicaoStats } from '@/actions/expedicao';
 import type { ExpedicaoStats } from '@/actions/expedicao';
 
-interface StatCardProps {
+interface StatRowProps {
   label: string;
   value: number | undefined;
   href: string;
@@ -15,21 +27,21 @@ interface StatCardProps {
   color: string;
 }
 
-function StatCard({ label, value, href, icon: Icon, color }: StatCardProps) {
+function StatRow({ label, value, href, icon: Icon, color }: StatRowProps) {
   return (
     <Link
       href={href}
-      className="flex flex-col gap-3 rounded-xl border bg-card p-5 shadow-sm hover:shadow-md transition-shadow"
+      className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 hover:bg-muted/40 transition-colors"
     >
-      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${color}`}>
         <Icon className="h-5 w-5" />
       </div>
+      <span className="flex-1 text-sm text-muted-foreground leading-tight">{label}</span>
       {value === undefined ? (
-        <div className="h-9 w-16 animate-pulse rounded bg-muted" />
+        <span className="h-7 w-9 animate-pulse rounded bg-muted" />
       ) : (
-        <p className="text-3xl font-bold">{value}</p>
+        <span className="text-2xl font-bold tabular-nums">{value}</span>
       )}
-      <p className="text-sm text-muted-foreground leading-tight">{label}</p>
     </Link>
   );
 }
@@ -43,44 +55,6 @@ export default function ExpedicaoDashboard() {
     enabled: !!token,
     refetchInterval: 30_000,
   });
-
-  const cards = [
-    {
-      label: 'Aguardando Separação',
-      value: data?.aguardandoSeparacao,
-      href: '/admin/expedicao/fila',
-      icon: ClipboardList,
-      color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-    },
-    {
-      label: 'Aguardando NF-e',
-      value: data?.aguardandoNFe,
-      href: '/admin/expedicao/prontos',
-      icon: FileText,
-      color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-    },
-    {
-      label: 'Aguardando Etiqueta',
-      value: data?.aguardandoEtiqueta,
-      href: '/admin/expedicao/prontos',
-      icon: Tag,
-      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    },
-    {
-      label: 'Enviados Hoje',
-      value: data?.enviadosHoje,
-      href: '/admin/expedicao/enviados',
-      icon: Truck,
-      color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-    },
-    {
-      label: 'Retiradas Hoje',
-      value: data?.retiradosHoje,
-      href: '/admin/expedicao/retirada',
-      icon: Store,
-      color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    },
-  ];
 
   return (
     <div className="space-y-6">
@@ -101,10 +75,113 @@ export default function ExpedicaoDashboard() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {cards.map((card) => (
-          <StatCard key={card.label} {...card} />
-        ))}
+      {/* Pendências operacionais (atravessa os dois fluxos) */}
+      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+        <StatRow
+          label="Aguardando NF-e"
+          value={data?.aguardandoNFe}
+          href="/admin/expedicao/prontos"
+          icon={FileText}
+          color="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+        />
+        <StatRow
+          label="Aguardando Etiqueta"
+          value={data?.aguardandoEtiqueta}
+          href="/admin/expedicao/prontos"
+          icon={Tag}
+          color="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* ENVIO */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+              <Truck className="h-5 w-5" />
+            </div>
+            <h2 className="font-semibold">Envio</h2>
+            <span className="text-xs text-muted-foreground">entrega por transportadora</span>
+          </div>
+          <div className="space-y-2">
+            <StatRow
+              label="Aguardando separação"
+              value={data?.envio.aguardandoSeparacao}
+              href="/admin/expedicao/fila"
+              icon={ClipboardList}
+              color="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+            />
+            <StatRow
+              label="Em separação"
+              value={data?.envio.emSeparacao}
+              href="/admin/expedicao/separacao"
+              icon={PackageCheck}
+              color="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+            />
+            <StatRow
+              label="Prontos para postar"
+              value={data?.envio.prontos}
+              href="/admin/expedicao/prontos"
+              icon={Tag}
+              color="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+            />
+            <StatRow
+              label="Em trânsito"
+              value={data?.envio.emTransito}
+              href="/admin/expedicao/enviados"
+              icon={Send}
+              color="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+            />
+            <StatRow
+              label="Entregues hoje"
+              value={data?.envio.entreguesHoje}
+              href="/admin/expedicao/concluidos"
+              icon={CheckCircle2}
+              color="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+            />
+          </div>
+        </section>
+
+        {/* RETIRADA */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+              <Store className="h-5 w-5" />
+            </div>
+            <h2 className="font-semibold">Retirada na loja</h2>
+            <span className="text-xs text-muted-foreground">cliente busca no balcão</span>
+          </div>
+          <div className="space-y-2">
+            <StatRow
+              label="Aguardando separação"
+              value={data?.retirada.aguardandoSeparacao}
+              href="/admin/expedicao/fila"
+              icon={ClipboardList}
+              color="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+            />
+            <StatRow
+              label="Em separação"
+              value={data?.retirada.emSeparacao}
+              href="/admin/expedicao/separacao"
+              icon={PackageCheck}
+              color="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+            />
+            <StatRow
+              label="Aguardando retirada"
+              value={data?.retirada.aguardandoRetirada}
+              href="/admin/expedicao/retirada"
+              icon={Clock}
+              color="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
+            />
+            <StatRow
+              label="Retiradas hoje"
+              value={data?.retirada.retiradosHoje}
+              href="/admin/expedicao/retirada"
+              icon={CheckCircle2}
+              color="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+            />
+          </div>
+        </section>
       </div>
     </div>
   );
