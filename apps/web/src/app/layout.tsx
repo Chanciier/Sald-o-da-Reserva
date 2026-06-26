@@ -9,10 +9,11 @@ import { ConditionalHeader } from '@/components/layout/conditional-header';
 import { ConditionalFooter } from '@/components/layout/conditional-footer';
 import { CookieBanner } from '@/components/cookie-banner';
 import { PixelProvider } from '@/components/pixel-provider';
+import { SITE_URL } from '@/lib/site-url';
 
 const inter = Inter({ subsets: ['latin'] });
 
-const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://saldaodareversa.com';
+const BASE = SITE_URL;
 
 export const metadata: Metadata = {
   title: { default: 'Saldão da Reserva', template: '%s — Saldão da Reserva' },

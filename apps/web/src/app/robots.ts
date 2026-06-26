@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/site-url';
 
-const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://saldaodareversa.com';
+const BASE = SITE_URL;
 
 export default function robots(): MetadataRoute.Robots {
   // Don't advertise protected route prefixes (admin/vendedor/checkout/...) in
