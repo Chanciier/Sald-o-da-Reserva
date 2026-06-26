@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, RefreshCw, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Search, RefreshCw, ChevronLeft, ChevronRight, Trash2, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -90,8 +90,195 @@ function fmt(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function AdminPedidos() {
-  const { token } = useAuth();
+// ─── Aba Pendentes ──────────────────────────────────────────────────────────
+
+function PendentesTab({ token }: { token: string }) {
+  const qc = useQueryClient();
+  const [deletingAll, setDeletingAll] = useState(false);
+
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['admin-orders-pending'],
+    queryFn: () => fetchOrders(token, 1, 'PENDING', ''),
+    enabled: !!token,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (orderId: string) => deleteOrder(token, orderId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-orders-pending'] });
+      qc.invalidateQueries({ queryKey: ['admin-orders'] });
+    },
+    onError: (e: Error) => alert(e.message),
+  });
+
+  async function handleDeleteAll() {
+    const orders = data?.data ?? [];
+    if (!orders.length) return;
+    if (
+      !window.confirm(
+        `Excluir TODOS os ${orders.length} pedidos pendentes? Esta ação não pode ser desfeita.`,
+      )
+    )
+      return;
+
+    setDeletingAll(true);
+    for (const o of orders) {
+      try {
+        await deleteOrder(token, o.id);
+      } catch {
+        // continua mesmo se um falhar
+      }
+    }
+    setDeletingAll(false);
+    qc.invalidateQueries({ queryKey: ['admin-orders-pending'] });
+    qc.invalidateQueries({ queryKey: ['admin-orders'] });
+  }
+
+  function handleDelete(orderId: string) {
+    if (
+      window.confirm(
+        `Excluir definitivamente o pedido #${orderId.slice(-8).toUpperCase()}? Esta ação não pode ser desfeita.`,
+      )
+    ) {
+      deleteMutation.mutate(orderId);
+    }
+  }
+
+  const orders = data?.data ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-yellow-600" />
+          <span className="text-sm font-medium text-muted-foreground">
+            {isLoading
+              ? '—'
+              : `${data?.total ?? 0} pedido${(data?.total ?? 0) !== 1 ? 's' : ''} pendente${(data?.total ?? 0) !== 1 ? 's' : ''}`}
+          </span>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="ml-1 rounded p-1 hover:bg-muted disabled:opacity-50"
+            title="Atualizar"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {orders.length > 1 && (
+          <button
+            onClick={handleDeleteAll}
+            disabled={deletingAll || deleteMutation.isPending}
+            className="flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {deletingAll ? 'Excluindo...' : `Excluir todos (${orders.length})`}
+          </button>
+        )}
+      </div>
+
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : !orders.length ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <Clock className="h-8 w-8 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">Nenhum pedido pendente</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40">
+                <tr className="text-left text-xs text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">Pedido</th>
+                  <th className="px-4 py-3 font-medium">Cliente</th>
+                  <th className="px-4 py-3 font-medium">Itens</th>
+                  <th className="px-4 py-3 font-medium">Pagamento</th>
+                  <th className="px-4 py-3 font-medium text-right">Total</th>
+                  <th className="px-4 py-3 font-medium">Data</th>
+                  <th className="px-4 py-3 font-medium">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {orders.map((o) => (
+                  <tr key={o.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/pedidos/${o.id}`}
+                        className="font-mono text-xs text-primary hover:underline"
+                      >
+                        #{o.id.slice(-8).toUpperCase()}
+                      </Link>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <p className="font-medium leading-tight">{o.user?.name ?? '—'}</p>
+                      <p className="text-xs text-muted-foreground">{o.user?.email}</p>
+                    </td>
+
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {o.items.length} item{o.items.length !== 1 ? 'ns' : ''}
+                    </td>
+
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {o.payment ? (
+                        <>
+                          <p>{o.payment.method}</p>
+                          <p className="opacity-70">{o.payment.status}</p>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-semibold">{fmt(o.total)}</td>
+
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(o.createdAt).toLocaleDateString('pt-BR')}
+                      <p className="opacity-70">
+                        {new Date(o.createdAt).toLocaleTimeString('pt-BR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/pedidos/${o.id}`}
+                          className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
+                        >
+                          Ver
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(o.id)}
+                          disabled={deleteMutation.isPending || deletingAll}
+                          title="Excluir pedido pendente"
+                          className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/5 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Aba Todos ───────────────────────────────────────────────────────────────
+
+function TodosTab({ token }: { token: string }) {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
@@ -101,30 +288,33 @@ export default function AdminPedidos() {
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['admin-orders', page, statusFilter, search],
-    queryFn: () => fetchOrders(token!, page, statusFilter, search),
+    queryFn: () => fetchOrders(token, page, statusFilter, search),
     enabled: !!token,
   });
 
   const mutation = useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: string }) =>
-      patchStatus(token!, orderId, status),
+      patchStatus(token, orderId, status),
     onSuccess: () => {
       setEditingId(null);
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      qc.invalidateQueries({ queryKey: ['admin-orders-pending'] });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (orderId: string) => deleteOrder(token!, orderId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-orders'] }),
+    mutationFn: (orderId: string) => deleteOrder(token, orderId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      qc.invalidateQueries({ queryKey: ['admin-orders-pending'] });
+    },
     onError: (e: Error) => alert(e.message),
   });
 
   function handleDelete(orderId: string) {
     if (
       window.confirm(
-        `Excluir definitivamente o pedido #${orderId.slice(-8).toUpperCase()}? ` +
-          'Esta ação não pode ser desfeita.',
+        `Excluir definitivamente o pedido #${orderId.slice(-8).toUpperCase()}? Esta ação não pode ser desfeita.`,
       )
     ) {
       deleteMutation.mutate(orderId);
@@ -143,21 +333,9 @@ export default function AdminPedidos() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Pedidos</h1>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-          Atualizar
-        </button>
-      </div>
-
+    <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <form onSubmit={handleSearch} className="flex gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -201,6 +379,15 @@ export default function AdminPedidos() {
             </option>
           ))}
         </select>
+
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="ml-auto flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+          Atualizar
+        </button>
       </div>
 
       {/* Table */}
@@ -354,7 +541,6 @@ export default function AdminPedidos() {
           </div>
         )}
 
-        {/* Pagination */}
         {data && data.pages > 1 && (
           <div className="flex items-center justify-between border-t px-4 py-3">
             <p className="text-xs text-muted-foreground">
@@ -379,6 +565,59 @@ export default function AdminPedidos() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+export default function AdminPedidos() {
+  const { token } = useAuth();
+  const [activeTab, setActiveTab] = useState<'todos' | 'pendentes'>('todos');
+
+  const { data: pendingData } = useQuery({
+    queryKey: ['admin-orders-pending'],
+    queryFn: () => fetchOrders(token!, 1, 'PENDING', ''),
+    enabled: !!token,
+  });
+
+  const pendingCount = pendingData?.total ?? 0;
+
+  return (
+    <div className="space-y-5">
+      <h1 className="text-xl font-bold">Pedidos</h1>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b">
+        <button
+          onClick={() => setActiveTab('todos')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'todos'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Todos
+        </button>
+        <button
+          onClick={() => setActiveTab('pendentes')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'pendentes'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Pendentes
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center justify-center rounded-full bg-yellow-100 px-1.5 py-0.5 text-xs font-semibold text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 min-w-[1.25rem]">
+              {pendingCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {token && activeTab === 'todos' && <TodosTab token={token} />}
+      {token && activeTab === 'pendentes' && <PendentesTab token={token} />}
     </div>
   );
 }
