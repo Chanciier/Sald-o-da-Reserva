@@ -1,8 +1,5 @@
-import DOMPurify from 'isomorphic-dompurify';
+import sanitizeHtmlLib from 'sanitize-html';
 
-// Tags/atributos seguros o suficiente para texto rico de CMS e descrição de
-// produto, sem permitir vetores de XSS (<script>, on*, javascript:, <iframe>,
-// <object>, <form>, etc. são removidos pelo DOMPurify).
 const ALLOWED_TAGS = [
   'p',
   'br',
@@ -43,32 +40,23 @@ const ALLOWED_TAGS = [
   'figcaption',
 ];
 
-const ALLOWED_ATTR = [
-  'href',
-  'target',
-  'rel',
-  'src',
-  'alt',
-  'title',
-  'class',
-  'colspan',
-  'rowspan',
-  'width',
-  'height',
-];
+const ALLOWED_ATTRIBUTES: Record<string, sanitizeHtmlLib.AllowedAttribute[]> = {
+  a: ['href', 'target', 'rel', 'title'],
+  img: ['src', 'alt', 'title', 'width', 'height'],
+  td: ['colspan', 'rowspan'],
+  th: ['colspan', 'rowspan'],
+  '*': ['class'],
+};
 
-/**
- * Sanitiza HTML vindo do CMS / descrição de produto antes de injetar via
- * `dangerouslySetInnerHTML`. Remove scripts, handlers de evento e URIs
- * perigosas, preservando a formatação de texto que o conteúdo legítimo usa.
- */
 export function sanitizeHtml(dirty: string | null | undefined): string {
   if (!dirty) return '';
-  return DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ALLOW_DATA_ATTR: false,
-    // Força links externos a não vazarem o opener e abrirem com segurança.
-    ADD_ATTR: ['target'],
+  return sanitizeHtmlLib(dirty, {
+    allowedTags: ALLOWED_TAGS,
+    allowedAttributes: ALLOWED_ATTRIBUTES,
+    allowedSchemes: ['http', 'https', 'mailto'],
+    transformTags: {
+      // Força rel="noopener noreferrer" em todos os links para não vazar opener.
+      a: sanitizeHtmlLib.simpleTransform('a', { rel: 'noopener noreferrer' }, true),
+    },
   });
 }
