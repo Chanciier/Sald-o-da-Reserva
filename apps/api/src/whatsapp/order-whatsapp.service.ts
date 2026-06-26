@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BaileysService } from './baileys.service';
+import { RedisService } from '../redis/redis.service';
 
 export interface OrderNotifyTarget {
   phone?: string | null;
@@ -24,6 +25,7 @@ export class OrderWhatsappService {
   constructor(
     private readonly baileys: BaileysService,
     private readonly config: ConfigService,
+    private readonly redis: RedisService,
   ) {}
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -82,6 +84,29 @@ export class OrderWhatsappService {
       this.logger.error(`Falha ao enviar aviso WhatsApp: ${(e as Error).message}`);
       return false;
     }
+  }
+
+  // ── Confirmação de pagamento (PAID) ─────────────────────────────────────────
+
+  /**
+   * Confirmação enviada uma única vez assim que o pagamento é aprovado.
+   * O pedido pode virar PAID por caminhos concorrentes (polling do checkout +
+   * webhook do Mercado Pago), então deduplicamos com um INCR atômico no Redis:
+   * apenas a primeira chamada (contador == 1) dispara a mensagem.
+   */
+  async notifyOrderConfirmed(t: OrderNotifyTarget): Promise<boolean> {
+    const first = await this.redis
+      .increment(`wa:order-confirmed:${t.orderId}`, 7 * 24 * 60 * 60)
+      .catch(() => 1);
+    if (first !== 1) return false;
+
+    const msg =
+      `${this.greeting(t.name)} ✅\n\n` +
+      `Recebemos seu pagamento e seu pedido *#${this.shortId(t.orderId)}* está confirmado!\n\n` +
+      `Já começamos a preparar tudo. Vamos te avisar por aqui a cada etapa. 💛\n\n` +
+      `Acompanhe: ${this.orderUrl(t.orderId)}\n` +
+      `${STORE_NAME}`;
+    return this.send(t.phone, msg);
   }
 
   // ── Envio (SHIPPING) ────────────────────────────────────────────────────────

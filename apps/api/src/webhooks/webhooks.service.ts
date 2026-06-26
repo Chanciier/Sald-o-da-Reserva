@@ -9,6 +9,7 @@ import { InvoiceService } from '../invoices/invoice.service';
 import { ShippingService } from '../shipping/shipping.service';
 import { MetaService } from '../meta/meta.service';
 import { StockService } from '../stock/stock.service';
+import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 import { recordOrderEvent } from '../common/order-timeline';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 
@@ -35,6 +36,7 @@ export class WebhooksService {
     private readonly meta: MetaService,
     private readonly stock: StockService,
     private readonly config: ConfigService,
+    private readonly orderWa: OrderWhatsappService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
   }
@@ -190,6 +192,14 @@ export class WebhooksService {
     }
 
     await this.redis.set(idempotencyKey, '1', IDEMPOTENCY_TTL);
+
+    if (becomingApproved) {
+      void this.orderWa.notifyOrderConfirmed({
+        phone: payment.order.customerPhone,
+        name: payment.order.buyerName,
+        orderId: payment.orderId,
+      });
+    }
 
     if (newStatus === PaymentStatus.APPROVED) {
       this.shippingService

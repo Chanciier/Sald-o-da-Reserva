@@ -10,6 +10,7 @@ import type { CreatePaymentDto } from './dto/create-payment.dto';
 import type { CreateCardPaymentDto } from './dto/create-card-payment.dto';
 import { InvoiceService } from '../invoices/invoice.service';
 import { StockService } from '../stock/stock.service';
+import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 import { recordOrderEvent } from '../common/order-timeline';
 
 const TERMINAL: PaymentStatus[] = ['REJECTED', 'CANCELLED', 'REFUNDED', 'CHARGED_BACK'];
@@ -28,6 +29,7 @@ export class PaymentsService {
     private readonly invoiceService: InvoiceService,
     private readonly mail: MailService,
     private readonly stock: StockService,
+    private readonly orderWa: OrderWhatsappService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
   }
@@ -340,10 +342,16 @@ export class PaymentsService {
           this.prisma.order
             .findUnique({ where: { id: orderId }, include: { user: true } })
             .then((o) => {
-              if (o?.user)
+              if (!o) return;
+              if (o.user)
                 this.mail
                   .sendOrderConfirmedEmail(o.user.email, o.user.name, orderId, o.total.toNumber())
                   .catch((e) => this.logger.error('Order confirmed email failed', e));
+              void this.orderWa.notifyOrderConfirmed({
+                phone: o.customerPhone,
+                name: o.buyerName ?? o.user?.name,
+                orderId,
+              });
             })
             .catch(() => {});
         }
@@ -433,11 +441,12 @@ export class PaymentsService {
       });
     }
 
-    if (newStatus === 'APPROVED') {
+    if (becomingApproved) {
       this.prisma.order
         .findUnique({ where: { id: payment.orderId }, include: { user: true } })
         .then((o) => {
-          if (o?.user)
+          if (!o) return;
+          if (o.user)
             this.mail
               .sendOrderConfirmedEmail(
                 o.user.email,
@@ -446,6 +455,11 @@ export class PaymentsService {
                 o.total.toNumber(),
               )
               .catch((e) => this.logger.error('Order confirmed email failed', e));
+          void this.orderWa.notifyOrderConfirmed({
+            phone: o.customerPhone,
+            name: o.buyerName ?? o.user?.name,
+            orderId: payment.orderId,
+          });
         })
         .catch(() => {});
     }
