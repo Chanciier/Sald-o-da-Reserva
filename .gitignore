@@ -50,3 +50,10 @@ packages/*/node_modules/
 ruvector.db
 *.db-shm
 *.db-wal
+
+# Tooling de agentes / codex / vercel (não faz parte do projeto)
+.agents/
+.codex/
+.vercel/
+.claude-flow/
+AGENTS.md

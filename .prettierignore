@@ -13,3 +13,7 @@ yarn.lock
 .claude-flow
 .mcp.json
 CLAUDE.md
+.agents
+.codex
+.vercel
+AGENTS.md
