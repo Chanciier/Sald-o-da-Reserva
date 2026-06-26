@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { LegalPageShell } from '@/components/legal-page-shell';
 import { sanitizeHtml } from '@/lib/sanitize';
 
@@ -18,12 +18,12 @@ async function getPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Política de Entrega — Saldão da Reserva',
+    title: 'Política de Entrega — Saldão da Reversa',
     description:
-      'Saiba tudo sobre os prazos de entrega, modalidades de frete, rastreamento e retirada na loja do Saldão da Reserva.',
+      'Saiba tudo sobre os prazos de entrega, modalidades de frete, rastreamento e retirada na loja do Saldão da Reversa.',
     openGraph: {
-      title: 'Política de Entrega — Saldão da Reserva',
-      description: 'Modalidades de entrega, prazos e rastreamento do Saldão da Reserva.',
+      title: 'Política de Entrega — Saldão da Reversa',
+      description: 'Modalidades de entrega, prazos e rastreamento do Saldão da Reversa.',
     },
   };
 }

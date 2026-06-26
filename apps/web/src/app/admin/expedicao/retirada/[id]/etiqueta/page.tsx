@@ -60,7 +60,7 @@ export default function EtiquetaRetiradaPage({ params }: { params: { id: string 
       <div className="mx-auto mt-6 w-[148mm] border-2 border-black font-sans text-black print:mt-0 print:border-0">
         {/* Header */}
         <div className="border-b-2 border-black px-5 py-4 text-center">
-          <p className="text-lg font-black uppercase tracking-widest">Saldão da Reserva</p>
+          <p className="text-lg font-black uppercase tracking-widest">Saldão da Reversa</p>
           <p className="text-sm font-bold uppercase tracking-wider mt-0.5">Etiqueta de Retirada</p>
         </div>
 

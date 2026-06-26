@@ -1,5 +1,5 @@
-export const STORE = {
-  name: 'Saldão da Reserva',
+﻿export const STORE = {
+  name: 'Saldão da Reversa',
   mall: 'Shopping Jardim Oriente',
   address: 'Rua Andorra, 500',
   neighborhood: 'Jardim América',

@@ -1,4 +1,4 @@
-import Image from 'next/image';
+﻿import Image from 'next/image';
 import { Flame, Tag, Package, Clock, ShieldCheck } from 'lucide-react';
 import { RandomButton } from '@/components/products/discovery/random-button';
 
@@ -61,7 +61,7 @@ export function Hero({ slugs }: { slugs: string[] }) {
           <div className="relative mx-auto aspect-[3/2] w-full max-w-xl">
             <Image
               src="/banner-produtos.png"
-              alt="Caixa do Saldão da Reserva cheia de achados"
+              alt="Caixa do Saldão da Reversa cheia de achados"
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 50vw"

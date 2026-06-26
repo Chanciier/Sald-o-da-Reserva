@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { LegalPageShell } from '@/components/legal-page-shell';
 import { sanitizeHtml } from '@/lib/sanitize';
 
@@ -18,11 +18,11 @@ async function getPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Sobre Nós — Saldão da Reserva',
+    title: 'Sobre Nós — Saldão da Reversa',
     description:
-      'Conheça a história, missão e valores do Saldão da Reserva. Especializados em produtos de logística reversa revisados com garantia.',
+      'Conheça a história, missão e valores do Saldão da Reversa. Especializados em produtos de logística reversa revisados com garantia.',
     openGraph: {
-      title: 'Sobre o Saldão da Reserva',
+      title: 'Sobre o Saldão da Reversa',
       description:
         'Plataforma especializada em produtos de logística reversa revisados com até 80% de desconto.',
     },

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { LegalPageShell } from '@/components/legal-page-shell';
 import { sanitizeHtml } from '@/lib/sanitize';
 
@@ -18,12 +18,12 @@ async function getPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Política de Cookies — Saldão da Reserva',
+    title: 'Política de Cookies — Saldão da Reversa',
     description:
-      'Entenda como o Saldão da Reserva utiliza cookies e como gerenciar suas preferências de privacidade.',
+      'Entenda como o Saldão da Reversa utiliza cookies e como gerenciar suas preferências de privacidade.',
     openGraph: {
-      title: 'Política de Cookies — Saldão da Reserva',
-      description: 'Política de cookies e consentimento do Saldão da Reserva.',
+      title: 'Política de Cookies — Saldão da Reversa',
+      description: 'Política de cookies e consentimento do Saldão da Reversa.',
     },
   };
 }

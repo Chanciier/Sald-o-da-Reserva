@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { LegalPageShell } from '@/components/legal-page-shell';
 import { sanitizeHtml } from '@/lib/sanitize';
 
@@ -18,12 +18,12 @@ async function getPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Política de Privacidade — Saldão da Reserva',
+    title: 'Política de Privacidade — Saldão da Reversa',
     description:
-      'Saiba como o Saldão da Reserva coleta, utiliza e protege seus dados pessoais, em conformidade com a LGPD (Lei 13.709/2018).',
+      'Saiba como o Saldão da Reversa coleta, utiliza e protege seus dados pessoais, em conformidade com a LGPD (Lei 13.709/2018).',
     openGraph: {
-      title: 'Política de Privacidade — Saldão da Reserva',
-      description: 'Política de privacidade e proteção de dados do Saldão da Reserva (LGPD).',
+      title: 'Política de Privacidade — Saldão da Reversa',
+      description: 'Política de privacidade e proteção de dados do Saldão da Reversa (LGPD).',
     },
   };
 }

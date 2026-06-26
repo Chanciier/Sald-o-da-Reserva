@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import Image from 'next/image';
 import { Home, Search } from 'lucide-react';
 
@@ -7,7 +7,7 @@ export default function NotFound() {
     <main className="flex min-h-[calc(100vh-64px)] flex-col items-center justify-center px-4 py-16 text-center">
       <Image
         src="/logo.png"
-        alt="Saldão da Reserva"
+        alt="Saldão da Reversa"
         width={72}
         height={72}
         className="mb-6 rounded-xl"

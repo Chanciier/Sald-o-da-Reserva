@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { ShieldCheck, Truck, Headphones } from 'lucide-react';
 
 const reassurance = [
@@ -112,7 +112,7 @@ export function Footer() {
 
         {/* Bottom */}
         <div className="mt-10 flex flex-col items-center gap-3 border-t border-border pt-6 text-center text-xs text-muted-foreground sm:gap-2">
-          <p>© {new Date().getFullYear()} Saldão da Reserva. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} Saldão da Reversa. Todos os direitos reservados.</p>
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
             <Link href="/termos-de-uso" className="hover:text-foreground">
               Termos de Uso

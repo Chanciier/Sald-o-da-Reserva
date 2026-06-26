@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { LegalPageShell } from '@/components/legal-page-shell';
 import { sanitizeHtml } from '@/lib/sanitize';
 
@@ -18,11 +18,11 @@ async function getPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Trocas e Devoluções — Saldão da Reserva',
+    title: 'Trocas e Devoluções — Saldão da Reversa',
     description:
-      'Política completa de trocas e devoluções do Saldão da Reserva. Conheça seu direito de arrependimento de 7 dias e o processo simplificado de devolução.',
+      'Política completa de trocas e devoluções do Saldão da Reversa. Conheça seu direito de arrependimento de 7 dias e o processo simplificado de devolução.',
     openGraph: {
-      title: 'Trocas e Devoluções — Saldão da Reserva',
+      title: 'Trocas e Devoluções — Saldão da Reversa',
       description: 'Política de trocas e devoluções conforme o Código de Defesa do Consumidor.',
     },
   };

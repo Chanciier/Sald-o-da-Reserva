@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { LegalPageShell } from '@/components/legal-page-shell';
 import { sanitizeHtml } from '@/lib/sanitize';
 
@@ -18,12 +18,12 @@ async function getPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Termos de Uso — Saldão da Reserva',
+    title: 'Termos de Uso — Saldão da Reversa',
     description:
-      'Leia os Termos de Uso da plataforma Saldão da Reserva. Conheça seus direitos, responsabilidades e as regras de utilização do nosso e-commerce.',
+      'Leia os Termos de Uso da plataforma Saldão da Reversa. Conheça seus direitos, responsabilidades e as regras de utilização do nosso e-commerce.',
     openGraph: {
-      title: 'Termos de Uso — Saldão da Reserva',
-      description: 'Termos e condições de uso da plataforma Saldão da Reserva.',
+      title: 'Termos de Uso — Saldão da Reversa',
+      description: 'Termos e condições de uso da plataforma Saldão da Reversa.',
     },
   };
 }
