@@ -35,9 +35,14 @@ export class ExpedicaoController {
   }
 
   @Get('separacao')
-  getSeparacao(@CurrentUser() user: AuthenticatedUser, @Query('page') page = '1') {
+  getSeparacao(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('page') page = '1',
+    @Query('deliveryMethod') deliveryMethod?: string,
+  ) {
     return this.expedicaoService.getSeparacao({
       page: parseInt(page, 10) || 1,
+      deliveryMethod,
       userId: this.resolveUserId(user),
     });
   }
@@ -81,10 +86,12 @@ export class ExpedicaoController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('page') page = '1',
     @Query('search') search?: string,
+    @Query('deliveryMethod') deliveryMethod?: string,
   ) {
     return this.expedicaoService.getConcluidos({
       page: parseInt(page, 10) || 1,
       search,
+      deliveryMethod,
       userId: this.resolveUserId(user),
     });
   }

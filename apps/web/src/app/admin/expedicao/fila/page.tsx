@@ -7,12 +7,7 @@ import { Search, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchFila, iniciarSeparacao, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
-
-const DELIVERY_OPTIONS = [
-  { value: '', label: 'Todos' },
-  { value: 'SHIPPING', label: 'Envio' },
-  { value: 'PICKUP', label: 'Retirada' },
-];
+import { DeliveryTabs } from '../_components/delivery-tabs';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -51,7 +46,7 @@ export default function FilaPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState('SHIPPING');
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
@@ -100,6 +95,14 @@ export default function FilaPage() {
         <h1 className="text-xl font-bold">Fila de Pedidos</h1>
       </div>
 
+      <DeliveryTabs
+        value={deliveryMethod}
+        onChange={(v) => {
+          setDeliveryMethod(v);
+          setPage(1);
+        }}
+      />
+
       <div className="flex flex-wrap gap-3">
         <form onSubmit={handleSearch} className="flex gap-2">
           <div className="relative">
@@ -132,21 +135,6 @@ export default function FilaPage() {
             </button>
           )}
         </form>
-
-        <select
-          value={deliveryMethod}
-          onChange={(e) => {
-            setDeliveryMethod(e.target.value);
-            setPage(1);
-          }}
-          className="h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          {DELIVERY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       {actionError && (

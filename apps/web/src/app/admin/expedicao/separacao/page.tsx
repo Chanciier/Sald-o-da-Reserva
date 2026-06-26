@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchSeparacao, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
+import { DeliveryTabs } from '../_components/delivery-tabs';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -34,6 +35,7 @@ export default function SeparacaoListPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
+  const [deliveryMethod, setDeliveryMethod] = useState('SHIPPING');
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
@@ -52,8 +54,8 @@ export default function SeparacaoListPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['expedicao-separacao', page],
-    queryFn: () => fetchSeparacao(token!, { page }),
+    queryKey: ['expedicao-separacao', page, deliveryMethod],
+    queryFn: () => fetchSeparacao(token!, { page, deliveryMethod }),
     enabled: !!token,
   });
 
@@ -63,6 +65,14 @@ export default function SeparacaoListPage() {
         <Package className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">Em Separação</h1>
       </div>
+
+      <DeliveryTabs
+        value={deliveryMethod}
+        onChange={(v) => {
+          setDeliveryMethod(v);
+          setPage(1);
+        }}
+      />
 
       {cancelError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3">

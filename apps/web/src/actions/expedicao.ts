@@ -150,7 +150,7 @@ export async function fetchFila(
 
 export async function fetchSeparacao(
   token: string,
-  params?: { page?: number },
+  params?: { page?: number; deliveryMethod?: string },
 ): Promise<ExpedicaoListResponse> {
   return apiFetch<ExpedicaoListResponse>(token, `/expedicao/separacao${qs(params)}`);
 }
@@ -178,7 +178,7 @@ export async function fetchRetirada(
 
 export async function fetchConcluidos(
   token: string,
-  params?: { page?: number; search?: string },
+  params?: { page?: number; search?: string; deliveryMethod?: string },
 ): Promise<ExpedicaoListResponse> {
   return apiFetch<ExpedicaoListResponse>(token, `/expedicao/concluidos${qs(params)}`);
 }

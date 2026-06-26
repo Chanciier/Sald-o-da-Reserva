@@ -7,12 +7,7 @@ import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchProntos, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
-
-const DELIVERY_OPTIONS = [
-  { value: '', label: 'Todos' },
-  { value: 'SHIPPING', label: 'Envio' },
-  { value: 'PICKUP', label: 'Retirada' },
-];
+import { DeliveryTabs } from '../_components/delivery-tabs';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -52,7 +47,7 @@ export default function ProntosPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
-  const [deliveryMethod, setDeliveryMethod] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState('SHIPPING');
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
@@ -81,7 +76,9 @@ export default function ProntosPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <Package className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">Prontos para Envio</h1>
+          <h1 className="text-xl font-bold">
+            {deliveryMethod === 'PICKUP' ? 'Prontos para Retirada' : 'Prontos para Envio'}
+          </h1>
         </div>
       </div>
 
@@ -112,22 +109,13 @@ export default function ProntosPage() {
         </div>
       )}
 
-      <div>
-        <select
-          value={deliveryMethod}
-          onChange={(e) => {
-            setDeliveryMethod(e.target.value);
-            setPage(1);
-          }}
-          className="h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          {DELIVERY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <DeliveryTabs
+        value={deliveryMethod}
+        onChange={(v) => {
+          setDeliveryMethod(v);
+          setPage(1);
+        }}
+      />
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
@@ -136,7 +124,9 @@ export default function ProntosPage() {
           </div>
         ) : !data?.data.length ? (
           <p className="py-16 text-center text-sm text-muted-foreground">
-            Nenhum pedido pronto para envio
+            {deliveryMethod === 'PICKUP'
+              ? 'Nenhum pedido pronto para retirada'
+              : 'Nenhum pedido pronto para envio'}
           </p>
         ) : (
           <div className="overflow-x-auto">

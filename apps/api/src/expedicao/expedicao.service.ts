@@ -214,11 +214,12 @@ export class ExpedicaoService {
     );
   }
 
-  async getSeparacao(opts: { page: number; userId?: string | null }) {
-    const { page, userId } = opts;
+  async getSeparacao(opts: { page: number; deliveryMethod?: string; userId?: string | null }) {
+    const { page, deliveryMethod, userId } = opts;
     const skip = (page - 1) * PAGE_SIZE;
     const where: Record<string, unknown> = { status: OrderStatus.SEPARATING };
     if (userId) where.userId = userId;
+    if (deliveryMethod) where.deliveryMethod = deliveryMethod;
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -336,12 +337,18 @@ export class ExpedicaoService {
     );
   }
 
-  async getConcluidos(opts: { page: number; search?: string; userId?: string | null }) {
-    const { page, search, userId } = opts;
+  async getConcluidos(opts: {
+    page: number;
+    search?: string;
+    deliveryMethod?: string;
+    userId?: string | null;
+  }) {
+    const { page, search, deliveryMethod, userId } = opts;
     const skip = (page - 1) * PAGE_SIZE;
 
     const where: Record<string, unknown> = { status: OrderStatus.DELIVERED };
     if (userId) where.userId = userId;
+    if (deliveryMethod) where.deliveryMethod = deliveryMethod;
     if (search) {
       where.OR = [
         { id: { contains: search, mode: 'insensitive' } },

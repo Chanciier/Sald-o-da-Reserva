@@ -6,6 +6,7 @@ import { Search, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchConcluidos } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
+import { DeliveryTabs } from '../_components/delivery-tabs';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -20,10 +21,11 @@ export default function ConcluidosPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState('SHIPPING');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['expedicao-concluidos', page, search],
-    queryFn: () => fetchConcluidos(token!, { page, search }),
+    queryKey: ['expedicao-concluidos', page, search, deliveryMethod],
+    queryFn: () => fetchConcluidos(token!, { page, search, deliveryMethod }),
     enabled: !!token,
   });
 
@@ -39,6 +41,14 @@ export default function ConcluidosPage() {
         <CheckCircle2 className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">Pedidos Concluídos</h1>
       </div>
+
+      <DeliveryTabs
+        value={deliveryMethod}
+        onChange={(v) => {
+          setDeliveryMethod(v);
+          setPage(1);
+        }}
+      />
 
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="relative">
