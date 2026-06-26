@@ -44,10 +44,12 @@ export class WebhooksService {
     xRequestId?: string,
     queryId?: string,
   ): Promise<{ received: true }> {
-    // Validate HMAC — return 200 on failure so MP doesn't keep retrying
-    if (this.webhookSecret && xSignature) {
-      if (!this.validateSignature(rawBody, xSignature, xRequestId, queryId)) {
-        this.logger.warn('Webhook MP: invalid HMAC signature');
+    // Validate HMAC — return 200 on failure so MP doesn't keep retrying.
+    // Se um secret está configurado, a assinatura é OBRIGATÓRIA: omitir o header
+    // x-signature não pode ser usado para burlar a verificação.
+    if (this.webhookSecret) {
+      if (!xSignature || !this.validateSignature(rawBody, xSignature, xRequestId, queryId)) {
+        this.logger.warn('Webhook MP: assinatura ausente ou inválida — ignorado');
         return { received: true };
       }
     }

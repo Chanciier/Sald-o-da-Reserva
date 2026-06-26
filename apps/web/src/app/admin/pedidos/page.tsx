@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, RefreshCw, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -76,6 +76,16 @@ async function patchStatus(token: string, orderId: string, status: string) {
   return data;
 }
 
+async function deleteOrder(token: string, orderId: string) {
+  const res = await fetch(`${BASE}/api/v1/orders/admin/${orderId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { message?: string }).message ?? 'Erro ao excluir');
+  return data;
+}
+
 function fmt(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -103,6 +113,23 @@ export default function AdminPedidos() {
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (orderId: string) => deleteOrder(token!, orderId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-orders'] }),
+    onError: (e: Error) => alert(e.message),
+  });
+
+  function handleDelete(orderId: string) {
+    if (
+      window.confirm(
+        `Excluir definitivamente o pedido #${orderId.slice(-8).toUpperCase()}? ` +
+          'Esta ação não pode ser desfeita.',
+      )
+    ) {
+      deleteMutation.mutate(orderId);
+    }
+  }
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -297,13 +324,26 @@ export default function AdminPedidos() {
                           Ver
                         </Link>
                         {o.status === 'PENDING' && (
-                          <button
-                            onClick={() => mutation.mutate({ orderId: o.id, status: 'CANCELLED' })}
-                            disabled={mutation.isPending}
-                            className="rounded border border-destructive/40 px-2 py-1 text-xs text-destructive hover:bg-destructive/5 disabled:opacity-50 transition-colors"
-                          >
-                            Cancelar
-                          </button>
+                          <>
+                            <button
+                              onClick={() =>
+                                mutation.mutate({ orderId: o.id, status: 'CANCELLED' })
+                              }
+                              disabled={mutation.isPending}
+                              className="rounded border border-destructive/40 px-2 py-1 text-xs text-destructive hover:bg-destructive/5 disabled:opacity-50 transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => handleDelete(o.id)}
+                              disabled={deleteMutation.isPending}
+                              title="Excluir pedido pendente"
+                              className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/5 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Excluir
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>

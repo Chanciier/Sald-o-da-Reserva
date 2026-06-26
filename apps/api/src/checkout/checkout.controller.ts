@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -55,6 +56,15 @@ export class CheckoutController {
   @Roles(Role.ADMIN)
   updateOrderStatus(@Param('id') orderId: string, @Body('status') status: string) {
     return this.checkout.updateOrderStatus(orderId, status);
+  }
+
+  // Exclui um pedido PENDENTE (somente admin). Diferente de "cancelar", remove
+  // o registro do banco — útil para limpar pedidos abandonados/não pagos.
+  @Delete('orders/admin/:id')
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  deletePendingOrder(@Param('id') orderId: string) {
+    return this.checkout.deletePendingOrder(orderId);
   }
 
   @Patch('orders/:id/cancel')

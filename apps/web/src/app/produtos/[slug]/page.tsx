@@ -4,6 +4,7 @@ import { ChevronLeft, Eye, Bookmark, Package, ShieldCheck, Truck, Zap, Dices } f
 import type { Metadata } from 'next';
 
 import { getProduct, getProducts } from '@/lib/api';
+import { sanitizeHtml } from '@/lib/sanitize';
 import {
   effectivePrice,
   hasDiscount,
@@ -218,7 +219,7 @@ export default async function ProductPage({ params }: PageProps) {
               [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5
               [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5
               [&_li]:mb-1 [&_strong]:font-semibold [&_em]:italic"
-            dangerouslySetInnerHTML={{ __html: product.description }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
           />
         </section>
       )}

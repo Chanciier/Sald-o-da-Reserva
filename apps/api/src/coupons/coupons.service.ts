@@ -48,12 +48,30 @@ export class CouponsService {
     return coupons.map(serializeCoupon);
   }
 
+  // Endpoint público (consulta por código). Para dificultar a enumeração/brute
+  // force de códigos, só responde a cupons válidos (ativos, não expirados e com
+  // uso disponível) e retorna apenas o necessário para exibir/aplicar — nunca
+  // campos internos (id, usageLimit, usageCount, isActive, timestamps).
   async findByCode(code: string) {
-    const coupon = await this.prisma.coupon.findUnique({
-      where: { code: code.toUpperCase() },
+    const coupon = await this.prisma.coupon.findFirst({
+      where: { code: code.toUpperCase(), isActive: true },
     });
-    if (!coupon) throw new NotFoundException('Cupom não encontrado.');
-    return serializeCoupon(coupon);
+
+    const valid =
+      coupon &&
+      (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
+      (coupon.usageLimit === null || coupon.usageCount < coupon.usageLimit);
+
+    if (!coupon || !valid) throw new NotFoundException('Cupom não encontrado.');
+
+    return {
+      code: coupon.code,
+      type: coupon.type,
+      value: coupon.value.toNumber(),
+      description: coupon.description,
+      minOrderValue: coupon.minOrderValue?.toNumber() ?? null,
+      maxDiscount: coupon.maxDiscount?.toNumber() ?? null,
+    };
   }
 
   async update(id: string, dto: UpdateCouponDto) {

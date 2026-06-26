@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { lookup } from 'dns/promises';
+import { isIP } from 'net';
 
 interface GeminiResult {
   nome: string;
@@ -58,6 +60,11 @@ export class AnalyzeImageService {
   }
 
   async analyze(imageUrl: string): Promise<AnalyzeResult> {
+    // Anti-SSRF: a URL é buscada pelo servidor, então só pode ser http(s)
+    // público — bloqueia localhost, IPs privados e o metadata de cloud
+    // (169.254.169.254). Roda antes de qualquer fetch.
+    await this.assertPublicHttpUrl(imageUrl);
+
     const geminiResult = await this.callGemini(imageUrl).catch(() => null);
 
     let mlPrices: MlPrice | null = null;
@@ -78,6 +85,77 @@ export class AnalyzeImageService {
       priceRange: mlPrices,
       searchTerm: geminiResult?.descricao_busca ?? '',
     };
+  }
+
+  // Valida que a URL é http(s) e que o host NÃO resolve para um IP interno.
+  // Lança BadRequestException caso contrário (anti-SSRF).
+  private async assertPublicHttpUrl(rawUrl: string): Promise<void> {
+    let url: URL;
+    try {
+      url = new URL(rawUrl);
+    } catch {
+      throw new BadRequestException('URL de imagem inválida.');
+    }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new BadRequestException('URL de imagem deve usar http ou https.');
+    }
+
+    const host = url.hostname;
+    // Resolve o host; se já for um IP literal, valida direto.
+    let addresses: string[];
+    if (isIP(host)) {
+      addresses = [host];
+    } else {
+      try {
+        const records = await lookup(host, { all: true });
+        addresses = records.map((r) => r.address);
+      } catch {
+        throw new BadRequestException('Não foi possível resolver o host da imagem.');
+      }
+    }
+
+    if (addresses.some((ip) => this.isPrivateIp(ip))) {
+      this.logger.warn(`analyze-image: URL bloqueada por SSRF — host=${host}`);
+      throw new BadRequestException('URL de imagem aponta para um endereço não permitido.');
+    }
+  }
+
+  // true se o IP for loopback/privado/link-local/reservado (IPv4 e IPv6).
+  private isPrivateIp(ip: string): boolean {
+    const v = isIP(ip);
+    if (v === 4) {
+      const p = ip.split('.').map(Number);
+      if (p.length !== 4 || p.some((n) => Number.isNaN(n))) return true;
+      const [a, b] = p;
+      return (
+        a === 0 || // 0.0.0.0/8
+        a === 10 || // 10.0.0.0/8
+        a === 127 || // loopback
+        (a === 169 && b === 254) || // link-local (inclui metadata 169.254.169.254)
+        (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
+        (a === 192 && b === 168) || // 192.168.0.0/16
+        (a === 100 && b >= 64 && b <= 127) // CGNAT 100.64.0.0/10
+      );
+    }
+    if (v === 6) {
+      const lower = ip.toLowerCase();
+      // IPv4 mapeado (::ffff:a.b.c.d) — valida o IPv4 embutido.
+      const mapped = lower.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+      if (mapped) return this.isPrivateIp(mapped[1]);
+      return (
+        lower === '::1' || // loopback
+        lower === '::' || // unspecified
+        lower.startsWith('fc') || // fc00::/7 unique local
+        lower.startsWith('fd') ||
+        lower.startsWith('fe8') || // fe80::/10 link-local
+        lower.startsWith('fe9') ||
+        lower.startsWith('fea') ||
+        lower.startsWith('feb')
+      );
+    }
+    // Não reconhecido como IP → bloqueia por segurança.
+    return true;
   }
 
   private async callGemini(imageUrl: string): Promise<GeminiResult | null> {

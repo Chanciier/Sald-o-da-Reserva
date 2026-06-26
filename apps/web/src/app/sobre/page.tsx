@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LegalPageShell } from '@/components/legal-page-shell';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -33,7 +34,7 @@ export default async function SobrePage() {
   return (
     <LegalPageShell title={page?.title ?? 'Sobre Nós'} updatedAt={undefined}>
       {page ? (
-        <div dangerouslySetInnerHTML={{ __html: page.content }} />
+        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }} />
       ) : (
         <p className="text-muted-foreground">Conteúdo temporariamente indisponível.</p>
       )}

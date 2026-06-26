@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { ArrowLeft, Eye } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -146,7 +147,7 @@ export default function EditLegalPagePage() {
                 [&_h3]:mt-4 [&_h3]:mb-1 [&_h3]:font-medium
                 [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5
                 [&_li]:mb-1 [&_strong]:font-semibold [&_em]:italic"
-              dangerouslySetInnerHTML={{ __html: content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
             />
           ) : (
             <textarea

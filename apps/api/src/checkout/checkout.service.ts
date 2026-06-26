@@ -93,7 +93,16 @@ export class CheckoutService {
       }
     }
 
-    const shippingCost = isPickup ? 0 : round2(Math.max(0, dto.shippingPrice ?? 0));
+    // Frete: o preço NUNCA é confiado a partir do DTO. Para envio, recotamos no
+    // servidor e usamos o preço do serviço escolhido (anti-manipulação). PICKUP
+    // é sempre 0.
+    const shippingCost = isPickup
+      ? 0
+      : await this.shippingService.resolveQuotedPrice(
+          dto.shippingAddress!.cep,
+          dto.meServiceId!,
+          dto.shippingPrice ?? 0,
+        );
 
     // Coupon
     const couponCode = dto.couponCode?.toUpperCase() ?? cart.couponCode ?? null;
@@ -334,6 +343,33 @@ export class CheckoutService {
       await this.stock.restoreForOrder(orderId);
     }
     return updated;
+  }
+
+  // Exclui DEFINITIVAMENTE um pedido PENDENTE (admin). Pedidos pendentes nunca
+  // baixaram estoque nem geraram nota/etiqueta, então a remoção é segura — os
+  // filhos (itens, pagamento, logs de pagamento, remessa e seus eventos) caem
+  // por cascata no banco (onDelete: Cascade).
+  async deletePendingOrder(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, status: true },
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Apenas pedidos pendentes podem ser excluídos.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.auditLog.create({
+        data: {
+          action: 'order.deleted',
+          metadata: { orderId, previousStatus: order.status } as Prisma.InputJsonValue,
+        },
+      });
+      await tx.order.delete({ where: { id: orderId } });
+    });
+
+    return { id: orderId, deleted: true };
   }
 
   async findOrderById(userId: string | null, orderId: string) {

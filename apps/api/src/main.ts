@@ -47,6 +47,27 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Auditoria de configuração em produção. NÃO derruba o boot (para não quebrar
+  // a produção), apenas alerta sobre segredos ausentes/inseguros que reduzem a
+  // postura de segurança.
+  if (process.env.NODE_ENV === 'production') {
+    const warnCfg = (msg: string) => logger.warn(`[CONFIG] ${msg}`);
+    if (!process.env.MERCADO_PAGO_WEBHOOK_SECRET) {
+      warnCfg('MERCADO_PAGO_WEBHOOK_SECRET ausente — webhooks do MP sem validação de assinatura.');
+    }
+    if ((process.env.TURNSTILE_SECRET_KEY ?? 'skip') === 'skip') {
+      warnCfg('TURNSTILE_SECRET_KEY=skip — proteção anti-bot desativada em login/registro.');
+    }
+    if ((process.env.MERCADO_PAGO_ACCESS_TOKEN ?? '').startsWith('TEST-')) {
+      warnCfg('MERCADO_PAGO_ACCESS_TOKEN é credencial de TESTE (TEST-) em produção.');
+    }
+    for (const key of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET']) {
+      if ((process.env[key] ?? '').startsWith('CHANGE_ME')) {
+        warnCfg(`${key} ainda usa o valor placeholder do .env.example — troque imediatamente.`);
+      }
+    }
+  }
+
   const port = process.env.PORT || 3001;
   await app.listen(port);
 

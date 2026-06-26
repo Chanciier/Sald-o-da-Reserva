@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { CouponsService } from './coupons.service';
 import { CreateCouponDto } from './dto/create-coupon.dto';
@@ -35,6 +36,8 @@ export class CouponsController {
 
   @Get(':code')
   @Public()
+  // Limite apertado para mitigar brute-force/enumeração de códigos de cupom.
+  @Throttle({ medium: { limit: 10, ttl: 60_000 } })
   findByCode(@Param('code') code: string) {
     return this.coupons.findByCode(code);
   }

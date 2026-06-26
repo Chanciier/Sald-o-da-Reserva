@@ -180,6 +180,36 @@ export class ShippingService {
     }
   }
 
+  // ── Server-side price resolution (anti price-tampering) ───────────────────
+  // O preço de frete NUNCA deve ser confiado a partir do corpo da requisição:
+  // o cliente poderia enviar shippingPrice=0 e pagar frete grátis enquanto a
+  // loja arca com a etiqueta real. Aqui recotamos no servidor e usamos o preço
+  // do serviço escolhido. Só caímos no valor do cliente se o ME estiver
+  // indisponível (cotação vazia), para não travar o checkout durante uma
+  // instabilidade do ME — esse caso é logado para monitoramento.
+  async resolveQuotedPrice(cep: string, serviceId: number, clientPrice: number): Promise<number> {
+    const options = await this.quote(cep).catch((e) => {
+      this.logger.warn(`resolveQuotedPrice: cotação falhou — ${(e as Error).message}`);
+      return [] as ShippingQuoteOption[];
+    });
+
+    if (options.length === 0) {
+      const fallback = Math.max(0, Math.round((clientPrice || 0) * 100) / 100);
+      this.logger.warn(
+        `resolveQuotedPrice: ME sem opções para CEP=${cep} — usando valor do cliente R$${fallback}`,
+      );
+      return fallback;
+    }
+
+    const match = options.find((o) => o.serviceId === serviceId);
+    if (!match) {
+      throw new BadRequestException(
+        'Opção de frete inválida ou expirada. Recalcule o frete e tente novamente.',
+      );
+    }
+    return Math.max(0, Math.round(match.price * 100) / 100);
+  }
+
   // Aplica a allow-list opcional (IDs têm prioridade; senão casa por nome da
   // transportadora ou do serviço, case-insensitive). Vazio = retorna tudo,
   // preservando o comportamento atual.

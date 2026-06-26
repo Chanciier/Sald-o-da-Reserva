@@ -20,7 +20,8 @@ export class MailService {
       'SMTP_FROM',
       this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@saldaodareserva.com.br'),
     );
-    this.frontendUrl = (this.config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
+    this.frontendUrl = this.config
+      .get<string>('FRONTEND_URL', 'http://localhost:3000')
       .split(',')[0]
       .trim();
 
@@ -294,19 +295,23 @@ export class MailService {
     ip?: string,
   ): Promise<void> {
     const to = this.config.get<string>('CONTACT_EMAIL', this.from);
-    const subject = `[Contato] ${form.subject}`;
+    // Escapa TODOS os campos vindos do formulário — name/email/subject também,
+    // não só a mensagem — para evitar injeção de HTML no e-mail do admin.
+    const esc = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const subject = `[Contato] ${esc(form.subject)}`;
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
         <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
           <h1 style="margin:0;font-size:18px">Novo contato — Saldão da Reserva</h1>
         </div>
         <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
-          <p style="margin:0 0 8px"><strong>Nome:</strong> ${form.name}</p>
-          <p style="margin:0 0 8px"><strong>E-mail:</strong> ${form.email}</p>
-          <p style="margin:0 0 8px"><strong>Assunto:</strong> ${form.subject}</p>
-          ${ip ? `<p style="margin:0 0 16px;font-size:12px;color:#999">IP: ${ip}</p>` : ''}
+          <p style="margin:0 0 8px"><strong>Nome:</strong> ${esc(form.name)}</p>
+          <p style="margin:0 0 8px"><strong>E-mail:</strong> ${esc(form.email)}</p>
+          <p style="margin:0 0 8px"><strong>Assunto:</strong> ${esc(form.subject)}</p>
+          ${ip ? `<p style="margin:0 0 16px;font-size:12px;color:#999">IP: ${esc(ip)}</p>` : ''}
           <hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0">
-          <p style="white-space:pre-wrap;margin:0">${form.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+          <p style="white-space:pre-wrap;margin:0">${esc(form.message)}</p>
         </div>
       </div>
     `;
