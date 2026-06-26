@@ -6,7 +6,7 @@ import { Search, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchConcluidos } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
-import { DeliveryTabs } from '../_components/delivery-tabs';
+import { DeliveryTabs, useDeliveryTab } from '../_components/delivery-tabs';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -21,7 +21,7 @@ export default function ConcluidosPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState('SHIPPING');
+  const [deliveryMethod, setDeliveryMethod] = useDeliveryTab();
 
   const { data, isLoading } = useQuery({
     queryKey: ['expedicao-concluidos', page, search, deliveryMethod],

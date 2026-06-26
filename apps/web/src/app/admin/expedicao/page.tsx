@@ -107,21 +107,21 @@ export default function ExpedicaoDashboard() {
             <StatRow
               label="Aguardando separação"
               value={data?.envio.aguardandoSeparacao}
-              href="/admin/expedicao/fila"
+              href="/admin/expedicao/fila?tipo=SHIPPING"
               icon={ClipboardList}
               color="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
             />
             <StatRow
               label="Em separação"
               value={data?.envio.emSeparacao}
-              href="/admin/expedicao/separacao"
+              href="/admin/expedicao/separacao?tipo=SHIPPING"
               icon={PackageCheck}
               color="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
             />
             <StatRow
               label="Prontos para postar"
               value={data?.envio.prontos}
-              href="/admin/expedicao/prontos"
+              href="/admin/expedicao/prontos?tipo=SHIPPING"
               icon={Tag}
               color="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
             />
@@ -135,7 +135,7 @@ export default function ExpedicaoDashboard() {
             <StatRow
               label="Entregues hoje"
               value={data?.envio.entreguesHoje}
-              href="/admin/expedicao/concluidos"
+              href="/admin/expedicao/concluidos?tipo=SHIPPING"
               icon={CheckCircle2}
               color="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
             />
@@ -155,14 +155,14 @@ export default function ExpedicaoDashboard() {
             <StatRow
               label="Aguardando separação"
               value={data?.retirada.aguardandoSeparacao}
-              href="/admin/expedicao/fila"
+              href="/admin/expedicao/fila?tipo=PICKUP"
               icon={ClipboardList}
               color="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
             />
             <StatRow
               label="Em separação"
               value={data?.retirada.emSeparacao}
-              href="/admin/expedicao/separacao"
+              href="/admin/expedicao/separacao?tipo=PICKUP"
               icon={PackageCheck}
               color="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
             />
@@ -176,7 +176,7 @@ export default function ExpedicaoDashboard() {
             <StatRow
               label="Retiradas hoje"
               value={data?.retirada.retiradosHoje}
-              href="/admin/expedicao/retirada"
+              href="/admin/expedicao/concluidos?tipo=PICKUP"
               icon={CheckCircle2}
               color="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
             />

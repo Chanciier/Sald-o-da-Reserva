@@ -7,7 +7,7 @@ import { Search, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchFila, iniciarSeparacao, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
-import { DeliveryTabs } from '../_components/delivery-tabs';
+import { DeliveryTabs, useDeliveryTab } from '../_components/delivery-tabs';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -46,7 +46,7 @@ export default function FilaPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState('SHIPPING');
+  const [deliveryMethod, setDeliveryMethod] = useDeliveryTab();
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);

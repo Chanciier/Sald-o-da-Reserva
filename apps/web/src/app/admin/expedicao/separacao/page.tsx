@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchSeparacao, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
-import { DeliveryTabs } from '../_components/delivery-tabs';
+import { DeliveryTabs, useDeliveryTab } from '../_components/delivery-tabs';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -35,7 +35,7 @@ export default function SeparacaoListPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
-  const [deliveryMethod, setDeliveryMethod] = useState('SHIPPING');
+  const [deliveryMethod, setDeliveryMethod] = useDeliveryTab();
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
