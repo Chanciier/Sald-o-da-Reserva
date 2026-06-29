@@ -2,10 +2,11 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import type { Notification } from '@prisma/client';
+import { Role, type Notification } from '@prisma/client';
 import type { Server, Socket } from 'socket.io';
 import type { JwtPayload } from '../auth/types/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushNotificationsService } from './push-notifications.service';
 
 const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
   .split(',')
@@ -26,6 +27,7 @@ export class NotificationsGateway implements OnGatewayConnection {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly push: PushNotificationsService,
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
@@ -55,6 +57,16 @@ export class NotificationsGateway implements OnGatewayConnection {
 
   emitToUser(userId: string, notification: Notification): void {
     this.server.to(this.userRoom(userId)).emit('notification', notification);
+    if (notification.roleTarget === Role.ADMIN && notification.orderId) {
+      void this.push
+        .sendToUser(userId, {
+          title: notification.title,
+          body: notification.message,
+          orderId: notification.orderId,
+          type: notification.type,
+        })
+        .catch((error) => this.logger.warn(`Falha ao despachar Web Push user=${userId}`, error));
+    }
   }
 
   private userRoom(userId: string): string {

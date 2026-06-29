@@ -16,6 +16,7 @@ const inter = Inter({ subsets: ['latin'] });
 const BASE = SITE_URL;
 
 export const metadata: Metadata = {
+  applicationName: 'Saldão da Reversa',
   title: { default: 'Saldão da Reversa', template: '%s — Saldão da Reversa' },
   description:
     'Produtos de logística reversa revisados e garantidos com economia de até 80%. Compra segura, NF-e e entrega para todo o Brasil.',
@@ -29,6 +30,12 @@ export const metadata: Metadata = {
     locale: 'pt_BR',
   },
   robots: { index: true, follow: true },
+  appleWebApp: {
+    capable: true,
+    title: 'Saldão',
+    statusBarStyle: 'default',
+  },
+  icons: { apple: '/icon.png' },
 };
 
 export default function RootLayout({

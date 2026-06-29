@@ -116,6 +116,7 @@ model User {
   consents        UserConsent[]
   reviews         Review[]
   notifications   Notification[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -437,6 +438,21 @@ model Notification {
   @@index([userId, readAt, createdAt])
   @@index([roleTarget, createdAt])
   @@map("notifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique @db.Text
+  p256dh    String   @db.Text
+  auth      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model Shipment {

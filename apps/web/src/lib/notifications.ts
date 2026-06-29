@@ -44,6 +44,55 @@ export async function markNotificationAsRead(token: string, id: string): Promise
   if (!response.ok) throw new Error('Não foi possível marcar a notificação como lida.');
 }
 
+export async function getVapidPublicKey(token: string): Promise<string> {
+  const response = await fetch(`${API_ORIGIN}/api/v1/notifications/push/public-key`, {
+    headers: authHeaders(token),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Web Push ainda não está configurado.');
+  const body = (await response.json()) as { publicKey?: unknown };
+  if (typeof body.publicKey !== 'string' || body.publicKey.length < 40) {
+    throw new Error('Chave Web Push inválida.');
+  }
+  return body.publicKey;
+}
+
+export async function savePushSubscription(
+  token: string,
+  subscription: PushSubscription,
+): Promise<void> {
+  const json = subscription.toJSON();
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) {
+    throw new Error('Inscrição Web Push inválida.');
+  }
+  const response = await fetch(`${API_ORIGIN}/api/v1/notifications/push/subscription`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+  });
+  if (!response.ok) throw new Error('Não foi possível ativar o Web Push.');
+}
+
+export async function removePushSubscription(token: string, endpoint: string): Promise<void> {
+  const response = await fetch(`${API_ORIGIN}/api/v1/notifications/push/subscription`, {
+    method: 'DELETE',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint }),
+  });
+  if (!response.ok) throw new Error('Não foi possível desativar o Web Push.');
+}
+
+export function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  const bytes = new Uint8Array(raw.length);
+  for (let index = 0; index < raw.length; index += 1) {
+    bytes[index] = raw.charCodeAt(index);
+  }
+  return bytes.buffer as ArrayBuffer;
+}
+
 export function isAppNotification(value: unknown): value is AppNotification {
   if (!value || typeof value !== 'object') return false;
   const item = value as Record<string, unknown>;

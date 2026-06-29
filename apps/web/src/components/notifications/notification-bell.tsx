@@ -12,6 +12,7 @@ import {
   isAppNotification,
   markNotificationAsRead,
 } from '@/lib/notifications';
+import { PushNotificationControl } from './push-notification-control';
 
 function playSound() {
   try {
@@ -119,6 +120,7 @@ export function NotificationBell() {
             <p className="text-sm font-semibold">Notificações</p>
             <p className="text-xs text-muted-foreground">{unreadCount} não lidas</p>
           </div>
+          <PushNotificationControl />
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">

@@ -7,6 +7,7 @@ import {
   IsString,
   IsUrl,
   MinLength,
+  ValidateIf,
   validateSync,
 } from 'class-validator';
 
@@ -56,6 +57,20 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   MERCADO_PAGO_WEBHOOK_SECRET: string = '';
+
+  @IsString()
+  @MinLength(40)
+  @ValidateIf((_object, value) => value !== undefined && value !== '')
+  VAPID_PUBLIC_KEY?: string;
+
+  @IsString()
+  @MinLength(40)
+  @ValidateIf((_object, value) => value !== undefined && value !== '')
+  VAPID_PRIVATE_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  VAPID_SUBJECT?: string;
 
   @IsUrl({ require_tld: false })
   @IsOptional()
