@@ -11,6 +11,7 @@ import { MetaService } from '../meta/meta.service';
 import { StockService } from '../stock/stock.service';
 import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 import { recordOrderEvent } from '../common/order-timeline';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 
 // Payment statuses that trigger stock restoration and order cancellation
@@ -37,6 +38,7 @@ export class WebhooksService {
     private readonly stock: StockService,
     private readonly config: ConfigService,
     private readonly orderWa: OrderWhatsappService,
+    private readonly notifications: NotificationsService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
   }
@@ -194,6 +196,9 @@ export class WebhooksService {
     await this.redis.set(idempotencyKey, '1', IDEMPOTENCY_TTL);
 
     if (becomingApproved) {
+      await this.notifications.notifyPaymentApproved(payment.orderId).catch((error) => {
+        this.logger.error(`Notification failed for approved order=${payment.orderId}`, error);
+      });
       void this.orderWa.notifyOrderConfirmed({
         phone: payment.order.customerPhone,
         name: payment.order.buyerName,

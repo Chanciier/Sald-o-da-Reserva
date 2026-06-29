@@ -115,6 +115,7 @@ model User {
   returnRequests  ReturnRequest[]
   consents        UserConsent[]
   reviews         Review[]
+  notifications   Notification[]
 
   @@map("users")
 }
@@ -346,6 +347,7 @@ model Order {
   invoices       Invoice[]
   returnRequests ReturnRequest[]
   statusEvents   OrderStatusEvent[]
+  notifications  Notification[]
 
   @@index([userId])
   @@map("orders")
@@ -415,6 +417,26 @@ model Payment {
 
   @@index([gatewayPaymentId])
   @@map("payments")
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String?   @map("user_id")
+  roleTarget Role      @map("role_target")
+  type       String
+  title      String
+  message    String
+  orderId    String    @map("order_id")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, orderId])
+  @@index([userId, readAt, createdAt])
+  @@index([roleTarget, createdAt])
+  @@map("notifications")
 }
 
 model Shipment {

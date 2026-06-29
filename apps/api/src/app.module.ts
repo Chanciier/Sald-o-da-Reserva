@@ -28,6 +28,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { MetaModule } from './meta/meta.module';
 import { MetaCatalogModule } from './meta-catalog/meta-catalog.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -70,6 +71,7 @@ import { envValidation } from './config/env.validation';
     WhatsappModule,
     MetaModule,
     MetaCatalogModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

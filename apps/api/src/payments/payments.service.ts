@@ -12,6 +12,7 @@ import { InvoiceService } from '../invoices/invoice.service';
 import { StockService } from '../stock/stock.service';
 import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 import { recordOrderEvent } from '../common/order-timeline';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const TERMINAL: PaymentStatus[] = ['REJECTED', 'CANCELLED', 'REFUNDED', 'CHARGED_BACK'];
 // Statuses that release previously-applied stock back to the catalog.
@@ -30,6 +31,7 @@ export class PaymentsService {
     private readonly mail: MailService,
     private readonly stock: StockService,
     private readonly orderWa: OrderWhatsappService,
+    private readonly notifications: NotificationsService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
   }
@@ -339,6 +341,9 @@ export class PaymentsService {
             status: OrderStatus.PAID,
             dedupe: true,
           });
+          await this.notifications.notifyPaymentApproved(orderId).catch((error) => {
+            this.logger.error(`Notification failed for approved order=${orderId}`, error);
+          });
           this.prisma.order
             .findUnique({ where: { id: orderId }, include: { user: true } })
             .then((o) => {
@@ -438,6 +443,9 @@ export class PaymentsService {
         orderId: payment.orderId,
         status: OrderStatus.PAID,
         dedupe: true,
+      });
+      await this.notifications.notifyPaymentApproved(payment.orderId).catch((error) => {
+        this.logger.error(`Notification failed for approved order=${payment.orderId}`, error);
       });
     }
 

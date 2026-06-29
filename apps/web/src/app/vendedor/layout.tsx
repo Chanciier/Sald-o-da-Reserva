@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import {
   LayoutDashboard,
   Package,
@@ -142,15 +143,18 @@ export default function VendedorLayout({ children }: { children: React.ReactNode
       {/* Main */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Mobile top bar */}
-        <div className="flex items-center gap-3 border-b bg-card px-4 py-3 md:hidden">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Abrir menu"
-            className="rounded-md p-1.5 hover:bg-muted transition-colors"
-          >
-            <Menu className="size-5" />
-          </button>
-          <span className="text-sm font-semibold">Vendedor · Saldão</span>
+        <div className="flex items-center justify-between border-b bg-card px-4 py-2.5">
+          <div className="flex items-center gap-3 md:invisible">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir menu"
+              className="rounded-md p-1.5 hover:bg-muted transition-colors"
+            >
+              <Menu className="size-5" />
+            </button>
+            <span className="text-sm font-semibold">Vendedor · Saldão</span>
+          </div>
+          <NotificationBell />
         </div>
 
         <main className="flex-1 overflow-y-auto">

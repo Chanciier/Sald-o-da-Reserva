@@ -5,6 +5,7 @@ import { CartService } from '../cart/cart.service';
 import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
 import { MetaService } from '../meta/meta.service';
 import { StockService } from '../stock/stock.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { recordOrderEvent } from '../common/order-timeline';
 import type { CreateOrderDto } from './dto/create-order.dto';
 
@@ -39,6 +40,7 @@ export class CheckoutService {
     private readonly shippingService: ShippingService,
     private readonly meta: MetaService,
     private readonly stock: StockService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async getShippingOptions(_subtotal: number, cep?: string): Promise<ShippingQuoteOption[]> {
@@ -218,6 +220,10 @@ export class CheckoutService {
     if (dto.cpf) {
       await this.prisma.user.update({ where: { id: userId }, data: { cpf: dto.cpf } });
     }
+
+    await this.notifications.notifyNewOrder(order.id).catch((error) => {
+      this.logger.error(`Notification failed for new order=${order.id}`, error);
+    });
 
     // Fire Meta CAPI InitiateCheckout (fire-and-forget)
     this.prisma.user
