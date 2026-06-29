@@ -21,3 +21,4 @@ AGENTS.md
 .design-sync
 .dsentry
 ds-bundle
+apps/api/src/notifications
