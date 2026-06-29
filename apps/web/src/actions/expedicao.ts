@@ -11,6 +11,7 @@ export interface EnvioStats {
 export interface RetiradaStats {
   aguardandoSeparacao: number;
   emSeparacao: number;
+  separados: number;
   aguardandoRetirada: number;
   retiradosHoje: number;
 }
