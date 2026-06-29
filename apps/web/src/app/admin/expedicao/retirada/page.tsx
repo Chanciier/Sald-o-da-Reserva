@@ -4,7 +4,12 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Store } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchRetirada, confirmarRetirada, cancelarPedido } from '@/actions/expedicao';
+import {
+  fetchRetirada,
+  marcarPronto,
+  confirmarRetirada,
+  cancelarPedido,
+} from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -52,6 +57,11 @@ export default function RetiradaPage() {
     queryKey: ['expedicao-retirada', page],
     queryFn: () => fetchRetirada(token!, { page }),
     enabled: !!token,
+  });
+
+  const prontoMutation = useMutation({
+    mutationFn: (orderId: string) => marcarPronto(token!, orderId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expedicao-retirada'] }),
   });
 
   const mutation = useMutation({
@@ -163,15 +173,27 @@ export default function RetiradaPage() {
                           </>
                         ) : (
                           <>
-                            <button
-                              onClick={() => mutation.mutate(o.id)}
-                              disabled={mutation.isPending}
-                              className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                            >
-                              {mutation.isPending && mutation.variables === o.id
-                                ? 'Confirmando...'
-                                : 'Confirmar Retirada'}
-                            </button>
+                            {o.status === 'SEPARATED' ? (
+                              <button
+                                onClick={() => prontoMutation.mutate(o.id)}
+                                disabled={prontoMutation.isPending}
+                                className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                              >
+                                {prontoMutation.isPending && prontoMutation.variables === o.id
+                                  ? 'Salvando...'
+                                  : 'Pronto na Loja'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => mutation.mutate(o.id)}
+                                disabled={mutation.isPending}
+                                className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                              >
+                                {mutation.isPending && mutation.variables === o.id
+                                  ? 'Confirmando...'
+                                  : 'Confirmar Retirada'}
+                              </button>
+                            )}
                             <button
                               onClick={() => setConfirmCancel(o.id)}
                               className="rounded-lg border border-destructive/50 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
