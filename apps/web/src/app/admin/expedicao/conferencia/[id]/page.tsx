@@ -4,7 +4,17 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileText, Tag, CheckCircle2, Loader2, AlertCircle, Truck } from 'lucide-react';
+import {
+  ArrowLeft,
+  FileText,
+  Tag,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Truck,
+  Phone,
+  MessageCircle,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
 import { fetchInvoices, emitInvoice, reemitInvoice } from '@/actions/invoices';
@@ -39,6 +49,21 @@ const STATUS_COLOR: Record<string, string> = {
 
 function fmt(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatPhone(d: string | null | undefined) {
+  if (!d) return '—';
+  const c = d.replace(/\D/g, '');
+  if (c.length === 11) return `(${c.slice(0, 2)}) ${c.slice(2, 7)}-${c.slice(7)}`;
+  if (c.length === 10) return `(${c.slice(0, 2)}) ${c.slice(2, 6)}-${c.slice(6)}`;
+  return d;
+}
+
+function waLink(d: string | null | undefined) {
+  if (!d) return null;
+  const c = d.replace(/\D/g, '');
+  if (c.length < 10) return null;
+  return `https://wa.me/55${c}`;
 }
 
 async function patchStatus(token: string, orderId: string, status: string) {
@@ -258,6 +283,9 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const pickupCode = (order as Order & { pickupCode?: string | null }).pickupCode;
   const shipment = order.shipment;
   const status = order.status;
+  const customerPhone = (order as Order & { customerPhone?: string | null }).customerPhone ?? null;
+  const buyerName = (order as Order & { buyerName?: string | null }).buyerName ?? null;
+  const wa = waLink(customerPhone);
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -275,6 +303,33 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
           {STATUS_LABEL[status] ?? status}
         </span>
       </div>
+
+      {/* Contato do cliente */}
+      <section className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="border-b px-4 py-3 flex items-center gap-2">
+          <MessageCircle className="h-4 w-4 text-muted-foreground" />
+          <h2 className="font-semibold text-sm">Contato do Cliente</h2>
+        </div>
+        <div className="p-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="font-medium">{buyerName ?? order.shippingAddress?.name ?? '—'}</p>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Phone className="h-3.5 w-3.5" />
+              {formatPhone(customerPhone)}
+            </p>
+          </div>
+          {wa && (
+            <a
+              href={wa}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+            >
+              <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+            </a>
+          )}
+        </div>
+      </section>
 
       {/* 1. Resumo do Pedido */}
       <section className="rounded-xl border bg-card shadow-sm overflow-hidden">
