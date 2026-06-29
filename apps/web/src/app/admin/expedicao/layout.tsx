@@ -7,9 +7,9 @@ const TABS = [
   { href: '/admin/expedicao', label: 'Dashboard', exact: true },
   { href: '/admin/expedicao/fila', label: 'Fila' },
   { href: '/admin/expedicao/separacao', label: 'Separação' },
-  { href: '/admin/expedicao/prontos', label: 'Prontos' },
+  { href: '/admin/expedicao/prontos', label: 'Prontos p/ Envio' },
   { href: '/admin/expedicao/enviados', label: 'Enviados' },
-  { href: '/admin/expedicao/retirada', label: 'Retirada' },
+  { href: '/admin/expedicao/retirada', label: 'Retirada na Loja' },
   { href: '/admin/expedicao/concluidos', label: 'Concluídos' },
 ];
 

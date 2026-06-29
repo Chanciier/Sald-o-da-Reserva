@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchProntos, marcarPronto, cancelarPedido } from '@/actions/expedicao';
+import { fetchProntos, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
-import { DeliveryTabs, useDeliveryTab } from '../_components/delivery-tabs';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -47,15 +46,9 @@ export default function ProntosPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
-  const [deliveryMethod, setDeliveryMethod] = useDeliveryTab();
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
-
-  const prontoMutation = useMutation({
-    mutationFn: (orderId: string) => marcarPronto(token!, orderId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expedicao-prontos'] }),
-  });
 
   const cancelMutation = useMutation({
     mutationFn: (orderId: string) => cancelarPedido(token!, orderId),
@@ -71,20 +64,16 @@ export default function ProntosPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['expedicao-prontos', page, deliveryMethod],
-    queryFn: () => fetchProntos(token!, { page, deliveryMethod }),
+    queryKey: ['expedicao-prontos', page],
+    queryFn: () => fetchProntos(token!, { page, deliveryMethod: 'SHIPPING' }),
     enabled: !!token,
   });
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <Package className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">
-            {deliveryMethod === 'PICKUP' ? 'Prontos para Retirada' : 'Prontos para Envio'}
-          </h1>
-        </div>
+      <div className="flex items-center gap-2">
+        <Package className="h-5 w-5 text-primary" />
+        <h1 className="text-xl font-bold">Prontos para Envio</h1>
       </div>
 
       {cancelError && (
@@ -114,14 +103,6 @@ export default function ProntosPage() {
         </div>
       )}
 
-      <DeliveryTabs
-        value={deliveryMethod}
-        onChange={(v) => {
-          setDeliveryMethod(v);
-          setPage(1);
-        }}
-      />
-
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -129,9 +110,7 @@ export default function ProntosPage() {
           </div>
         ) : !data?.data.length ? (
           <p className="py-16 text-center text-sm text-muted-foreground">
-            {deliveryMethod === 'PICKUP'
-              ? 'Nenhum pedido pronto para retirada'
-              : 'Nenhum pedido pronto para envio'}
+            Nenhum pedido pronto para envio
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -140,8 +119,6 @@ export default function ProntosPage() {
                 <tr className="text-left text-xs text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Pedido</th>
                   <th className="px-4 py-3 font-medium">Cliente</th>
-                  <th className="px-4 py-3 font-medium">Tipo</th>
-                  <th className="px-4 py-3 font-medium">Cód. Retirada</th>
                   <th className="px-4 py-3 font-medium">NF-e</th>
                   <th className="px-4 py-3 font-medium">Etiqueta</th>
                   <th className="px-4 py-3 font-medium">Ação</th>
@@ -156,22 +133,6 @@ export default function ProntosPage() {
                     <td className="px-4 py-3">
                       <p className="font-medium leading-tight">{o.user.name ?? '—'}</p>
                       <p className="text-xs text-muted-foreground">{o.user.email}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${o.deliveryMethod === 'PICKUP' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'}`}
-                      >
-                        {o.deliveryMethod === 'PICKUP' ? 'Retirada' : 'Envio'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {o.deliveryMethod === 'PICKUP' ? (
-                        <span className="font-mono text-sm font-bold tracking-wider">
-                          {o.pickupCode ?? '—'}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <InvoiceBadge invoices={o.invoices} />
@@ -202,17 +163,6 @@ export default function ProntosPage() {
                           </>
                         ) : (
                           <>
-                            {o.deliveryMethod === 'PICKUP' && o.status === 'SEPARATED' && (
-                              <button
-                                onClick={() => prontoMutation.mutate(o.id)}
-                                disabled={prontoMutation.isPending}
-                                className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
-                              >
-                                {prontoMutation.isPending && prontoMutation.variables === o.id
-                                  ? 'Salvando...'
-                                  : 'Pronto na Loja'}
-                              </button>
-                            )}
                             <Link
                               href={`/admin/expedicao/conferencia/${o.id}`}
                               className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
