@@ -16,10 +16,6 @@ export class MailService {
     const smtpUser = this.config.get<string>('SMTP_USER', '');
     const smtpPass = this.config.get<string>('SMTP_PASS', '');
 
-    this.from = this.config.get<string>(
-      'SMTP_FROM',
-      this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@saldaodareserva.com.br'),
-    );
     this.frontendUrl = this.config
       .get<string>('FRONTEND_URL', 'http://localhost:3000')
       .split(',')[0]
@@ -37,12 +33,24 @@ export class MailService {
           })
         : null;
 
+    // O remetente precisa casar com o provedor ATIVO. O Resend só aceita um from
+    // de domínio verificado (RESEND_FROM_EMAIL); o SMTP usa a conta autenticada
+    // (SMTP_FROM). Como send() prefere Resend quando ambos existem, a prioridade
+    // do "from" segue a mesma ordem — senão o Resend recusa o envio em silêncio.
+    const resendFrom = this.config.get<string>('RESEND_FROM_EMAIL', '');
+    const smtpFrom = this.config.get<string>('SMTP_FROM', '');
+    if (this.resend) {
+      this.from = resendFrom || smtpFrom || 'noreply@saldaodareversa.com';
+    } else {
+      this.from = smtpFrom || resendFrom || 'noreply@saldaodareversa.com';
+    }
+
     if (!this.resend && !this.smtp) {
       this.logger.warn('Nenhum provedor de e-mail configurado — e-mails apenas logados.');
-    } else if (this.smtp) {
-      this.logger.log(`MailService: usando SMTP (${smtpUser})`);
+    } else if (this.resend) {
+      this.logger.log(`MailService: usando Resend (from ${this.from})`);
     } else {
-      this.logger.log('MailService: usando Resend');
+      this.logger.log(`MailService: usando SMTP (${smtpUser}, from ${this.from})`);
     }
   }
 
@@ -323,12 +331,21 @@ export class MailService {
   private async send(opts: { to: string; subject: string; html: string }): Promise<void> {
     if (this.resend) {
       try {
-        await this.resend.emails.send({
+        // O SDK do Resend NÃO lança em erro de API — retorna { data, error }.
+        // Precisamos inspecionar `error` explicitamente, senão a falha é silenciosa.
+        const { data, error } = await this.resend.emails.send({
           from: `Saldão da Reserva <${this.from}>`,
           to: opts.to,
           subject: opts.subject,
           html: opts.html,
         });
+        if (error) {
+          this.logger.error(
+            `Resend recusou e-mail para ${opts.to} (from ${this.from}): ${error.name} — ${error.message}`,
+          );
+        } else {
+          this.logger.log(`Resend: "${opts.subject}" enviado para ${opts.to} (id ${data?.id})`);
+        }
       } catch (err) {
         this.logger.error(`Resend error to ${opts.to}: ${(err as Error).message}`);
       }
