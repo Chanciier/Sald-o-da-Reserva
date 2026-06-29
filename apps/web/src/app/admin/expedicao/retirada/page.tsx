@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Store, PackageCheck, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -221,6 +222,12 @@ export default function RetiradaPage() {
                           </>
                         ) : (
                           <>
+                            <Link
+                              href={`/pedidos/${o.id}`}
+                              className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted transition-colors"
+                            >
+                              Ver
+                            </Link>
                             {grupo === 'separados' ? (
                               <button
                                 onClick={() => prontoMutation.mutate(o.id)}
