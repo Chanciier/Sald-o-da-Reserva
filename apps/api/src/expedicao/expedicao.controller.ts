@@ -74,10 +74,15 @@ export class ExpedicaoController {
   }
 
   @Get('retirada')
-  getRetirada(@CurrentUser() user: AuthenticatedUser, @Query('page') page = '1') {
+  getRetirada(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('page') page = '1',
+    @Query('grupo') grupo?: string,
+  ) {
     return this.expedicaoService.getRetirada({
       page: parseInt(page, 10) || 1,
       userId: this.resolveUserId(user),
+      grupo: grupo as 'separados' | 'prontos' | undefined,
     });
   }
 

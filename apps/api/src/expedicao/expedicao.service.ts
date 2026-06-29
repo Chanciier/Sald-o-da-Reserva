@@ -155,11 +155,10 @@ export class ExpedicaoService {
     const retirada = {
       aguardandoSeparacao: count(DeliveryMethod.PICKUP, OrderStatus.PAID),
       emSeparacao: count(DeliveryMethod.PICKUP, OrderStatus.SEPARATING),
-      aguardandoRetirada: count(
-        DeliveryMethod.PICKUP,
-        OrderStatus.SEPARATED,
-        OrderStatus.READY_TO_SHIP,
-      ),
+      // Separados, mas ainda não marcados como prontos/postos no balcão.
+      separados: count(DeliveryMethod.PICKUP, OrderStatus.SEPARATED),
+      // Prontos na loja, aguardando o cliente buscar.
+      aguardandoRetirada: count(DeliveryMethod.PICKUP, OrderStatus.READY_TO_SHIP),
       retiradosHoje,
     };
 
@@ -309,13 +308,24 @@ export class ExpedicaoService {
     );
   }
 
-  async getRetirada(opts: { page: number; userId?: string | null }) {
-    const { page, userId } = opts;
+  async getRetirada(opts: {
+    page: number;
+    userId?: string | null;
+    grupo?: 'separados' | 'prontos';
+  }) {
+    const { page, userId, grupo } = opts;
     const skip = (page - 1) * PAGE_SIZE;
+
+    const statusFilter =
+      grupo === 'separados'
+        ? OrderStatus.SEPARATED
+        : grupo === 'prontos'
+          ? OrderStatus.READY_TO_SHIP
+          : { in: [OrderStatus.SEPARATED, OrderStatus.READY_TO_SHIP] };
 
     const where: Record<string, unknown> = {
       deliveryMethod: DeliveryMethod.PICKUP,
-      status: { in: [OrderStatus.SEPARATED, OrderStatus.READY_TO_SHIP] },
+      status: statusFilter,
     };
     if (userId) where.userId = userId;
 

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Store } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Store, PackageCheck, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import {
   fetchRetirada,
@@ -11,6 +11,8 @@ import {
   cancelarPedido,
 } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
+
+type Grupo = 'separados' | 'prontos';
 
 const STATUS_LABEL: Record<string, string> = {
   PAID: 'Pago',
@@ -32,10 +34,20 @@ function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
 }
 
+function useGrupoTab(): [Grupo, (g: Grupo) => void] {
+  const [grupo, setGrupo] = useState<Grupo>('separados');
+  useEffect(() => {
+    const g = new URLSearchParams(window.location.search).get('grupo');
+    if (g === 'separados' || g === 'prontos') setGrupo(g);
+  }, []);
+  return [grupo, setGrupo];
+}
+
 export default function RetiradaPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
+  const [grupo, setGrupo] = useGrupoTab();
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
@@ -54,8 +66,8 @@ export default function RetiradaPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['expedicao-retirada', page],
-    queryFn: () => fetchRetirada(token!, { page }),
+    queryKey: ['expedicao-retirada', grupo, page],
+    queryFn: () => fetchRetirada(token!, { page, grupo }),
     enabled: !!token,
   });
 
@@ -69,11 +81,45 @@ export default function RetiradaPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['expedicao-retirada'] }),
   });
 
+  function handleGrupo(g: Grupo) {
+    setGrupo(g);
+    setPage(1);
+    setConfirmCancel(null);
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
         <Store className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">Retirada na Loja</h1>
+      </div>
+
+      {/* Tabs */}
+      <div className="inline-flex rounded-lg border bg-card p-1">
+        <button
+          type="button"
+          onClick={() => handleGrupo('separados')}
+          className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            grupo === 'separados'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <PackageCheck className="h-4 w-4" />
+          Separados
+        </button>
+        <button
+          type="button"
+          onClick={() => handleGrupo('prontos')}
+          className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            grupo === 'prontos'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Clock className="h-4 w-4" />
+          Aguardando Retirada
+        </button>
       </div>
 
       {cancelError && (
@@ -110,7 +156,9 @@ export default function RetiradaPage() {
           </div>
         ) : !data?.data.length ? (
           <p className="py-16 text-center text-sm text-muted-foreground">
-            Nenhum pedido aguardando retirada
+            {grupo === 'separados'
+              ? 'Nenhum pedido separado aguardando ser posto no balcão'
+              : 'Nenhum pedido aguardando retirada pelo cliente'}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -173,7 +221,7 @@ export default function RetiradaPage() {
                           </>
                         ) : (
                           <>
-                            {o.status === 'SEPARATED' ? (
+                            {grupo === 'separados' ? (
                               <button
                                 onClick={() => prontoMutation.mutate(o.id)}
                                 disabled={prontoMutation.isPending}
