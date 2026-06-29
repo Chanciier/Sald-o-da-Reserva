@@ -10,6 +10,7 @@ import {
   Store,
   ArrowRight,
   ClipboardList,
+  ClipboardCheck,
   PackageCheck,
   Send,
   CheckCircle2,
@@ -165,6 +166,13 @@ export default function ExpedicaoDashboard() {
               href="/admin/expedicao/separacao?tipo=PICKUP"
               icon={PackageCheck}
               color="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+            />
+            <StatRow
+              label="Separados (preparar)"
+              value={data?.retirada.separados}
+              href="/admin/expedicao/retirada"
+              icon={ClipboardCheck}
+              color="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
             />
             <StatRow
               label="Aguardando retirada"
