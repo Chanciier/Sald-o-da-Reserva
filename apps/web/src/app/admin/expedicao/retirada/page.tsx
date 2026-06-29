@@ -223,7 +223,7 @@ export default function RetiradaPage() {
                         ) : (
                           <>
                             <Link
-                              href={`/pedidos/${o.id}`}
+                              href={`/admin/expedicao/conferencia/${o.id}`}
                               className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted transition-colors"
                             >
                               Ver
