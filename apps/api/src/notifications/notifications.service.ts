@@ -32,13 +32,24 @@ export class NotificationsService {
     });
   }
 
-  notifyPaymentApproved(orderId: string): Promise<void> {
-    const shortId = orderId.slice(-8).toUpperCase();
+  async notifyPaymentApproved(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { total: true },
+    });
+    const amount = order
+      ? new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(Number(order.total))
+      : null;
     return this.notify({
       role: Role.ADMIN,
       type: 'PAYMENT_APPROVED',
       title: 'Pagamento aprovado',
-      message: `O pagamento do pedido #${shortId} foi aprovado.`,
+      message: amount
+        ? `Pagamento aprovado: ${amount}.`
+        : 'Um pagamento foi aprovado.',
       orderId,
     });
   }
