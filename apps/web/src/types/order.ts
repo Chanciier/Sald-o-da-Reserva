@@ -95,6 +95,7 @@ export interface Order {
     amount: number;
   } | null;
   shipment?: Shipment | null;
+  deliveredAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

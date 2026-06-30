@@ -252,7 +252,7 @@ export default function OrderDetailPage() {
       {(() => {
         const activeReturn = returnRequests.find((r) => r.status !== 'REJECTED');
         const deliveredAt =
-          (order.shipment as Shipment | null | undefined)?.deliveredAt ?? order.updatedAt;
+          order.deliveredAt ?? (order.shipment as Shipment | null | undefined)?.deliveredAt ?? null;
         const withinWindow =
           order.status === 'DELIVERED' && deliveredAt
             ? (Date.now() - new Date(deliveredAt).getTime()) / (1000 * 60 * 60 * 24) <= 7

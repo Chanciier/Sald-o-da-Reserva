@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { OrderStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShippingService } from '../shipping/shipping.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
@@ -38,7 +38,14 @@ export class ReturnsService {
   async create(dto: CreateReturnDto, user: AuthenticatedUser) {
     const order = await this.prisma.order.findUnique({
       where: { id: dto.orderId },
-      include: { shipment: true },
+      include: {
+        shipment: true,
+        statusEvents: {
+          where: { status: OrderStatus.DELIVERED },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+      },
     });
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
@@ -51,7 +58,8 @@ export class ReturnsService {
       throw new BadRequestException('Só é possível solicitar devolução de pedidos entregues.');
     }
 
-    const deliveredAt = order.shipment?.deliveredAt ?? order.updatedAt;
+    const deliveredAt =
+      order.shipment?.deliveredAt ?? order.statusEvents[0]?.createdAt ?? order.updatedAt;
     const diffMs = Date.now() - new Date(deliveredAt).getTime();
     const diffDays = diffMs / (1000 * 60 * 60 * 24);
     if (diffDays > RETURN_WINDOW_DAYS) {

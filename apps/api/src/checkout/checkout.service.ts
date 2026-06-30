@@ -403,16 +403,26 @@ export class CheckoutService {
             deliveredAt: true,
           },
         },
+        statusEvents: {
+          where: { status: 'DELIVERED' },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { createdAt: true },
+        },
       },
     });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
-    const o = order as Record<string, unknown> & {
-      coupon: { code: string; type: string; value: { toNumber(): number } } | null;
-    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const o = order as any;
+    const { statusEvents, ...orderData } = o;
+    const deliveredAt: string | null =
+      o.shipment?.deliveredAt ??
+      (statusEvents?.[0]?.createdAt ? new Date(statusEvents[0].createdAt).toISOString() : null);
 
     return {
-      ...serializeOrder(o),
+      ...serializeOrder(orderData as Record<string, unknown>),
+      deliveredAt,
       coupon: o.coupon
         ? { code: o.coupon.code, type: o.coupon.type, value: o.coupon.value.toNumber() }
         : null,
