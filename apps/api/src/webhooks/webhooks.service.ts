@@ -14,7 +14,6 @@ import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { RedisService } from '../redis/redis.service';
 import { InvoiceService } from '../invoices/invoice.service';
 import { ShippingService } from '../shipping/shipping.service';
-import { MetaService } from '../meta/meta.service';
 import { StockService } from '../stock/stock.service';
 import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 import { recordOrderEvent } from '../common/order-timeline';
@@ -43,7 +42,6 @@ export class WebhooksService {
     private readonly redis: RedisService,
     private readonly invoiceService: InvoiceService,
     private readonly shippingService: ShippingService,
-    private readonly meta: MetaService,
     private readonly stock: StockService,
     private readonly config: ConfigService,
     private readonly orderWa: OrderWhatsappService,
@@ -245,14 +243,6 @@ export class WebhooksService {
             `Webhook MP: auto-shipping skipped for order=${payment.orderId} — ${(e as Error).message}`,
           ),
         );
-
-      this.meta.purchase({
-        orderId: payment.orderId,
-        amount: payment.amount.toNumber(),
-        contentIds: payment.order.items.map((i) => i.productId),
-        numItems: payment.order.items.reduce((s, i) => s + i.quantity, 0),
-        email: payment.order.user?.email,
-      });
     }
 
     this.logger.log(

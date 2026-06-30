@@ -21,7 +21,6 @@ import { AddToCartButton } from '@/components/products/add-to-cart-button';
 import { ProductReviews } from '@/components/products/product-reviews';
 import { ShareButton } from '@/components/products/share-button';
 import { ProductBadge } from '@/components/products/discovery/product-badge';
-import { ProductPixelEvents } from '@/components/products/product-pixel-events';
 import { ProductSection } from '@/components/products/discovery/product-section';
 import { SaveButton } from '@/components/products/discovery/save-button';
 
@@ -83,7 +82,6 @@ export default async function ProductPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-4">
-      <ProductPixelEvents productId={product.id} productName={product.name} productPrice={price} />
       {/* Back link */}
       <div className="mb-6">
         <Link
@@ -177,12 +175,7 @@ export default async function ProductPage({ params }: PageProps) {
 
           {/* CTAs */}
           {product.status === 'ACTIVE' && (
-            <AddToCartButton
-              productId={product.id}
-              stock={product.stock}
-              productName={product.name}
-              productPrice={price}
-            />
+            <AddToCartButton productId={product.id} stock={product.stock} />
           )}
           <SaveButton product={product} />
 

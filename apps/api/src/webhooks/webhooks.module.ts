@@ -6,7 +6,6 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { MercadoPagoModule } from '../mercadopago/mercadopago.module';
 import { InvoiceModule } from '../invoices/invoice.module';
 import { ShippingModule } from '../shipping/shipping.module';
-import { MetaModule } from '../meta/meta.module';
 import { StockModule } from '../stock/stock.module';
 import { MarketplaceModule } from '../marketplace/marketplace.module';
 
@@ -16,7 +15,6 @@ import { MarketplaceModule } from '../marketplace/marketplace.module';
     MercadoPagoModule,
     InvoiceModule,
     ShippingModule,
-    MetaModule,
     StockModule,
     MarketplaceModule,
   ],

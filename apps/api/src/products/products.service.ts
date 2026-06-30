@@ -14,7 +14,6 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
 import { WhatsappMarketingService } from '../whatsapp/whatsapp-marketing.service';
-import { MetaCatalogService, CatalogProduct } from '../meta-catalog/meta-catalog.service';
 import { MarketplaceHubService } from '../marketplace/marketplace-hub.service';
 
 const CACHE_TTL = 300;
@@ -75,7 +74,6 @@ export class ProductsService {
     private readonly redis: RedisService,
     private readonly storage: StorageService,
     private readonly whatsappMarketing: WhatsappMarketingService,
-    private readonly metaCatalog: MetaCatalogService,
     private readonly marketplaceHub: MarketplaceHubService,
   ) {}
 
@@ -101,32 +99,6 @@ export class ProductsService {
     } catch (_) {
       // fire-and-forget: audit failures must not break business operations
     }
-  }
-
-  private toCatalogProduct(p: {
-    id: string;
-    name: string;
-    slug: string;
-    price: Prisma.Decimal;
-    salePrice: Prisma.Decimal | null;
-    description: string | null;
-    shortDescription: string | null;
-    stock: number;
-    brand: string | null;
-    images: { url: string }[];
-  }): CatalogProduct {
-    return {
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      price: p.price.toNumber(),
-      salePrice: p.salePrice?.toNumber() ?? null,
-      description: p.description,
-      shortDescription: p.shortDescription,
-      stock: p.stock,
-      brand: p.brand,
-      images: p.images,
-    };
   }
 
   private async connectImagesWithPosition(imageIds: string[], productId: string) {
@@ -204,10 +176,6 @@ export class ProductsService {
 
     if (product.status === 'ACTIVE') {
       this.whatsappMarketing.publishProduct(product, product.whatsappGroupIds).catch(() => {});
-    }
-
-    if (product.status === 'ACTIVE') {
-      this.metaCatalog.upsert(this.toCatalogProduct(product));
     }
 
     // OMS: cria jobs de publicação nos marketplaces escolhidos. SITE é sempre
@@ -382,14 +350,6 @@ export class ProductsService {
       this.whatsappMarketing.publishProduct(updated, updated.whatsappGroupIds).catch(() => {});
     }
 
-    if (updated) {
-      if (updated.status === 'ACTIVE') {
-        this.metaCatalog.upsert(this.toCatalogProduct(updated));
-      } else {
-        this.metaCatalog.remove(updated.id, updated.name);
-      }
-    }
-
     // OMS: sincroniza apenas o que mudou, e só para os marketplaces onde o
     // produto está publicado (enqueueSync é no-op se não houver publicações).
     await this.enqueueSyncForChanges(id, existing, dto, dimensions !== undefined, updated);
@@ -461,8 +421,6 @@ export class ProductsService {
       newStock: stock,
     });
 
-    this.metaCatalog.upsert(this.toCatalogProduct(updated));
-
     // OMS: propaga o novo estoque aos marketplaces onde o produto está publicado.
     if (stock !== existing.stock) {
       await this.marketplaceHub.enqueueSync(id, SyncAction.UPDATE_STOCK, stock);
@@ -519,7 +477,6 @@ export class ProductsService {
       await this.redis.delPattern('products:*');
       await this.auditLog('PRODUCT_ARCHIVED', user.id, { productId: id, name: existing.name });
 
-      this.metaCatalog.remove(id, existing.name);
       return { archived: true };
     }
 
@@ -530,7 +487,6 @@ export class ProductsService {
     await this.redis.delPattern('products:*');
     await this.auditLog('PRODUCT_DELETED', user.id, { productId: id, name: existing.name });
 
-    this.metaCatalog.remove(id, existing.name);
     return { archived: false };
   }
 }

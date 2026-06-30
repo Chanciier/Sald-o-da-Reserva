@@ -8,7 +8,6 @@ import { QueryProvider } from '@/providers/query-provider';
 import { ConditionalHeader } from '@/components/layout/conditional-header';
 import { ConditionalFooter } from '@/components/layout/conditional-footer';
 import { CookieBanner } from '@/components/cookie-banner';
-import { PixelProvider } from '@/components/pixel-provider';
 import { SITE_URL } from '@/lib/site-url';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -57,7 +56,6 @@ export default function RootLayout({
           </AuthProvider>
         </QueryProvider>
         <Analytics />
-        <PixelProvider />
       </body>
     </html>
   );

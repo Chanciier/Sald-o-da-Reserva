@@ -26,8 +26,6 @@ import { MailModule } from './mail/mail.module';
 import { ContentModule } from './content/content.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
-import { MetaModule } from './meta/meta.module';
-import { MetaCatalogModule } from './meta-catalog/meta-catalog.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { EventBusModule } from './events/event-bus.module';
 import { QueueModule } from './queue/queue.module';
@@ -73,8 +71,6 @@ import { envValidation } from './config/env.validation';
     ContentModule,
     ReviewsModule,
     WhatsappModule,
-    MetaModule,
-    MetaCatalogModule,
     NotificationsModule,
     EventBusModule,
     QueueModule,

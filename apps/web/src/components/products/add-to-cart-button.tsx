@@ -3,16 +3,13 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
-import { pixelAddToCart } from '@/lib/pixel';
 
 interface Props {
   productId: string;
   stock: number;
-  productName?: string;
-  productPrice?: number;
 }
 
-export function AddToCartButton({ productId, stock, productName, productPrice }: Props) {
+export function AddToCartButton({ productId, stock }: Props) {
   const { user } = useAuth();
   const { addItem, loading } = useCart();
   const [qty, setQty] = useState(1);
@@ -44,13 +41,6 @@ export function AddToCartButton({ productId, stock, productName, productPrice }:
     setFeedback('');
     try {
       await addItem(productId, qty);
-      pixelAddToCart({
-        content_ids: [productId],
-        content_name: productName ?? '',
-        content_type: 'product',
-        value: (productPrice ?? 0) * qty,
-        currency: 'BRL',
-      });
       setFeedback('Adicionado!');
       setTimeout(() => setFeedback(''), 2000);
     } catch (e) {

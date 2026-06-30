@@ -3,7 +3,6 @@ import { DeliveryMethod, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
-import { MetaService } from '../meta/meta.service';
 import { StockService } from '../stock/stock.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { recordOrderEvent } from '../common/order-timeline';
@@ -40,7 +39,6 @@ export class CheckoutService {
     private readonly prisma: PrismaService,
     private readonly cartService: CartService,
     private readonly shippingService: ShippingService,
-    private readonly meta: MetaService,
     private readonly stock: StockService,
     private readonly notifications: NotificationsService,
     private readonly events: EventBusService,
@@ -234,22 +232,6 @@ export class CheckoutService {
       this.logger.error(`Reserva de estoque falhou para pedido=${order.id}`, error);
     });
     this.events.emit(OmsEvents.OrderCreated, { orderId: order.id });
-
-    // Fire Meta CAPI InitiateCheckout (fire-and-forget)
-    this.prisma.user
-      .findUnique({ where: { id: userId }, select: { email: true } })
-      .then((user) => {
-        this.meta.initiateCheckout({
-          orderId: order.id,
-          value: order.total.toNumber(),
-          contentIds: order.items.map((i: { productId: string }) => i.productId),
-          numItems: order.items.reduce((s: number, i: { quantity: number }) => s + i.quantity, 0),
-          email: user?.email,
-        });
-      })
-      .catch((err) =>
-        this.logger.warn(`Meta CAPI InitiateCheckout skipped for order=${order.id}`, err),
-      );
 
     return serializeOrder(order as unknown as Record<string, unknown>);
   }

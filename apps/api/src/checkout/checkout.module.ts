@@ -4,11 +4,10 @@ import { CheckoutController } from './checkout.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CartModule } from '../cart/cart.module';
 import { ShippingModule } from '../shipping/shipping.module';
-import { MetaModule } from '../meta/meta.module';
 import { StockModule } from '../stock/stock.module';
 
 @Module({
-  imports: [PrismaModule, CartModule, ShippingModule, MetaModule, StockModule],
+  imports: [PrismaModule, CartModule, ShippingModule, StockModule],
   controllers: [CheckoutController],
   providers: [CheckoutService],
 })
