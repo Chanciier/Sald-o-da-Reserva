@@ -402,6 +402,18 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
   const errorCls = 'mt-1 text-xs text-destructive';
   const cardCls = 'rounded-xl border bg-card p-5 shadow-sm space-y-4';
 
+  // Realce dos campos exigidos pela publicação no Mercado Livre.
+  const mlSelected = publishTo.includes('MERCADO_LIVRE');
+  const mlBadge = mlSelected ? (
+    <span
+      title="Campo usado na publicação do anúncio no Mercado Livre"
+      className="ml-1.5 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+    >
+      ML
+    </span>
+  ) : null;
+  const mlFieldRing = mlSelected ? ' ring-1 ring-amber-400/70' : '';
+
   return (
     <form onSubmit={handleSubmit(onFormSubmit)}>
       {/* Top bar */}
@@ -454,8 +466,12 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           <div className={cardCls}>
             <h2 className="text-sm font-semibold">Informações básicas</h2>
             <div>
-              <label className={labelCls}>Nome *</label>
-              <input {...register('name')} className={inputCls} placeholder="Nome do produto" />
+              <label className={labelCls}>Nome *{mlBadge}</label>
+              <input
+                {...register('name')}
+                className={`${inputCls}${mlFieldRing}`}
+                placeholder="Nome do produto"
+              />
               {errors.name && <p className={errorCls}>{errors.name.message}</p>}
             </div>
             <div>
@@ -509,8 +525,17 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               </div>
             </div>
             <div>
-              <label className={labelCls}>Marca</label>
-              <input {...register('brand')} className={inputCls} placeholder="Nome da marca" />
+              <label className={labelCls}>Marca{mlBadge}</label>
+              <input
+                {...register('brand')}
+                className={`${inputCls}${mlFieldRing}`}
+                placeholder="Nome da marca"
+              />
+              {mlSelected && (
+                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                  Sem marca, o anúncio vai como “Genérica”.
+                </p>
+              )}
             </div>
             <div>
               <label className={labelCls}>Descrição curta</label>
@@ -532,8 +557,13 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           </div>
 
           {/* Imagens */}
-          <div className={cardCls}>
-            <h2 className="text-sm font-semibold">Imagens</h2>
+          <div className={`${cardCls}${mlSelected ? ' ring-1 ring-amber-400/70' : ''}`}>
+            <h2 className="text-sm font-semibold">Imagens{mlBadge}</h2>
+            {mlSelected && (
+              <p className="-mt-2 text-xs text-amber-700 dark:text-amber-400">
+                O Mercado Livre exige pelo menos 1 foto.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {images.map((img, idx) => (
                 <div
@@ -659,13 +689,13 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
             <h2 className="text-sm font-semibold">Preço</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className={labelCls}>Preço normal (R$) *</label>
+                <label className={labelCls}>Preço normal (R$) *{mlBadge}</label>
                 <input
                   {...register('price')}
                   type="number"
                   step="0.01"
                   min="0"
-                  className={inputCls}
+                  className={`${inputCls}${mlFieldRing}`}
                   placeholder="0,00"
                 />
                 {errors.price && <p className={errorCls}>{errors.price.message}</p>}
@@ -718,8 +748,13 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           {/* Logística */}
           <div className={cardCls}>
             <h2 className="text-sm font-semibold">Logística</h2>
+            {mlSelected && (
+              <p className="-mt-2 text-xs text-amber-700 dark:text-amber-400">
+                Peso e dimensões são usados pelo Mercado Livre para calcular o frete.
+              </p>
+            )}
             <div>
-              <label className={labelCls}>Peso (kg)</label>
+              <label className={labelCls}>Peso (kg){mlBadge}</label>
               <input
                 {...register('weight')}
                 type="number"
@@ -730,7 +765,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               />
             </div>
             <div>
-              <p className={labelCls}>Dimensões (cm)</p>
+              <p className={labelCls}>Dimensões (cm){mlBadge}</p>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
                   <input
@@ -842,23 +877,40 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                   : 'O site é sempre incluído. Marketplaces sem credenciais ficam com erro visível no painel — o cadastro no site não é afetado.'}
               </p>
             </div>
+
+            {mlSelected && (
+              <div className="mt-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                <p className="font-medium">Para o anúncio no Mercado Livre, confira:</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  <li>Nome, preço e ao menos 1 imagem</li>
+                  <li>Marca (sem marca, vai como “Genérica”)</li>
+                  <li>Peso e dimensões (cálculo do frete)</li>
+                  <li>GTIN/EAN e condição (algumas categorias exigem)</li>
+                </ul>
+                <p className="mt-1.5">
+                  A categoria é detectada automaticamente pelo título — os campos marcados com{' '}
+                  <span className="font-semibold">ML</span> no formulário são os usados na
+                  publicação.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Mercado Livre */}
-          <div className={cardCls}>
+          <div className={`${cardCls}${mlSelected ? ' ring-1 ring-amber-400/70' : ''}`}>
             <h2 className="text-sm font-semibold">Mercado Livre</h2>
             <div>
               <label className={labelCls}>Condição do anúncio</label>
-              <select {...register('condition')} className={inputCls}>
+              <select {...register('condition')} className={`${inputCls}${mlFieldRing}`}>
                 <option value="new">Novo</option>
                 <option value="used">Usado</option>
               </select>
             </div>
             <div>
-              <label className={labelCls}>GTIN / EAN (código de barras)</label>
+              <label className={labelCls}>GTIN / EAN (código de barras){mlBadge}</label>
               <input
                 {...register('gtin')}
-                className={inputCls}
+                className={`${inputCls}${mlFieldRing}`}
                 placeholder="Ex: 7891234567895"
                 maxLength={14}
               />
