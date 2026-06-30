@@ -5,6 +5,7 @@ import { SiteProvider } from './providers/site.provider';
 import { MercadoLivreProvider } from './providers/mercadolivre.provider';
 import { ShopeeProvider } from './providers/shopee.provider';
 import { MlTokenService } from './providers/ml-token.service';
+import { MlCatalogService } from './providers/ml-catalog.service';
 import { RedisModule } from '../redis/redis.module';
 
 @Module({
@@ -16,6 +17,7 @@ import { RedisModule } from '../redis/redis.module';
     MercadoLivreProvider,
     ShopeeProvider,
     MlTokenService,
+    MlCatalogService,
   ],
   exports: [MarketplaceHubService],
 })

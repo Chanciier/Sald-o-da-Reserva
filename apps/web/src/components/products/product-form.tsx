@@ -69,6 +69,8 @@ const schema = z.object({
   ncm: z.string().max(20).optional(),
   origem: z.coerce.number().int().min(0).max(8).optional(),
   cstCsosn: z.string().max(10).optional(),
+  gtin: z.string().max(14).optional(),
+  condition: z.enum(['new', 'used']).default('new'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -202,6 +204,8 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           ncm: initialData.ncm ?? '',
           origem: initialData.origem ?? 0,
           cstCsosn: initialData.cstCsosn ?? '102',
+          gtin: initialData.gtin ?? '',
+          condition: (initialData.condition as FormData['condition']) ?? 'new',
         }
       : {
           status: 'ACTIVE',
@@ -211,6 +215,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           featuredOffer: false,
           sku: generateSku(),
           cstCsosn: '102',
+          condition: 'new',
         },
   });
 
@@ -379,6 +384,8 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       ncm: data.ncm || undefined,
       origem: data.origem ?? 0,
       cstCsosn: data.cstCsosn || undefined,
+      gtin: data.gtin || undefined,
+      condition: data.condition,
       imageIds: images.map((i) => i.id),
       autoPublishWhatsapp,
       whatsappGroupIds,
@@ -833,6 +840,31 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                 {initialData
                   ? 'Marque os canais para publicar ao salvar. Deixe vazio para não alterar.'
                   : 'O site é sempre incluído. Marketplaces sem credenciais ficam com erro visível no painel — o cadastro no site não é afetado.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Mercado Livre */}
+          <div className={cardCls}>
+            <h2 className="text-sm font-semibold">Mercado Livre</h2>
+            <div>
+              <label className={labelCls}>Condição do anúncio</label>
+              <select {...register('condition')} className={inputCls}>
+                <option value="new">Novo</option>
+                <option value="used">Usado</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>GTIN / EAN (código de barras)</label>
+              <input
+                {...register('gtin')}
+                className={inputCls}
+                placeholder="Ex: 7891234567895"
+                maxLength={14}
+              />
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Exigido por várias categorias do ML. A categoria é detectada automaticamente pelo
+                título ao publicar.
               </p>
             </div>
           </div>

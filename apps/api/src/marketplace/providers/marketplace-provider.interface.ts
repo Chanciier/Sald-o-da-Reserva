@@ -16,6 +16,14 @@ export interface MarketplaceProductInput {
   images: string[];
   categoryName?: string | null;
   ncm?: string | null;
+  /** EAN/UPC do produto — usado no atributo GTIN do Mercado Livre. */
+  gtin?: string | null;
+  /** Condição do anúncio no ML: 'new' | 'used'. */
+  condition?: string | null;
+  /** Produto único (peça sem reposição) → quantidade publicada = 1. */
+  isUnique?: boolean;
+  /** Id do anúncio no marketplace (preenchido em updates de produto já publicado). */
+  externalId?: string | null;
 }
 
 /** Referência de um produto já publicado em um marketplace. */

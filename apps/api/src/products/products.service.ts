@@ -162,6 +162,8 @@ export class ProductsService {
         origem: dto.origem ?? 0,
         cfop: dto.cfop,
         cstCsosn: dto.cstCsosn,
+        gtin: dto.gtin,
+        condition: dto.condition ?? 'new',
         createdById: userId,
       },
       include: INCLUDE_FULL,

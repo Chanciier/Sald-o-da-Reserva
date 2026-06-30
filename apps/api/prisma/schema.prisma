@@ -241,6 +241,11 @@ model Product {
   origem              Int?          @default(0)
   cfop                String?       @db.VarChar(10)
   cstCsosn            String?       @map("cst_csosn") @db.VarChar(10)
+  // OMS/Marketplace: dados usados na publicação em marketplaces externos (ML).
+  // `gtin` (EAN/UPC) é exigido por várias categorias do Mercado Livre; `condition`
+  // mapeia para o campo `condition` do anúncio ('new' | 'used').
+  gtin                String?
+  condition           String        @default("new")
   pickupAvailable     Boolean       @default(false) @map("pickup_available")
   featuredOffer       Boolean       @default(false) @map("featured_offer")
   status              ProductStatus @default(ACTIVE)

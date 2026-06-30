@@ -223,6 +223,7 @@ export class MarketplaceHubService implements OnModuleInit {
     switch (job.action) {
       case SyncAction.UPDATE: {
         const input = await this.buildInput(job.productId);
+        if (input) input.externalId = pub.externalId;
         result = input
           ? await provider.updateProduct(input)
           : { ok: false, error: 'Produto não encontrado' };
@@ -363,6 +364,9 @@ export class MarketplaceHubService implements OnModuleInit {
       images: product.images.map((i) => i.url),
       categoryName: product.category?.name ?? null,
       ncm: product.ncm,
+      gtin: product.gtin,
+      condition: product.condition,
+      isUnique: product.isUnique,
     };
   }
 

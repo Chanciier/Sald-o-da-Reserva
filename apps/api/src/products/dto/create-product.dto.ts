@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsObject,
@@ -143,6 +144,18 @@ export class CreateProductDto {
   @IsString()
   @MaxLength(10)
   cstCsosn?: string;
+
+  // OMS/Marketplace: EAN/UPC (atributo GTIN exigido por várias categorias do ML).
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @IsString()
+  @MaxLength(14)
+  gtin?: string;
+
+  // OMS/Marketplace: condição do anúncio ('new' | 'used').
+  @IsOptional()
+  @IsIn(['new', 'used'])
+  condition?: string;
 
   @IsOptional()
   @IsArray()
