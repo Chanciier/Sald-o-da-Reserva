@@ -20,6 +20,7 @@ import { AIContentService } from './ai-content.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { GenerateContentDto, UpdateContentDto } from './dto/generate-content.dto';
+import { StartBroadcastDto } from './dto/start-broadcast.dto';
 
 @Controller('whatsapp')
 @Roles(Role.ADMIN)
@@ -79,8 +80,8 @@ export class WhatsappController {
   // repetir, até completar o ciclo. Retorna o estado inicial (com o 1º já enviado).
   @Post('broadcast-active')
   @HttpCode(HttpStatus.ACCEPTED)
-  broadcastActive() {
-    return this.broadcast.start();
+  broadcastActive(@Body() dto: StartBroadcastDto) {
+    return this.broadcast.start(dto.days);
   }
 
   @Get('broadcast-active/status')

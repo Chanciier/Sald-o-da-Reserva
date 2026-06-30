@@ -64,7 +64,25 @@ interface BroadcastStatus {
   lastProductName: string | null;
   startedAt: string;
   finishedAt: string | null;
+  intervalMin: number;
 }
+
+interface BroadcastDay {
+  dayOfWeek: number;
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+  intervalMin: number;
+}
+
+const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const DEFAULT_SCHEDULE: BroadcastDay[] = DAY_NAMES.map((_, dayOfWeek) => ({
+  dayOfWeek,
+  enabled: dayOfWeek >= 1 && dayOfWeek <= 5,
+  startTime: '09:00',
+  endTime: '18:00',
+  intervalMin: 10,
+}));
 
 function minutesUntil(iso: string): number {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 60_000));
@@ -147,6 +165,7 @@ export default function AdminWhatsappPage() {
 
   // --- Broadcast state ---
   const [broadcastResult, setBroadcastResult] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<BroadcastDay[]>(DEFAULT_SCHEDULE);
 
   // --- Conteúdo state ---
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -304,6 +323,7 @@ export default function AdminWhatsappPage() {
       const res = await fetch(`${BASE}/api/v1/whatsapp/broadcast-active`, {
         method: 'POST',
         headers: headers(),
+        body: JSON.stringify({ days: schedule }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -312,7 +332,7 @@ export default function AdminWhatsappPage() {
       return res.json();
     },
     onSuccess: () => {
-      setBroadcastResult('Disparo iniciado! 1 produto a cada 10 min, em ordem aleatória.');
+      setBroadcastResult('Rotina de disparo iniciada com sucesso.');
       qc.invalidateQueries({ queryKey: ['whatsapp-broadcast-status'] });
     },
     onError: (e: Error) => setBroadcastResult(`Erro: ${e.message}`),
@@ -399,10 +419,9 @@ export default function AdminWhatsappPage() {
           <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold">Repostar produtos ativos</p>
+                <p className="text-sm font-semibold">Rotina de disparo de produtos</p>
                 <p className="text-xs text-muted-foreground">
-                  Dispara 1 produto a cada 10 min, em ordem aleatória (sem repetir), até enviar
-                  todos os ativos em estoque para os grupos.
+                  Escolha os dias, a janela diária e o intervalo entre os disparos.
                 </p>
                 {broadcastResult && !broadcastRunning && (
                   <p
@@ -439,10 +458,91 @@ export default function AdminWhatsappPage() {
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                  Repostar Ativos
+                  Iniciar rotina
                 </button>
               )}
             </div>
+
+            {!broadcastRunning && (
+              <div className="overflow-x-auto rounded-lg border">
+                <div className="min-w-[620px]">
+                  <div className="grid grid-cols-[80px_1fr_1fr_1fr] gap-3 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+                    <span>Dia</span>
+                    <span>Início</span>
+                    <span>Fim</span>
+                    <span>Intervalo (min)</span>
+                  </div>
+                  {schedule.map((day, index) => (
+                    <div
+                      key={day.dayOfWeek}
+                      className="grid grid-cols-[80px_1fr_1fr_1fr] items-center gap-3 border-b px-3 py-2 last:border-0"
+                    >
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          checked={day.enabled}
+                          onChange={(event) =>
+                            setSchedule((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, enabled: event.target.checked }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                        {DAY_NAMES[day.dayOfWeek]}
+                      </label>
+                      <input
+                        type="time"
+                        value={day.startTime}
+                        disabled={!day.enabled}
+                        onChange={(event) =>
+                          setSchedule((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, startTime: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                        className={inputCls}
+                      />
+                      <input
+                        type="time"
+                        value={day.endTime}
+                        disabled={!day.enabled}
+                        onChange={(event) =>
+                          setSchedule((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index ? { ...item, endTime: event.target.value } : item,
+                            ),
+                          )
+                        }
+                        className={inputCls}
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        max={1440}
+                        value={day.intervalMin}
+                        disabled={!day.enabled}
+                        onChange={(event) =>
+                          setSchedule((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, intervalMin: Number(event.target.value) }
+                                : item,
+                            ),
+                          )
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Barra de progresso do ciclo */}
             {broadcastStatus && broadcastStatus.total > 0 && (
