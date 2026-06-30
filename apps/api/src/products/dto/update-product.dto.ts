@@ -13,7 +13,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { ProductStatus } from '@prisma/client';
+import { Marketplace, ProductStatus } from '@prisma/client';
 import { DimensionsDto } from './create-product.dto';
 
 export class UpdateProductDto {
@@ -159,4 +159,10 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   isUnique?: boolean;
+
+  // OMS: enfileira publicação imediata nos canais selecionados durante a edição.
+  @IsOptional()
+  @IsArray()
+  @IsEnum(Marketplace, { each: true })
+  publishTo?: Marketplace[];
 }

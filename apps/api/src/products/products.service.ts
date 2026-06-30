@@ -314,7 +314,7 @@ export class ProductsService {
       if (conflict) throw new ConflictException('SKU já em uso.');
     }
 
-    const { imageIds, dimensions, ...rest } = dto;
+    const { imageIds, dimensions, publishTo, ...rest } = dto;
     const slug = rest.name && !rest.slug ? slugify(rest.name) : (rest.slug ?? existing.slug);
 
     await this.prisma.product.update({
@@ -353,6 +353,12 @@ export class ProductsService {
     // OMS: sincroniza apenas o que mudou, e só para os marketplaces onde o
     // produto está publicado (enqueueSync é no-op se não houver publicações).
     await this.enqueueSyncForChanges(id, existing, dto, dimensions !== undefined, updated);
+
+    // OMS: publica imediatamente nos canais selecionados pelo admin na edição.
+    if (publishTo?.length) {
+      const targets = [...new Set<Marketplace>([Marketplace.SITE, ...publishTo])];
+      await this.marketplaceHub.enqueuePublish(id, targets);
+    }
 
     return serializeProduct(updated!);
   }

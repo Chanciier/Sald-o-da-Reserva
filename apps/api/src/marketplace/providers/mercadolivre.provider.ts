@@ -9,35 +9,26 @@ import {
   MarketplaceWebhookResult,
   ProductRef,
 } from './marketplace-provider.interface';
+import { MlTokenService } from './ml-token.service';
 
-/**
- * Provider do Mercado Livre — ESTRUTURA PREPARADA.
- *
- * As chamadas reais à API do ML exigem credenciais OAuth (app id/secret + token
- * por vendedor) que ainda não estão configuradas. Enquanto `isEnabled()` for
- * false, toda operação retorna um resultado de falha controlada (sem lançar),
- * de modo que o Hub registre o erro na publicação e o site continue funcionando.
- *
- * Pontos de integração reais estão marcados com TODO e centralizados em
- * `request()`, que já trata token/baseUrl/headers.
- */
 @Injectable()
 export class MercadoLivreProvider implements MarketplaceProvider {
   readonly marketplace = Marketplace.MERCADO_LIVRE;
   private readonly logger = new Logger(MercadoLivreProvider.name);
 
-  private readonly accessToken: string;
   private readonly sellerId: string;
   private readonly baseUrl: string;
 
-  constructor(private readonly config: ConfigService) {
-    this.accessToken = this.config.get<string>('ML_ACCESS_TOKEN', '');
+  constructor(
+    private readonly config: ConfigService,
+    private readonly tokenService: MlTokenService,
+  ) {
     this.sellerId = this.config.get<string>('ML_SELLER_ID', '');
     this.baseUrl = this.config.get<string>('ML_API_URL', 'https://api.mercadolibre.com');
   }
 
   isEnabled(): boolean {
-    return Boolean(this.accessToken && this.sellerId);
+    return this.tokenService.isConfigured() && Boolean(this.sellerId);
   }
 
   async publishProduct(product: MarketplaceProductInput): Promise<MarketplaceResult> {
@@ -100,6 +91,12 @@ export class MercadoLivreProvider implements MarketplaceProvider {
    * autenticado aqui (Authorization: Bearer {accessToken}).
    */
   private async request(operation: string, meta: unknown): Promise<MarketplaceResult> {
+    const token = await this.tokenService.getToken();
+    if (!token) {
+      return { ok: false, payloadSent: meta, error: 'ML: token de acesso indisponível' };
+    }
+    // TODO: implementar chamadas reais à API do ML usando token + this.baseUrl + this.sellerId.
+    // O token agora é renovado automaticamente via MlTokenService (cron a cada 5h + Redis).
     this.logger.warn(`ML.${operation}: chamada real ainda não implementada — retornando stub`);
     return {
       ok: false,

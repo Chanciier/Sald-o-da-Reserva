@@ -110,8 +110,10 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
     initialData?.whatsappGroupIds ?? [],
   );
   const [isUnique, setIsUnique] = useState(initialData?.isUnique ?? false);
-  // Canais de publicação (apenas no cadastro). SITE marcado por padrão.
-  const [publishTo, setPublishTo] = useState<('SITE' | 'MERCADO_LIVRE' | 'SHOPEE')[]>(['SITE']);
+  // No cadastro: SITE pré-selecionado. Na edição: vazio (publica só o que o usuário marcar).
+  const [publishTo, setPublishTo] = useState<('SITE' | 'MERCADO_LIVRE' | 'SHOPEE')[]>(
+    initialData ? [] : ['SITE'],
+  );
   const [resending, setResending] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeMsg, setAnalyzeMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -381,8 +383,8 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       autoPublishWhatsapp,
       whatsappGroupIds,
       isUnique,
-      // publishTo só faz sentido no cadastro inicial (cria as publicações).
-      ...(initialData ? {} : { publishTo }),
+      // No cadastro: publishTo cria as publicações. Na edição: só enfileira se algo foi selecionado.
+      ...(initialData ? (publishTo.length ? { publishTo } : {}) : { publishTo }),
     };
     await onSubmit(payload);
   }
@@ -801,46 +803,38 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
               </div>
             </label>
 
-            {!initialData ? (
-              <div className="mt-1 space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">Publicar em</p>
-                {(
-                  [
-                    { value: 'SITE', label: 'Site próprio' },
-                    { value: 'MERCADO_LIVRE', label: 'Mercado Livre' },
-                    { value: 'SHOPEE', label: 'Shopee' },
-                  ] as const
-                ).map((ch) => (
-                  <label key={ch.value} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={publishTo.includes(ch.value)}
-                      onChange={(e) =>
-                        setPublishTo((prev) =>
-                          e.target.checked
-                            ? [...prev, ch.value]
-                            : prev.filter((v) => v !== ch.value),
-                        )
-                      }
-                      className="h-4 w-4 accent-primary"
-                    />
-                    <span className="text-sm">{ch.label}</span>
-                  </label>
-                ))}
-                <p className="text-xs text-muted-foreground">
-                  O site é sempre incluído. Marketplaces sem credenciais ficam com erro visível no
-                  painel — o cadastro no site não é afetado.
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Gerencie a publicação nos marketplaces pelo{' '}
-                <a href="/admin/marketplaces" className="underline hover:text-foreground">
-                  painel de marketplaces
-                </a>
-                .
+            <div className="mt-1 space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                {initialData ? 'Publicar agora em' : 'Publicar em'}
               </p>
-            )}
+              {(
+                [
+                  { value: 'SITE', label: 'Site próprio' },
+                  { value: 'MERCADO_LIVRE', label: 'Mercado Livre' },
+                  { value: 'SHOPEE', label: 'Shopee' },
+                ] as const
+              ).map((ch) => (
+                <label key={ch.value} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={publishTo.includes(ch.value)}
+                    disabled={!initialData && ch.value === 'SITE'}
+                    onChange={(e) =>
+                      setPublishTo((prev) =>
+                        e.target.checked ? [...prev, ch.value] : prev.filter((v) => v !== ch.value),
+                      )
+                    }
+                    className="h-4 w-4 accent-primary disabled:opacity-60"
+                  />
+                  <span className="text-sm">{ch.label}</span>
+                </label>
+              ))}
+              <p className="text-xs text-muted-foreground">
+                {initialData
+                  ? 'Marque os canais para publicar ao salvar. Deixe vazio para não alterar.'
+                  : 'O site é sempre incluído. Marketplaces sem credenciais ficam com erro visível no painel — o cadastro no site não é afetado.'}
+              </p>
+            </div>
           </div>
 
           {/* Retirada na loja */}

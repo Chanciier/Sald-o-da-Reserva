@@ -4,15 +4,19 @@ import { MarketplaceHubService } from './marketplace-hub.service';
 import { SiteProvider } from './providers/site.provider';
 import { MercadoLivreProvider } from './providers/mercadolivre.provider';
 import { ShopeeProvider } from './providers/shopee.provider';
+import { MlTokenService } from './providers/ml-token.service';
+import { RedisModule } from '../redis/redis.module';
 
-/**
- * Marketplace Hub. Depende de Redis/Queue/EventBus (globais) e Prisma (global).
- * Exporta o Hub para que products/orchestrator possam enfileirar publicações e
- * sincronizações.
- */
 @Module({
+  imports: [RedisModule],
   controllers: [MarketplaceController],
-  providers: [MarketplaceHubService, SiteProvider, MercadoLivreProvider, ShopeeProvider],
+  providers: [
+    MarketplaceHubService,
+    SiteProvider,
+    MercadoLivreProvider,
+    ShopeeProvider,
+    MlTokenService,
+  ],
   exports: [MarketplaceHubService],
 })
 export class MarketplaceModule {}
