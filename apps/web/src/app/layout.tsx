@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     title: 'Saldão',
     statusBarStyle: 'default',
   },
-  icons: { apple: '/icon.png' },
+  icons: { icon: '/icon.png', apple: '/icon.png' },
 };
 
 export default function RootLayout({

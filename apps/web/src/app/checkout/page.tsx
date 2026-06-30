@@ -378,6 +378,7 @@ export default function CheckoutPage() {
                   onChange={(e) => setBuyerName(e.target.value)}
                   placeholder="Nome como deve constar na nota fiscal"
                   maxLength={150}
+                  autoComplete="name"
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
@@ -390,6 +391,7 @@ export default function CheckoutPage() {
                   placeholder="(11) 91234-5678"
                   maxLength={16}
                   inputMode="tel"
+                  autoComplete="tel"
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -464,6 +466,7 @@ export default function CheckoutPage() {
                     value={address.name}
                     onChange={(e) => set('name', e.target.value)}
                     placeholder="Fulano da Silva"
+                    autoComplete="name"
                     className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
@@ -478,6 +481,8 @@ export default function CheckoutPage() {
                       onBlur={(e) => lookupCep(e.target.value)}
                       placeholder="00000-000"
                       maxLength={9}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                     {cepLoading && (
@@ -490,6 +495,7 @@ export default function CheckoutPage() {
                       required
                       value={address.state}
                       onChange={(e) => set('state', e.target.value)}
+                      autoComplete="address-level1"
                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       <option value="">UF</option>
@@ -509,6 +515,7 @@ export default function CheckoutPage() {
                     value={address.street}
                     onChange={(e) => set('street', e.target.value)}
                     placeholder="Rua das Flores"
+                    autoComplete="address-line1"
                     className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
@@ -521,6 +528,8 @@ export default function CheckoutPage() {
                       value={address.number}
                       onChange={(e) => set('number', e.target.value)}
                       placeholder="123"
+                      inputMode="numeric"
+                      autoComplete="address-line2"
                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
@@ -543,6 +552,7 @@ export default function CheckoutPage() {
                       value={address.neighborhood}
                       onChange={(e) => set('neighborhood', e.target.value)}
                       placeholder="Centro"
+                      autoComplete="address-level3"
                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
@@ -553,6 +563,7 @@ export default function CheckoutPage() {
                       value={address.city}
                       onChange={(e) => set('city', e.target.value)}
                       placeholder="São Paulo"
+                      autoComplete="address-level2"
                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
@@ -646,7 +657,7 @@ export default function CheckoutPage() {
           </div>
 
           {/* Order summary */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:sticky lg:top-8 lg:self-start">
             <div className="rounded-xl border border-border p-5 space-y-3">
               <h2 className="font-semibold">Resumo</h2>
 

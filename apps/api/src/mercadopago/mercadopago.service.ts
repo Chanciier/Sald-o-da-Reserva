@@ -130,7 +130,11 @@ export class MercadoPagoService {
     const result = await this.refundApi!.create({
       payment_id: mpPaymentId,
       body: amount ? { amount } : undefined,
-      requestOptions: { idempotencyKey: `refund-${mpPaymentId}-${Date.now()}` },
+      // Stable idempotency key: no timestamp, amount-scoped for partial refunds.
+      // Prevents double-charging when the caller retries after a MP 5xx.
+      requestOptions: {
+        idempotencyKey: amount ? `refund-${mpPaymentId}-${amount}` : `refund-${mpPaymentId}`,
+      },
     });
     return {
       id: result.id ?? 0,
