@@ -46,9 +46,13 @@ export interface OrderDetailItem {
   image: string | null;
 }
 
+export type OrderChannel = 'SITE' | 'MERCADO_LIVRE' | 'SHOPEE';
+
 export interface ExpedicaoOrderDetail {
   id: string;
   status: string;
+  channel: OrderChannel;
+  externalId: string | null;
   deliveryMethod: 'SHIPPING' | 'PICKUP';
   pickupCode: string | null;
   customerPhone: string | null;
@@ -81,6 +85,8 @@ export interface ExpedicaoOrderDetail {
 export interface OrderSummary {
   id: string;
   status: string;
+  channel: OrderChannel;
+  buyerName: string | null;
   deliveryMethod: 'SHIPPING' | 'PICKUP';
   pickupCode: string | null;
   separatedItems: string[] | null;
@@ -227,6 +233,29 @@ export async function finalizarSeparacao(token: string, orderId: string) {
 
 export async function marcarPronto(token: string, orderId: string) {
   return apiFetch(token, `/expedicao/${orderId}/marcar-pronto`, { method: 'PATCH' });
+}
+
+export async function marcarEnviado(token: string, orderId: string) {
+  return apiFetch(token, `/expedicao/${orderId}/marcar-enviado`, { method: 'PATCH' });
+}
+
+/**
+ * Baixa a etiqueta do Mercado Livre (PDF protegido por token) e abre numa nova
+ * aba. Como o endpoint exige Authorization, buscamos como blob e geramos a URL.
+ */
+export async function abrirEtiquetaMl(token: string, orderId: string): Promise<void> {
+  const res = await fetch(`${API}/marketplaces/ml/orders/${orderId}/label`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: 'Falha ao obter etiqueta.' }));
+    throw new Error((err as { message?: string }).message ?? 'Falha ao obter etiqueta.');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export async function confirmarRetirada(token: string, orderId: string) {

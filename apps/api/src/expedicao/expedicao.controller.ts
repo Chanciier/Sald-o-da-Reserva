@@ -133,6 +133,11 @@ export class ExpedicaoController {
     return this.expedicaoService.marcarPronto(id, user.email);
   }
 
+  @Patch(':id/marcar-enviado')
+  marcarEnviado(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.expedicaoService.marcarEnviado(id, user.email);
+  }
+
   @Patch(':id/confirmar-retirada')
   confirmarRetirada(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.expedicaoService.confirmarRetirada(id, user.email);

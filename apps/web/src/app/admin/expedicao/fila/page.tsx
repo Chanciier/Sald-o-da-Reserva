@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { fetchFila, iniciarSeparacao, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
 import { DeliveryTabs, useDeliveryTab } from '../_components/delivery-tabs';
+import { ChannelBadge } from '../_components/channel-badge';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -192,11 +193,20 @@ export default function FilaPage() {
                 {data.data.map((o: OrderSummary) => (
                   <tr key={o.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-primary">{shortId(o.id)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-primary">{shortId(o.id)}</span>
+                        <ChannelBadge channel={o.channel} />
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium leading-tight">{o.user.name ?? '—'}</p>
-                      <p className="text-xs text-muted-foreground">{o.user.email}</p>
+                      <p className="font-medium leading-tight">
+                        {o.channel === 'SITE'
+                          ? (o.user.name ?? '—')
+                          : (o.buyerName ?? o.user.name ?? '—')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {o.channel === 'SITE' ? o.user.email : 'Comprador do marketplace'}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(o.createdAt).toLocaleDateString('pt-BR')}

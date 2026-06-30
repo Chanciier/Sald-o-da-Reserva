@@ -1,6 +1,12 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { DeliveryMethod, OrderStatus, PaymentStatus } from '@prisma/client';
+import {
+  DeliveryMethod,
+  Marketplace,
+  OrderStatus,
+  PaymentStatus,
+  ShipmentStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { InvoiceService } from '../invoices/invoice.service';
@@ -540,7 +546,8 @@ export class ExpedicaoService {
       actor,
     });
 
-    // Aviso ao cliente (fire-and-forget; o service nunca lança)
+    // Aviso ao cliente (fire-and-forget; o service nunca lança). Pedidos de
+    // marketplace não têm telefone/cliente local — o WhatsApp simplesmente no-opa.
     const target = { phone: order.customerPhone, name: order.buyerName, orderId };
     if (isPickup) {
       void this.orderWa.notifyPickupReady(target, order.pickupCode);
@@ -548,10 +555,59 @@ export class ExpedicaoService {
       void this.orderWa.notifyReadyToShip(target);
     }
 
-    this.invoiceService
-      .emitForOrder(orderId)
-      .catch((e) => this.logger.warn(`NF-e emission failed for order ${orderId}`, e));
+    // NF-e: emitimos automaticamente apenas para pedidos da loja própria. Em
+    // marketplaces (ex.: Mercado Livre) a parte fiscal segue o fluxo do canal —
+    // emitir aqui poderia gerar nota incorreta/duplicada.
+    if (order.channel === Marketplace.SITE) {
+      this.invoiceService
+        .emitForOrder(orderId)
+        .catch((e) => this.logger.warn(`NF-e emission failed for order ${orderId}`, e));
+    }
 
+    return updated;
+  }
+
+  /**
+   * Marca um pedido de ENVIO como despachado (READY_TO_SHIP/SEPARATED → SHIPPED).
+   * Pensado para pedidos de marketplace (ex.: Mercado Livre), cuja etiqueta é do
+   * próprio canal e não passa pelo Melhor Envio — então não há webhook do ME para
+   * avançar o estado automaticamente.
+   */
+  async marcarEnviado(orderId: string, actor?: string | null) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { shipment: { select: { id: true } } },
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+    if (order.deliveryMethod !== DeliveryMethod.SHIPPING) {
+      throw new BadRequestException('Marcar como enviado só é válido para pedidos de envio.');
+    }
+    if (order.status !== OrderStatus.READY_TO_SHIP && order.status !== OrderStatus.SEPARATED) {
+      throw new BadRequestException(
+        `Pedido deve estar pronto/separado para marcar como enviado. Status atual: ${order.status}`,
+      );
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const o = await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.SHIPPED },
+      });
+      if (order.shipment) {
+        await tx.shipment.update({
+          where: { id: order.shipment.id },
+          data: { status: ShipmentStatus.SHIPPED, shippedAt: new Date() },
+        });
+      }
+      return o;
+    });
+
+    await recordOrderEvent(this.prisma, { orderId, status: OrderStatus.SHIPPED, actor });
+    void this.orderWa.notifyShipped({
+      phone: order.customerPhone,
+      name: order.buyerName,
+      orderId,
+    });
     return updated;
   }
 
@@ -707,6 +763,9 @@ export class ExpedicaoService {
             break;
           case 'marcar-pronto':
             await this.marcarPronto(id, actor);
+            break;
+          case 'marcar-enviado':
+            await this.marcarEnviado(id, actor);
             break;
           case 'confirmar-retirada':
             await this.confirmarRetirada(id, actor);

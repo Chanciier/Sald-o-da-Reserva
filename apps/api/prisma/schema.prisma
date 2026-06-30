@@ -387,6 +387,12 @@ model Order {
   couponId        String?     @map("coupon_id")
   status          OrderStatus    @default(PENDING)
   deliveryMethod  DeliveryMethod @default(SHIPPING) @map("delivery_method")
+  // OMS: canal de origem do pedido. SITE = loja própria; demais = marketplaces.
+  // `externalId` é o id do pedido no marketplace (idempotência de importação);
+  // `externalReference` guarda o pack/shipment usado para agrupar/rastrear.
+  channel           Marketplace @default(SITE)
+  externalId        String?     @map("external_id")
+  externalReference String?     @map("external_reference")
   subtotal        Decimal        @db.Decimal(10, 2)
   discount        Decimal        @default(0) @db.Decimal(10, 2)
   shipping        Decimal        @default(0) @db.Decimal(10, 2)
@@ -414,7 +420,9 @@ model Order {
   statusEvents   OrderStatusEvent[]
   notifications  Notification[]
 
+  @@unique([channel, externalId], map: "orders_channel_external_id_key")
   @@index([userId])
+  @@index([channel])
   @@map("orders")
 }
 
@@ -527,6 +535,9 @@ model Shipment {
   orderId      String         @unique @map("order_id")
   meOrderId    String?        @unique @map("me_order_id")
   frenetTicket String?        @unique @map("frenet_ticket")
+  // Id do envio no marketplace de origem (ex.: shipment do Mercado Livre). Usado
+  // para baixar a etiqueta e sincronizar o rastreio quando o canal não é o ME.
+  externalId   String?        @map("external_id")
   carrier      String
   service      String
   serviceId    Int            @map("service_id")

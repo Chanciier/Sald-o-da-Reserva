@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Package, Printer, Truck } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchProntos, cancelarPedido } from '@/actions/expedicao';
+import { fetchProntos, cancelarPedido, marcarEnviado, abrirEtiquetaMl } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
+import { ChannelBadge } from '../_components/channel-badge';
 
 function shortId(id: string) {
   return '#' + id.slice(-8).toUpperCase();
@@ -49,6 +50,7 @@ export default function ProntosPage() {
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
+  const [labelBusy, setLabelBusy] = useState<string | null>(null);
 
   const cancelMutation = useMutation({
     mutationFn: (orderId: string) => cancelarPedido(token!, orderId),
@@ -62,6 +64,25 @@ export default function ProntosPage() {
       qc.invalidateQueries({ queryKey: ['expedicao-prontos'] });
     },
   });
+
+  const shipMutation = useMutation({
+    mutationFn: (orderId: string) => marcarEnviado(token!, orderId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expedicao-prontos'] }),
+    onError: (err) => setCancelError((err as Error).message),
+  });
+
+  async function handleMlLabel(orderId: string) {
+    if (!token) return;
+    setLabelBusy(orderId);
+    setCancelError(null);
+    try {
+      await abrirEtiquetaMl(token, orderId);
+    } catch (err) {
+      setCancelError((err as Error).message);
+    } finally {
+      setLabelBusy(null);
+    }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['expedicao-prontos', page],
@@ -128,11 +149,20 @@ export default function ProntosPage() {
                 {data.data.map((o: OrderSummary) => (
                   <tr key={o.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-primary">{shortId(o.id)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-primary">{shortId(o.id)}</span>
+                        <ChannelBadge channel={o.channel} />
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium leading-tight">{o.user.name ?? '—'}</p>
-                      <p className="text-xs text-muted-foreground">{o.user.email}</p>
+                      <p className="font-medium leading-tight">
+                        {o.channel === 'SITE'
+                          ? (o.user.name ?? '—')
+                          : (o.buyerName ?? o.user.name ?? '—')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {o.channel === 'SITE' ? o.user.email : 'Comprador do marketplace'}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <InvoiceBadge invoices={o.invoices} />
@@ -163,12 +193,35 @@ export default function ProntosPage() {
                           </>
                         ) : (
                           <>
-                            <Link
-                              href={`/admin/expedicao/conferencia/${o.id}`}
-                              className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
-                            >
-                              Conferência
-                            </Link>
+                            {o.channel === 'MERCADO_LIVRE' ? (
+                              <>
+                                <button
+                                  onClick={() => handleMlLabel(o.id)}
+                                  disabled={labelBusy === o.id}
+                                  className="flex items-center gap-1 rounded border border-yellow-400 px-2 py-1 text-xs text-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 disabled:opacity-50 transition-colors"
+                                >
+                                  <Printer className="h-3.5 w-3.5" />
+                                  {labelBusy === o.id ? '...' : 'Etiqueta ML'}
+                                </button>
+                                <button
+                                  onClick={() => shipMutation.mutate(o.id)}
+                                  disabled={shipMutation.isPending}
+                                  className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                                >
+                                  <Truck className="h-3.5 w-3.5" />
+                                  {shipMutation.isPending && shipMutation.variables === o.id
+                                    ? 'Enviando...'
+                                    : 'Marcar enviado'}
+                                </button>
+                              </>
+                            ) : (
+                              <Link
+                                href={`/admin/expedicao/conferencia/${o.id}`}
+                                className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
+                              >
+                                Conferência
+                              </Link>
+                            )}
                             <button
                               onClick={() => setConfirmCancel(o.id)}
                               className="rounded-lg border border-destructive/50 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"

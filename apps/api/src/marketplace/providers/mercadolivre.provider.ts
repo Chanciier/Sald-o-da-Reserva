@@ -11,6 +11,7 @@ import {
 } from './marketplace-provider.interface';
 import { MlTokenService } from './ml-token.service';
 import { MlAttribute, MlCatalogService } from './ml-catalog.service';
+import { MlOrderImportService } from './ml-order-import.service';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT';
 
@@ -49,6 +50,7 @@ export class MercadoLivreProvider implements MarketplaceProvider {
     private readonly config: ConfigService,
     private readonly tokenService: MlTokenService,
     private readonly catalog: MlCatalogService,
+    private readonly importer: MlOrderImportService,
   ) {
     this.sellerId = this.config.get<string>('ML_SELLER_ID', '');
     this.baseUrl = this.config.get<string>('ML_API_URL', 'https://api.mercadolibre.com');
@@ -152,16 +154,41 @@ export class MercadoLivreProvider implements MarketplaceProvider {
 
   async getOrders(): Promise<MarketplaceOrder[]> {
     if (!this.isEnabled()) return [];
-    // Importação de pedidos externos: fase futura (GET /orders/search?seller=).
-    return [];
+    const res = await this.ml<{ results?: Array<Record<string, unknown>> }>(
+      'GET',
+      `/orders/search?seller=${this.sellerId}&order.status=paid&sort=date_desc&limit=25`,
+    );
+    if (!res.ok || !res.data?.results) return [];
+    return res.data.results.map((o) => ({
+      externalId: String(o.id),
+      status: typeof o.status === 'string' ? o.status : undefined,
+      total: typeof o.total_amount === 'number' ? o.total_amount : undefined,
+      buyerName:
+        typeof o.buyer === 'object' && o.buyer
+          ? String((o.buyer as { nickname?: string }).nickname ?? '')
+          : undefined,
+      raw: o,
+    }));
   }
 
+  /**
+   * Webhook do ML: roteia por tópico. Pedidos pagos viram pedidos internos
+   * (importer); envios atualizam rastreio/estado. Erros transitórios propagam
+   * para a fila reprocessar; nada além de orders/shipments é tratado aqui.
+   */
   async handleWebhook(payload: unknown): Promise<MarketplaceWebhookResult> {
-    const topic =
-      typeof payload === 'object' && payload !== null && 'topic' in payload
-        ? String((payload as { topic: unknown }).topic)
-        : undefined;
-    this.logger.log(`Webhook ML recebido topic=${topic ?? 'desconhecido'}`);
+    const { topic, resource } = parseNotification(payload);
+    this.logger.log(`Webhook ML topic=${topic ?? '?'} resource=${resource ?? '?'}`);
+
+    const externalId = lastPathSegment(resource);
+    if (externalId && isOrderTopic(topic, resource)) {
+      const result = await this.importer.importByOrderId(externalId);
+      if (!result.imported && result.reason) {
+        this.logger.log(`Webhook ML order ${externalId}: ${result.reason}`);
+      }
+    } else if (externalId && isShipmentTopic(topic, resource)) {
+      await this.importer.syncShipmentById(externalId);
+    }
     return { received: true, eventType: topic };
   }
 
@@ -302,4 +329,28 @@ export class MercadoLivreProvider implements MarketplaceProvider {
       error: 'Mercado Livre não configurado (ML_CLIENT_ID/SECRET/TOKEN/ML_SELLER_ID ausentes)',
     };
   }
+}
+
+/** Extrai topic/resource de uma notificação do ML (formato pode variar). */
+function parseNotification(payload: unknown): { topic?: string; resource?: string } {
+  if (typeof payload !== 'object' || payload === null) return {};
+  const p = payload as Record<string, unknown>;
+  const topic = typeof p.topic === 'string' ? p.topic : undefined;
+  const resource = typeof p.resource === 'string' ? p.resource : undefined;
+  return { topic, resource };
+}
+
+function lastPathSegment(resource?: string): string | null {
+  if (!resource) return null;
+  const parts = resource.split('/').filter(Boolean);
+  const last = parts[parts.length - 1];
+  return last && /^\d+$/.test(last) ? last : (last ?? null);
+}
+
+function isOrderTopic(topic?: string, resource?: string): boolean {
+  return Boolean(topic?.includes('order') || resource?.includes('/orders/'));
+}
+
+function isShipmentTopic(topic?: string, resource?: string): boolean {
+  return Boolean(topic?.includes('shipment') || resource?.includes('/shipments/'));
 }

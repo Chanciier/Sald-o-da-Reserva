@@ -13,8 +13,10 @@ import {
   finalizarSeparacao,
   cancelarPedido,
   salvarObservacao,
+  abrirEtiquetaMl,
 } from '@/actions/expedicao';
 import type { ExpedicaoOrderDetail, OrderDetailItem, TimelineEvent } from '@/actions/expedicao';
+import { ChannelBadge } from '../../_components/channel-badge';
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Pendente',
@@ -167,6 +169,8 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelError, setCancelError] = useState('');
   const [refundWarning, setRefundWarning] = useState('');
+  const [labelBusy, setLabelBusy] = useState(false);
+  const [labelError, setLabelError] = useState('');
 
   const { data: order, isLoading } = useQuery<ExpedicaoOrderDetail>({
     queryKey: ['expedicao-order', params.id],
@@ -249,7 +253,21 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
   const checkedCount = items.filter((i) => checked.has(i.id)).length;
   const allChecked = total > 0 && checkedCount === total;
   const isPickup = order.deliveryMethod === 'PICKUP';
+  const isMl = order.channel === 'MERCADO_LIVRE';
   const wa = waLink(order.customerPhone);
+
+  async function handleMlLabel() {
+    if (!token) return;
+    setLabelBusy(true);
+    setLabelError('');
+    try {
+      await abrirEtiquetaMl(token, order!.id);
+    } catch (err) {
+      setLabelError((err as Error).message);
+    } finally {
+      setLabelBusy(false);
+    }
+  }
   const addr = order.shippingAddress as {
     street?: string;
     number?: string;
@@ -284,6 +302,7 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
           {isPickup ? <Store className="h-3 w-3" /> : <Truck className="h-3 w-3" />}
           {isPickup ? 'Retirada' : 'Envio'}
         </span>
+        <ChannelBadge channel={order.channel} />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
@@ -347,6 +366,25 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
                   {order.shipment?.carrier ? ` · ${order.shipment.carrier}` : ''}
                   {order.shipment?.trackingCode ? ` · ${order.shipment.trackingCode}` : ''}
                 </p>
+              </div>
+            )}
+
+            {/* Mercado Livre: etiqueta e fiscal são do próprio canal */}
+            {isMl && !isPickup && (
+              <div className="rounded-lg border border-yellow-300/60 bg-yellow-50 dark:bg-yellow-900/10 px-4 py-3 space-y-2">
+                <p className="text-xs text-yellow-800 dark:text-yellow-300">
+                  Pedido do <strong>Mercado Livre</strong>. Use a etiqueta do próprio ML para postar
+                  — a NF-e segue o fluxo fiscal do canal.
+                </p>
+                <button
+                  onClick={handleMlLabel}
+                  disabled={labelBusy}
+                  className="flex items-center gap-1.5 rounded-lg border border-yellow-400 px-3 py-1.5 text-xs font-medium text-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 disabled:opacity-50"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  {labelBusy ? 'Abrindo...' : 'Baixar etiqueta do Mercado Livre'}
+                </button>
+                {labelError && <p className="text-xs text-destructive">{labelError}</p>}
               </div>
             )}
           </div>

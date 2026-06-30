@@ -6,10 +6,12 @@ import { MercadoLivreProvider } from './providers/mercadolivre.provider';
 import { ShopeeProvider } from './providers/shopee.provider';
 import { MlTokenService } from './providers/ml-token.service';
 import { MlCatalogService } from './providers/ml-catalog.service';
+import { MlOrderImportService } from './providers/ml-order-import.service';
 import { RedisModule } from '../redis/redis.module';
+import { StockModule } from '../stock/stock.module';
 
 @Module({
-  imports: [RedisModule],
+  imports: [RedisModule, StockModule],
   controllers: [MarketplaceController],
   providers: [
     MarketplaceHubService,
@@ -18,7 +20,8 @@ import { RedisModule } from '../redis/redis.module';
     ShopeeProvider,
     MlTokenService,
     MlCatalogService,
+    MlOrderImportService,
   ],
-  exports: [MarketplaceHubService],
+  exports: [MarketplaceHubService, MlOrderImportService],
 })
 export class MarketplaceModule {}

@@ -378,7 +378,7 @@ export class MarketplaceHubService implements OnModuleInit {
     return Promise.all(
       marketplaces.map(async (marketplace) => {
         const provider = this.providers.get(marketplace);
-        const [published, failed, lastSync, queued, dead] = await Promise.all([
+        const [published, failed, lastSync, queued, dead, importedOrders] = await Promise.all([
           this.prisma.marketplacePublication.count({
             where: { marketplace, status: PublicationStatus.PUBLISHED },
           }),
@@ -392,6 +392,10 @@ export class MarketplaceHubService implements OnModuleInit {
           }),
           this.queue.count(QueueNames.MarketplacePublish),
           this.queue.countDead(QueueNames.MarketplaceSync),
+          // Pedidos importados deste canal (o SITE não importa — fica em 0).
+          marketplace === Marketplace.SITE
+            ? Promise.resolve(0)
+            : this.prisma.order.count({ where: { channel: marketplace } }),
         ]);
 
         return {
@@ -402,7 +406,7 @@ export class MarketplaceHubService implements OnModuleInit {
           lastSyncAt: lastSync?.finishedAt ?? null,
           queuedJobs: queued,
           deadLetterJobs: dead,
-          importedOrders: 0, // importação de pedidos externos: fase futura
+          importedOrders,
         };
       }),
     );
