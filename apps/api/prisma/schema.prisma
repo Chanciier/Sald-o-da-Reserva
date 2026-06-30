@@ -19,6 +19,58 @@ enum ProductStatus {
   OUT_OF_STOCK
   DRAFT
   ARCHIVED
+  // OMS: ciclo de vida para produtos únicos e proteção contra venda duplicada.
+  RESERVED
+  SOLD
+  UNAVAILABLE
+  REMOVED
+}
+
+// ── OMS / Marketplace ─────────────────────────────────────────────────────────
+enum Marketplace {
+  SITE
+  MERCADO_LIVRE
+  SHOPEE
+}
+
+enum PublicationStatus {
+  PENDING
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  PAUSED
+  REMOVED
+  SYNC_PENDING
+}
+
+enum SyncAction {
+  PUBLISH
+  UPDATE
+  UPDATE_STOCK
+  UPDATE_PRICE
+  PAUSE
+  REMOVE
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum WebhookSource {
+  MERCADO_PAGO
+  MERCADO_LIVRE
+  SHOPEE
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
 }
 
 enum CouponType {
@@ -182,6 +234,9 @@ model Product {
   dimensions          Json?
   stock               Int           @default(0)
   minimumStock        Int           @default(0) @map("minimum_stock")
+  // OMS: produto único (peça de saldão sem reposição). Reserva estoque já no
+  // pedido e pausa o anúncio nos demais canais para evitar venda duplicada.
+  isUnique            Boolean       @default(false) @map("is_unique")
   ncm                 String?
   origem              Int?          @default(0)
   cfop                String?       @db.VarChar(10)
@@ -206,10 +261,14 @@ model Product {
   whatsappLogs    WhatsappMessageLog[]
   whatsappContent WhatsappContentHistory[]
   metaCatalogSync MetaCatalogSync?
+  publications    MarketplacePublication[]
+  syncLogs        MarketplaceSyncLog[]
+  notifications   Notification[]
 
   @@index([categoryId])
   @@index([status])
   @@index([createdById])
+  @@index([isUnique])
   @@map("products")
 }
 
@@ -427,16 +486,19 @@ model Notification {
   type       String
   title      String
   message    String
-  orderId    String    @map("order_id")
+  orderId    String?   @map("order_id")
+  productId  String?   @map("product_id")
   readAt     DateTime? @map("read_at")
   createdAt  DateTime  @default(now()) @map("created_at")
 
-  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order   Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type, orderId])
   @@index([userId, readAt, createdAt])
   @@index([roleTarget, createdAt])
+  @@index([productId])
   @@map("notifications")
 }
 
@@ -637,4 +699,65 @@ model MetaCatalogSync {
 
   @@index([status])
   @@map("meta_catalog_syncs")
+}
+
+// ── OMS / Marketplace ─────────────────────────────────────────────────────────
+
+// Estado de publicação de um produto em cada marketplace. Um par
+// (product, marketplace) é único: representa "onde o produto está anunciado".
+model MarketplacePublication {
+  id               String            @id @default(cuid())
+  productId        String            @map("product_id")
+  marketplace      Marketplace
+  externalId       String?           @map("external_id")
+  status           PublicationStatus @default(PENDING)
+  errorMessage     String?           @map("error_message") @db.Text
+  payloadSent      Json?             @map("payload_sent")
+  responseReceived Json?             @map("response_received")
+  publishedAt      DateTime?         @map("published_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, marketplace])
+  @@index([marketplace, status])
+  @@index([status])
+  @@map("marketplace_publications")
+}
+
+// Log de cada operação de sincronização disparada para um marketplace.
+model MarketplaceSyncLog {
+  id           String      @id @default(cuid())
+  productId    String      @map("product_id")
+  marketplace  Marketplace
+  action       SyncAction
+  status       SyncStatus  @default(PENDING)
+  errorMessage String?     @map("error_message") @db.Text
+  createdAt    DateTime    @default(now()) @map("created_at")
+  finishedAt   DateTime?   @map("finished_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([marketplace, status])
+  @@index([createdAt])
+  @@map("marketplace_sync_logs")
+}
+
+// Log bruto de todo webhook recebido (MP, ML, Shopee). Persistido antes de
+// qualquer processamento para nunca travar o fluxo principal e permitir replay.
+model WebhookLog {
+  id           String        @id @default(cuid())
+  source       WebhookSource
+  eventType    String?       @map("event_type")
+  payload      Json
+  status       WebhookStatus @default(RECEIVED)
+  errorMessage String?       @map("error_message") @db.Text
+  createdAt    DateTime      @default(now()) @map("created_at")
+  processedAt  DateTime?     @map("processed_at")
+
+  @@index([source, status])
+  @@index([createdAt])
+  @@map("webhook_logs")
 }

@@ -1,7 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  Prisma,
+  WebhookSource,
+  WebhookStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { RedisService } from '../redis/redis.service';
@@ -12,6 +19,8 @@ import { StockService } from '../stock/stock.service';
 import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 import { recordOrderEvent } from '../common/order-timeline';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EventBusService } from '../events/event-bus.service';
+import { OmsEvents } from '../events/oms-events';
 import type { MpPaymentResponse, MpWebhookPayload } from '../mercadopago/mercadopago.types';
 
 // Payment statuses that trigger stock restoration and order cancellation
@@ -39,6 +48,7 @@ export class WebhooksService {
     private readonly config: ConfigService,
     private readonly orderWa: OrderWhatsappService,
     private readonly notifications: NotificationsService,
+    private readonly events: EventBusService,
   ) {
     this.webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET', '');
   }
@@ -65,6 +75,18 @@ export class WebhooksService {
     } catch {
       return { received: true };
     }
+
+    // Log bruto (fire-and-forget): nunca pode travar o processamento do MP.
+    void this.prisma.webhookLog
+      .create({
+        data: {
+          source: WebhookSource.MERCADO_PAGO,
+          eventType: payload.type ?? null,
+          payload: payload as unknown as Prisma.InputJsonValue,
+          status: WebhookStatus.RECEIVED,
+        },
+      })
+      .catch(() => undefined);
 
     if (payload.type !== 'payment') return { received: true };
 
@@ -198,6 +220,15 @@ export class WebhooksService {
     if (becomingApproved) {
       await this.notifications.notifyPaymentApproved(payment.orderId).catch((error) => {
         this.logger.error(`Notification failed for approved order=${payment.orderId}`, error);
+      });
+      // OMS: produtos únicos viram SOLD e saem dos outros canais (orchestrator).
+      this.events.emit(OmsEvents.OrderPaid, {
+        orderId: payment.orderId,
+        paymentId: payment.id,
+      });
+      this.events.emit(OmsEvents.PaymentApproved, {
+        orderId: payment.orderId,
+        paymentId: payment.id,
       });
       void this.orderWa.notifyOrderConfirmed({
         phone: payment.order.customerPhone,

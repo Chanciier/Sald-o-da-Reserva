@@ -57,3 +57,10 @@ ruvector.db
 .vercel/
 .claude-flow/
 AGENTS.md
+
+# DesignSync tooling local (não faz parte do projeto)
+.design-sync/
+.ds-sync/
+ds-bundle/
+.dsentry/
+.ds-compiled.css

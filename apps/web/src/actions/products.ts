@@ -47,6 +47,7 @@ export interface Product {
   cstCsosn: string | null;
   autoPublishWhatsapp: boolean;
   whatsappGroupIds: string[];
+  isUnique: boolean;
   categoryId: string | null;
   createdById: string | null;
   createdAt: string;

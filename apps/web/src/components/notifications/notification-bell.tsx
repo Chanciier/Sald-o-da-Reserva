@@ -10,6 +10,7 @@ import {
   AppNotification,
   getNotifications,
   isAppNotification,
+  markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '@/lib/notifications';
 import { PushNotificationControl } from './push-notification-control';
@@ -94,7 +95,25 @@ export function NotificationBell() {
       }
     }
     setOpen(false);
-    router.push(`/pedidos/${notification.orderId}`);
+    // Pedido → tela do pedido; senão produto → edição do produto no admin.
+    if (notification.orderId) {
+      router.push(`/pedidos/${notification.orderId}`);
+    } else if (notification.productId) {
+      router.push(`/admin/produtos/${notification.productId}`);
+    }
+  }
+
+  async function markAll() {
+    if (!token) return;
+    try {
+      await markAllNotificationsAsRead(token);
+      setNotifications((current) =>
+        current.map((item) => (item.readAt ? item : { ...item, readAt: new Date().toISOString() })),
+      );
+      setUnreadCount(0);
+    } catch {
+      // silencioso — UI permanece consistente na próxima sincronização
+    }
   }
 
   return (
@@ -116,9 +135,20 @@ export function NotificationBell() {
 
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border bg-card shadow-xl sm:w-96">
-          <div className="border-b px-4 py-3">
-            <p className="text-sm font-semibold">Notificações</p>
-            <p className="text-xs text-muted-foreground">{unreadCount} não lidas</p>
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold">Notificações</p>
+              <p className="text-xs text-muted-foreground">{unreadCount} não lidas</p>
+            </div>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={() => void markAll()}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Marcar todas como lidas
+              </button>
+            )}
           </div>
           <PushNotificationControl />
           <div className="max-h-96 overflow-y-auto">

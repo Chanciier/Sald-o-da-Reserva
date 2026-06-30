@@ -27,6 +27,7 @@ import {
   X,
   FileText,
   MessageCircle,
+  Boxes,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -36,6 +37,14 @@ type NavItem =
 
 const NAV: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  {
+    label: 'OMS',
+    icon: Boxes,
+    children: [
+      { href: '/admin/oms', label: 'Painel OMS' },
+      { href: '/admin/marketplaces', label: 'Marketplaces' },
+    ],
+  },
   {
     label: 'Usuários',
     icon: Users,

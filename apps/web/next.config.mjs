@@ -7,7 +7,11 @@
 //   connect  → API, MP API, BrasilAPI/ViaCEP (lookup de CEP), Turnstile
 //   frames   → Turnstile widget, MP secure fields
 //   images   → S3/CloudFront/QR server/any https + data/blob (next/image)
-const apiOrigin = process.env.NEXT_PUBLIC_API_URL || '';
+const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+// WebSocket origin for the realtime notifications socket (Socket.IO upgrades to
+// wss://). https:// and wss:// are distinct CSP schemes, so the ws origin must
+// be whitelisted explicitly or the socket (and its reconnect attempts) get blocked.
+const wsOrigin = apiOrigin.replace(/^http/, 'ws');
 
 const csp = [
   `default-src 'self'`,
@@ -15,7 +19,7 @@ const csp = [
   `style-src 'self' 'unsafe-inline'`,
   `img-src 'self' data: blob: https:`,
   `font-src 'self' data:`,
-  `connect-src 'self' ${apiOrigin} https://api.mercadopago.com https://*.mercadopago.com https://brasilapi.com.br https://viacep.com.br https://challenges.cloudflare.com`,
+  `connect-src 'self' ${apiOrigin} ${wsOrigin} https://api.mercadopago.com https://*.mercadopago.com https://brasilapi.com.br https://viacep.com.br https://challenges.cloudflare.com`,
   `frame-src 'self' https://challenges.cloudflare.com https://*.mercadopago.com`,
   `worker-src 'self' blob:`,
   `object-src 'none'`,

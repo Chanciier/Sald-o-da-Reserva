@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { EventBusService } from '../events/event-bus.service';
+import { OmsEvents } from '../events/oms-events';
 
 /**
  * Single source of truth for order stock movements.
@@ -15,7 +17,61 @@ import { PrismaService } from '../prisma/prisma.service';
 export class StockService {
   private readonly logger = new Logger(StockService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventBusService,
+  ) {}
+
+  /**
+   * Reserva produtos ÚNICOS de um pedido no momento da criação, protegendo
+   * contra venda duplicada entre canais. Faz a transição atômica
+   * ACTIVE → RESERVED por produto: só um pedido consegue reservar cada item
+   * único. Emite `product.reserved` (orchestrator pausa os outros canais).
+   *
+   * Produtos não-únicos seguem o fluxo normal (baixa só na aprovação do
+   * pagamento via applyForOrder). Retorna os itens reservados e os conflitos
+   * (únicos que já não estavam disponíveis).
+   */
+  async reserveForOrder(orderId: string): Promise<{ reserved: string[]; conflicts: string[] }> {
+    const items = await this.prisma.orderItem.findMany({
+      where: { orderId },
+      select: { productId: true, product: { select: { isUnique: true } } },
+    });
+
+    const reserved: string[] = [];
+    const conflicts: string[] = [];
+
+    for (const item of items) {
+      if (!item.product?.isUnique) continue;
+      const claim = await this.prisma.product.updateMany({
+        where: {
+          id: item.productId,
+          isUnique: true,
+          status: ProductStatus.ACTIVE,
+        },
+        data: { status: ProductStatus.RESERVED },
+      });
+      if (claim.count > 0) {
+        reserved.push(item.productId);
+        this.events.emit(OmsEvents.ProductReserved, {
+          productId: item.productId,
+          orderId,
+        });
+      } else {
+        conflicts.push(item.productId);
+      }
+    }
+
+    if (reserved.length > 0) {
+      this.logger.log(`Únicos reservados para pedido=${orderId}: ${reserved.join(', ')}`);
+    }
+    if (conflicts.length > 0) {
+      this.logger.warn(
+        `Conflito de reserva (já indisponível) pedido=${orderId}: ${conflicts.join(', ')}`,
+      );
+    }
+    return { reserved, conflicts };
+  }
 
   /** Decrement stock for an order's items exactly once. Returns true if applied now. */
   async applyForOrder(orderId: string): Promise<boolean> {

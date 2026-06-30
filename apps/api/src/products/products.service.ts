@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Role } from '@prisma/client';
+import { Marketplace, Prisma, ProductStatus, Role, SyncAction } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { StorageService } from '../storage/storage.service';
@@ -15,6 +15,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
 import { WhatsappMarketingService } from '../whatsapp/whatsapp-marketing.service';
 import { MetaCatalogService, CatalogProduct } from '../meta-catalog/meta-catalog.service';
+import { MarketplaceHubService } from '../marketplace/marketplace-hub.service';
 
 const CACHE_TTL = 300;
 // v2: cache namespace bumped after public responses started stripping internal
@@ -75,6 +76,7 @@ export class ProductsService {
     private readonly storage: StorageService,
     private readonly whatsappMarketing: WhatsappMarketingService,
     private readonly metaCatalog: MetaCatalogService,
+    private readonly marketplaceHub: MarketplaceHubService,
   ) {}
 
   private generateSku(name: string): string {
@@ -178,6 +180,7 @@ export class ProductsService {
         pickupAvailable: dto.pickupAvailable ?? false,
         featuredOffer: dto.featuredOffer ?? false,
         status: dto.status,
+        isUnique: dto.isUnique ?? false,
         autoPublishWhatsapp: dto.autoPublishWhatsapp ?? false,
         whatsappGroupIds: dto.whatsappGroupIds ?? [],
         categoryId: dto.categoryId,
@@ -206,6 +209,12 @@ export class ProductsService {
     if (product.status === 'ACTIVE') {
       this.metaCatalog.upsert(this.toCatalogProduct(product));
     }
+
+    // OMS: cria jobs de publicação nos marketplaces escolhidos. SITE é sempre
+    // incluído (canal próprio). Enfileiramento nunca lança — se um marketplace
+    // falhar, o erro fica visível no painel e o cadastro no site segue normal.
+    const targets = [...new Set<Marketplace>([Marketplace.SITE, ...(dto.publishTo ?? [])])];
+    await this.marketplaceHub.enqueuePublish(product.id, targets);
 
     return serializeProduct(product);
   }
@@ -256,6 +265,20 @@ export class ProductsService {
       ...(createdById && { createdById }),
       ...(query.featuredOffer === true && { featuredOffer: true }),
     };
+
+    // OMS: no catálogo público, esconde itens reservados/vendidos/indisponíveis.
+    // Restringe apenas os status novos do OMS — não altera o comportamento já
+    // existente para ACTIVE/INACTIVE/etc. quando o cliente não filtra por status.
+    if (!isStaff && !status) {
+      where.status = {
+        notIn: [
+          ProductStatus.RESERVED,
+          ProductStatus.SOLD,
+          ProductStatus.UNAVAILABLE,
+          ProductStatus.REMOVED,
+        ],
+      };
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
@@ -367,7 +390,54 @@ export class ProductsService {
       }
     }
 
+    // OMS: sincroniza apenas o que mudou, e só para os marketplaces onde o
+    // produto está publicado (enqueueSync é no-op se não houver publicações).
+    await this.enqueueSyncForChanges(id, existing, dto, dimensions !== undefined, updated);
+
     return serializeProduct(updated!);
+  }
+
+  /** Detecta campos relevantes alterados e dispara os jobs de sync adequados. */
+  private async enqueueSyncForChanges(
+    id: string,
+    existing: {
+      name: string;
+      description: string | null;
+      shortDescription: string | null;
+      price: Prisma.Decimal;
+      salePrice: Prisma.Decimal | null;
+      weight: Prisma.Decimal | null;
+      stock: number;
+    },
+    dto: UpdateProductDto,
+    dimensionsChanged: boolean,
+    updated: { price: Prisma.Decimal; salePrice: Prisma.Decimal | null; stock: number } | null,
+  ): Promise<void> {
+    const priceChanged =
+      (dto.price !== undefined && dto.price !== existing.price.toNumber()) ||
+      (dto.salePrice !== undefined &&
+        dto.salePrice !== (existing.salePrice?.toNumber() ?? undefined));
+    const stockChanged = dto.stock !== undefined && dto.stock !== existing.stock;
+    const contentChanged =
+      (dto.name !== undefined && dto.name !== existing.name) ||
+      (dto.description !== undefined && dto.description !== existing.description) ||
+      (dto.shortDescription !== undefined && dto.shortDescription !== existing.shortDescription) ||
+      (dto.weight !== undefined && dto.weight !== (existing.weight?.toNumber() ?? undefined)) ||
+      dimensionsChanged ||
+      dto.imageIds !== undefined;
+
+    // Update completo cobre preço/estoque; granular só quando nada mais mudou.
+    if (contentChanged) {
+      await this.marketplaceHub.enqueueSync(id, SyncAction.UPDATE);
+      return;
+    }
+    if (priceChanged) {
+      const price = updated?.salePrice?.toNumber() ?? updated?.price.toNumber() ?? 0;
+      await this.marketplaceHub.enqueueSync(id, SyncAction.UPDATE_PRICE, price);
+    }
+    if (stockChanged) {
+      await this.marketplaceHub.enqueueSync(id, SyncAction.UPDATE_STOCK, updated?.stock ?? 0);
+    }
   }
 
   async updateStock(id: string, stock: number, user: AuthenticatedUser) {
@@ -392,6 +462,11 @@ export class ProductsService {
     });
 
     this.metaCatalog.upsert(this.toCatalogProduct(updated));
+
+    // OMS: propaga o novo estoque aos marketplaces onde o produto está publicado.
+    if (stock !== existing.stock) {
+      await this.marketplaceHub.enqueueSync(id, SyncAction.UPDATE_STOCK, stock);
+    }
 
     return serializeProduct(updated);
   }

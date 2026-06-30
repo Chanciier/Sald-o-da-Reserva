@@ -154,4 +154,9 @@ export class UpdateProductDto {
   @IsArray()
   @IsString({ each: true })
   whatsappGroupIds?: string[];
+
+  // OMS: alterna o produto entre único/normal.
+  @IsOptional()
+  @IsBoolean()
+  isUnique?: boolean;
 }

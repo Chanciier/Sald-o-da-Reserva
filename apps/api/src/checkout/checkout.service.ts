@@ -7,6 +7,8 @@ import { MetaService } from '../meta/meta.service';
 import { StockService } from '../stock/stock.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { recordOrderEvent } from '../common/order-timeline';
+import { EventBusService } from '../events/event-bus.service';
+import { OmsEvents } from '../events/oms-events';
 import type { CreateOrderDto } from './dto/create-order.dto';
 
 function round2(n: number) {
@@ -41,6 +43,7 @@ export class CheckoutService {
     private readonly meta: MetaService,
     private readonly stock: StockService,
     private readonly notifications: NotificationsService,
+    private readonly events: EventBusService,
   ) {}
 
   async getShippingOptions(_subtotal: number, cep?: string): Promise<ShippingQuoteOption[]> {
@@ -224,6 +227,13 @@ export class CheckoutService {
     await this.notifications.notifyNewOrder(order.id).catch((error) => {
       this.logger.error(`Notification failed for new order=${order.id}`, error);
     });
+
+    // OMS: reserva imediata de itens únicos (proteção contra venda duplicada) e
+    // sinaliza o pedido para o orquestrador. Nunca interrompe o checkout.
+    await this.stock.reserveForOrder(order.id).catch((error) => {
+      this.logger.error(`Reserva de estoque falhou para pedido=${order.id}`, error);
+    });
+    this.events.emit(OmsEvents.OrderCreated, { orderId: order.id });
 
     // Fire Meta CAPI InitiateCheckout (fire-and-forget)
     this.prisma.user

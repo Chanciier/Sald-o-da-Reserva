@@ -29,6 +29,10 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { MetaModule } from './meta/meta.module';
 import { MetaCatalogModule } from './meta-catalog/meta-catalog.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { EventBusModule } from './events/event-bus.module';
+import { QueueModule } from './queue/queue.module';
+import { MarketplaceModule } from './marketplace/marketplace.module';
+import { OmsModule } from './oms/oms.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -72,6 +76,10 @@ import { envValidation } from './config/env.validation';
     MetaModule,
     MetaCatalogModule,
     NotificationsModule,
+    EventBusModule,
+    QueueModule,
+    MarketplaceModule,
+    OmsModule,
   ],
   controllers: [AppController],
   providers: [

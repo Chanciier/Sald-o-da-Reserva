@@ -71,4 +71,20 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
     return count;
   }
+
+  // ── List operations (used by the OMS lightweight queue) ────────────────────
+  /** Append to the tail of a list. */
+  async rpush(key: string, value: string): Promise<void> {
+    await this.client.rpush(key, value);
+  }
+
+  /** Pop from the head of a list (FIFO with rpush). Returns null when empty. */
+  async lpop(key: string): Promise<string | null> {
+    return this.client.lpop(key);
+  }
+
+  /** Number of items in a list. */
+  async llen(key: string): Promise<number> {
+    return this.client.llen(key);
+  }
 }

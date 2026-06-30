@@ -2,10 +2,11 @@ export interface AppNotification {
   id: string;
   userId: string | null;
   roleTarget: 'ADMIN' | 'VENDEDOR' | 'CLIENTE';
-  type: 'ORDER_CREATED' | 'PAYMENT_APPROVED';
+  type: string;
   title: string;
   message: string;
-  orderId: string;
+  orderId: string | null;
+  productId: string | null;
   readAt: string | null;
   createdAt: string;
 }
@@ -42,6 +43,14 @@ export async function markNotificationAsRead(token: string, id: string): Promise
     },
   );
   if (!response.ok) throw new Error('Não foi possível marcar a notificação como lida.');
+}
+
+export async function markAllNotificationsAsRead(token: string): Promise<void> {
+  const response = await fetch(`${API_ORIGIN}/api/v1/notifications/read-all`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  });
+  if (!response.ok) throw new Error('Não foi possível marcar todas como lidas.');
 }
 
 export async function getVapidPublicKey(token: string): Promise<string> {
@@ -100,7 +109,7 @@ export function isAppNotification(value: unknown): value is AppNotification {
     typeof item.id === 'string' &&
     typeof item.title === 'string' &&
     typeof item.message === 'string' &&
-    typeof item.orderId === 'string' &&
+    (item.orderId === null || typeof item.orderId === 'string') &&
     typeof item.createdAt === 'string' &&
     (item.readAt === null || typeof item.readAt === 'string')
   );

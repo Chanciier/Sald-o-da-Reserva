@@ -13,7 +13,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { ProductStatus } from '@prisma/client';
+import { Marketplace, ProductStatus } from '@prisma/client';
 
 export class DimensionsDto {
   @IsNumber() width: number;
@@ -157,4 +157,17 @@ export class CreateProductDto {
   @IsArray()
   @IsString({ each: true })
   whatsappGroupIds?: string[];
+
+  // OMS: produto único (peça sem reposição) → reserva imediata + proteção contra
+  // venda duplicada entre canais.
+  @IsOptional()
+  @IsBoolean()
+  isUnique?: boolean;
+
+  // OMS: marketplaces onde publicar ao salvar. SITE é incluído por padrão no
+  // service quando a lista vier vazia.
+  @IsOptional()
+  @IsArray()
+  @IsEnum(Marketplace, { each: true })
+  publishTo?: Marketplace[];
 }
