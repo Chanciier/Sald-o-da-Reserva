@@ -265,6 +265,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
       if (result.refundError) {
         setRefundWarning(result.refundError);
         setConfirmCancel(false);
+        qc.invalidateQueries({ queryKey: ['order', params.id] });
         return;
       }
       router.push('/admin/expedicao/fila');

@@ -12,6 +12,7 @@ const CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.SEPARATING,
   OrderStatus.SEPARATED,
   OrderStatus.READY_TO_SHIP,
+  OrderStatus.REFUNDED,
 ];
 
 function serializeOrder(order: Record<string, unknown>) {
@@ -618,6 +619,10 @@ export class ExpedicaoService {
       payment.method !== 'BOLETO' &&
       this.mp.isConfigured();
 
+    // alreadyRefundedOnMp is set to true when the MP API error indicates the payment
+    // was refunded by a concurrent webhook — treated as success, not as failure
+    let alreadyRefundedOnMp = false;
+
     if (canRefund) {
       try {
         await this.mp.createRefund(payment!.gatewayPaymentId!);
@@ -631,7 +636,24 @@ export class ExpedicaoService {
         } else {
           refundError = String(err);
         }
-        this.logger.warn(`Refund failed for order ${orderId}: ${refundError}`);
+        this.logger.warn(
+          `Refund failed for order ${orderId} (mp_id=${payment!.gatewayPaymentId}): ${refundError} | full=${JSON.stringify(err).slice(0, 500)}`,
+        );
+
+        // Race condition guard: webhook may have already processed the refund.
+        // Verify with MP before surfacing an error to the operator.
+        try {
+          const mpPayment = await this.mp.getPayment(payment!.gatewayPaymentId!);
+          if (mpPayment.status === 'refunded') {
+            alreadyRefundedOnMp = true;
+            refundError = undefined;
+            this.logger.log(
+              `Payment ${payment!.gatewayPaymentId} already refunded on MP (webhook race) — treating as success`,
+            );
+          }
+        } catch {
+          // getPayment failed — keep original refundError
+        }
       }
     }
 
@@ -640,7 +662,7 @@ export class ExpedicaoService {
         where: { id: orderId },
         data: { status: OrderStatus.CANCELLED },
       });
-      if (payment && canRefund && !refundError) {
+      if (payment && ((canRefund && !refundError) || alreadyRefundedOnMp)) {
         await tx.payment.update({
           where: { id: payment.id },
           data: { status: PaymentStatus.REFUNDED },
