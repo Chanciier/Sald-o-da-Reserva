@@ -178,4 +178,10 @@ export class UpdateProductDto {
   @IsArray()
   @IsEnum(Marketplace, { each: true })
   publishTo?: Marketplace[];
+
+  // OMS: remove/fecha o anúncio nos canais desmarcados durante a edição.
+  @IsOptional()
+  @IsArray()
+  @IsEnum(Marketplace, { each: true })
+  unpublishFrom?: Marketplace[];
 }

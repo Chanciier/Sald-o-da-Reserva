@@ -38,6 +38,7 @@ export class OrderOrchestratorService implements OnModuleInit {
     this.events.on(OmsEvents.OrderPaid, (p) => this.onOrderPaid(p));
     this.events.on(OmsEvents.OrderCancelled, (p) => this.onOrderCancelled(p));
     this.events.on(OmsEvents.MarketplacePublishFailed, (p) => this.onPublishFailed(p));
+    this.events.on(OmsEvents.StockDecremented, (p) => this.onStockDecremented(p));
   }
 
   private async onOrderCreated({ orderId }: OmsEventPayloads['order.created']): Promise<void> {
@@ -110,6 +111,14 @@ export class OrderOrchestratorService implements OnModuleInit {
         await this.audit('oms.product.released', { productId: product.id, orderId });
       }
     }
+  }
+
+  /** Estoque baixado por venda: propaga o novo nível a todos os canais ativos. */
+  private async onStockDecremented({
+    productId,
+    newStock,
+  }: OmsEventPayloads['stock.decremented']): Promise<void> {
+    await this.hub.enqueueSync(productId, SyncAction.UPDATE_STOCK, newStock);
   }
 
   /** Falha de publicação: avisa o admin para reprocessar pelo painel. */

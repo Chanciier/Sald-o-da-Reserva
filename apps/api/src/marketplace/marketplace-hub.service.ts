@@ -151,6 +151,21 @@ export class MarketplaceHubService implements OnModuleInit {
     });
   }
 
+  /** Enfileira uma ação de sync para um marketplace específico (ex.: REMOVE ao desmarcar canal). */
+  async enqueueSyncForMarketplace(
+    productId: string,
+    marketplace: Marketplace,
+    action: SyncAction,
+    value?: number,
+  ): Promise<void> {
+    await this.queue.enqueue<SyncJob>(QueueNames.MarketplaceSync, {
+      productId,
+      marketplace,
+      action,
+      value,
+    });
+  }
+
   /** Reenfileira todas as publicações com erro de um marketplace. Retorna o total. */
   async retryFailed(marketplace: Marketplace): Promise<number> {
     const failed = await this.prisma.marketplacePublication.findMany({

@@ -292,7 +292,10 @@ export class ProductsService {
   async findById(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      include: INCLUDE_FULL,
+      include: {
+        ...INCLUDE_FULL,
+        publications: { select: { marketplace: true, status: true, externalId: true } },
+      },
     });
     if (!product) throw new NotFoundException('Produto não encontrado.');
     return serializeProduct(product);
@@ -316,7 +319,7 @@ export class ProductsService {
       if (conflict) throw new ConflictException('SKU já em uso.');
     }
 
-    const { imageIds, dimensions, publishTo, ...rest } = dto;
+    const { imageIds, dimensions, publishTo, unpublishFrom, ...rest } = dto;
     const slug = rest.name && !rest.slug ? slugify(rest.name) : (rest.slug ?? existing.slug);
 
     await this.prisma.product.update({
@@ -360,6 +363,13 @@ export class ProductsService {
     if (publishTo?.length) {
       const targets = [...new Set<Marketplace>([Marketplace.SITE, ...publishTo])];
       await this.marketplaceHub.enqueuePublish(id, targets);
+    }
+
+    // OMS: remove/fecha anúncios nos canais desmarcados pelo admin.
+    if (unpublishFrom?.length) {
+      for (const marketplace of unpublishFrom) {
+        await this.marketplaceHub.enqueueSyncForMarketplace(id, marketplace, SyncAction.REMOVE);
+      }
     }
 
     return serializeProduct(updated!);

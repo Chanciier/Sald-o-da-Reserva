@@ -75,6 +75,8 @@ export class StockService {
 
   /** Decrement stock for an order's items exactly once. Returns true if applied now. */
   async applyForOrder(orderId: string): Promise<boolean> {
+    const stockUpdates: Array<{ productId: string; newStock: number }> = [];
+
     const applied = await this.prisma.$transaction(async (tx) => {
       // Claim atomically: only the first caller flips false → true.
       const claim = await tx.order.updateMany({
@@ -100,11 +102,17 @@ export class StockService {
             data: { status: ProductStatus.INACTIVE },
           });
         }
+        stockUpdates.push({ productId: item.productId, newStock: Math.max(0, updated.stock) });
       }
       return true;
     });
 
-    if (applied) this.logger.log(`Stock applied for order=${orderId}`);
+    if (applied) {
+      this.logger.log(`Stock applied for order=${orderId}`);
+      for (const update of stockUpdates) {
+        this.events.emit(OmsEvents.StockDecremented, update);
+      }
+    }
     return applied;
   }
 

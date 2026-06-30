@@ -20,9 +20,19 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import type { Product, ProductImage, CategoryItem } from '@/actions/products';
+import type { Product, ProductImage, CategoryItem, ProductPublication } from '@/actions/products';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+type Channel = 'SITE' | 'MERCADO_LIVRE' | 'SHOPEE';
+const LIVE_PUB_STATUSES = ['PUBLISHED', 'PAUSED', 'SYNC_PENDING'];
+
+function getPublishedChannels(pubs?: ProductPublication[]): Channel[] {
+  if (!pubs) return [];
+  return pubs
+    .filter((p) => LIVE_PUB_STATUSES.includes(p.status))
+    .map((p) => p.marketplace as Channel);
+}
 
 function generateSku(name = ''): string {
   const prefix = name
@@ -112,9 +122,11 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
     initialData?.whatsappGroupIds ?? [],
   );
   const [isUnique, setIsUnique] = useState(initialData?.isUnique ?? false);
-  // No cadastro: SITE pré-selecionado. Na edição: vazio (publica só o que o usuário marcar).
-  const [publishTo, setPublishTo] = useState<('SITE' | 'MERCADO_LIVRE' | 'SHOPEE')[]>(
-    initialData ? [] : ['SITE'],
+  // Canais originalmente publicados (referência imutável para calcular o diff no save).
+  const originalChannels = useRef<Channel[]>(getPublishedChannels(initialData?.publications));
+  // Estado visual dos checkboxes: na edição, pré-marca os canais onde já está publicado.
+  const [publishTo, setPublishTo] = useState<Channel[]>(() =>
+    initialData ? getPublishedChannels(initialData.publications) : ['SITE'],
   );
   const [resending, setResending] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -390,8 +402,19 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       autoPublishWhatsapp,
       whatsappGroupIds,
       isUnique,
-      // No cadastro: publishTo cria as publicações. Na edição: só enfileira se algo foi selecionado.
-      ...(initialData ? (publishTo.length ? { publishTo } : {}) : { publishTo }),
+      // Para novos produtos: publishTo inclui todos os canais marcados.
+      // Para edição: publishTo = canais NOVOS (não estavam publicados); unpublishFrom = canais REMOVIDOS.
+      ...(initialData
+        ? (() => {
+            const orig = originalChannels.current;
+            const toPublish = publishTo.filter((ch) => !orig.includes(ch));
+            const unpublishFrom = orig.filter((ch) => !publishTo.includes(ch));
+            return {
+              ...(toPublish.length ? { publishTo: toPublish } : {}),
+              ...(unpublishFrom.length ? { unpublishFrom } : {}),
+            };
+          })()
+        : { publishTo }),
     };
     await onSubmit(payload);
   }
@@ -847,7 +870,7 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
 
             <div className="mt-1 space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground">
-                {initialData ? 'Publicar agora em' : 'Publicar em'}
+                {initialData ? 'Canais de venda' : 'Publicar em'}
               </p>
               {(
                 [
@@ -855,25 +878,35 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                   { value: 'MERCADO_LIVRE', label: 'Mercado Livre' },
                   { value: 'SHOPEE', label: 'Shopee' },
                 ] as const
-              ).map((ch) => (
-                <label key={ch.value} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={publishTo.includes(ch.value)}
-                    disabled={!initialData && ch.value === 'SITE'}
-                    onChange={(e) =>
-                      setPublishTo((prev) =>
-                        e.target.checked ? [...prev, ch.value] : prev.filter((v) => v !== ch.value),
-                      )
-                    }
-                    className="h-4 w-4 accent-primary disabled:opacity-60"
-                  />
-                  <span className="text-sm">{ch.label}</span>
-                </label>
-              ))}
+              ).map((ch) => {
+                const isOriginal = originalChannels.current.includes(ch.value);
+                return (
+                  <label key={ch.value} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={publishTo.includes(ch.value)}
+                      disabled={!initialData && ch.value === 'SITE'}
+                      onChange={(e) =>
+                        setPublishTo((prev) =>
+                          e.target.checked
+                            ? [...prev, ch.value]
+                            : prev.filter((v) => v !== ch.value),
+                        )
+                      }
+                      className="h-4 w-4 accent-primary disabled:opacity-60"
+                    />
+                    <span className="text-sm">{ch.label}</span>
+                    {initialData && isOriginal && (
+                      <span className="text-[10px] rounded bg-green-100 px-1.5 py-0.5 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                        publicado
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
               <p className="text-xs text-muted-foreground">
                 {initialData
-                  ? 'Marque os canais para publicar ao salvar. Deixe vazio para não alterar.'
+                  ? 'Marque para publicar em novo canal · Desmarque para remover o anúncio do canal.'
                   : 'O site é sempre incluído. Marketplaces sem credenciais ficam com erro visível no painel — o cadastro no site não é afetado.'}
               </p>
             </div>

@@ -208,6 +208,7 @@ export class MercadoLivreProvider implements MarketplaceProvider {
       buying_mode: 'buy_it_now',
       condition: input.condition === 'used' ? 'used' : 'new',
       listing_type_id: this.listingTypeId,
+      status: 'active',
       pictures: input.images.map((source) => ({ source })),
       attributes,
       shipping: {

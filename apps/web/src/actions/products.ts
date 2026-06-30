@@ -21,6 +21,12 @@ export interface ProductCreatedBy {
   email: string;
 }
 
+export interface ProductPublication {
+  marketplace: string;
+  status: string;
+  externalId: string | null;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -57,6 +63,7 @@ export interface Product {
   category: ProductCategory | null;
   images: ProductImage[];
   createdBy: ProductCreatedBy | null;
+  publications?: ProductPublication[];
 }
 
 export interface ProductsResponse {

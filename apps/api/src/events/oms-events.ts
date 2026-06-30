@@ -13,6 +13,7 @@ export const OmsEvents = {
   OrderCancelled: 'order.cancelled',
   ProductReserved: 'product.reserved',
   ProductSold: 'product.sold',
+  StockDecremented: 'stock.decremented',
   MarketplacePublishFailed: 'marketplace.publish.failed',
   MarketplaceProductPublished: 'marketplace.product.published',
   PaymentApproved: 'payment.approved',
@@ -39,6 +40,7 @@ export interface OmsEventPayloads {
     externalId?: string | null;
   };
   'payment.approved': { orderId: string; paymentId: string };
+  'stock.decremented': { productId: string; newStock: number };
   'shipping.label.created': { orderId: string; trackingCode?: string | null };
   'invoice.created': { orderId: string; invoiceId: string };
 }
