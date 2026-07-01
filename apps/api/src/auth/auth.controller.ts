@@ -1,14 +1,20 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -16,15 +22,23 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { TurnstileGuard } from './guards/turnstile.guard';
 import { AuthenticatedUser } from './types/auth.types';
+import { StorageService } from '../storage/storage.service';
+
+const ALLOWED_AVATAR_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5 MB
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Post('register')
   @Public()
@@ -129,6 +143,35 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async me(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.getMe(user.id);
+  }
+
+  @Patch('me')
+  @HttpCode(HttpStatus.OK)
+  async updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateMeDto) {
+    return this.authService.updateMe(user.id, dto);
+  }
+
+  @Post('me/avatar')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      fileFilter(_req, file, cb) {
+        if (!ALLOWED_AVATAR_MIME.includes(file.mimetype)) {
+          return cb(new BadRequestException(`Tipo não permitido: ${file.mimetype}`), false);
+        }
+        cb(null, true);
+      },
+      limits: { fileSize: MAX_AVATAR_SIZE },
+    }),
+  )
+  async updateAvatar(
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Nenhuma imagem enviada.');
+    const image = await this.storage.uploadAvatar(file, user.id);
+    return this.authService.updateAvatarUrl(user.id, image.url);
   }
 
   // ─── private helpers ──────────────────────────────────────────────────────

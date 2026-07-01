@@ -152,6 +152,8 @@ model User {
   email        String   @unique
   name         String?
   cpf          String?  @map("cpf")
+  phone        String?  @map("phone")
+  avatarUrl    String?  @map("avatar_url")
   passwordHash String   @map("password_hash")
   role         Role     @default(CLIENTE)
   isActive     Boolean  @default(true) @map("is_active")

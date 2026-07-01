@@ -138,35 +138,54 @@ export class AnalyticsService {
     };
   }
 
-  async getSellerOverview(sellerId: string) {
+  async getSellerOverview(sellerId: string, days = 30) {
     const now = new Date();
     const today = startOfDay(now);
-    const monthStart = startOfMonth(now);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const prevSince = new Date(since.getTime() - days * 24 * 60 * 60 * 1000);
 
     const sellerItemsWhere = {
       product: { createdById: sellerId },
       order: { status: { in: PAID } },
     };
 
-    const [revenueToday, revenueMonth, topProducts, recentItems, chartItems] = await Promise.all([
+    const [
+      revenueToday,
+      revenuePeriodAgg,
+      revenuePrevPeriodAgg,
+      unitsPeriodAgg,
+      topProducts,
+      recentItems,
+      chartItems,
+      periodOrders,
+      statusOrders,
+      ordersTodayCount,
+    ] = await Promise.all([
       this.prisma.orderItem.aggregate({
         where: { ...sellerItemsWhere, order: { status: { in: PAID }, createdAt: { gte: today } } },
         _sum: { subtotal: true },
       }),
       this.prisma.orderItem.aggregate({
+        where: { ...sellerItemsWhere, order: { status: { in: PAID }, createdAt: { gte: since } } },
+        _sum: { subtotal: true },
+      }),
+      this.prisma.orderItem.aggregate({
         where: {
           ...sellerItemsWhere,
-          order: { status: { in: PAID }, createdAt: { gte: monthStart } },
+          order: { status: { in: PAID }, createdAt: { gte: prevSince, lt: since } },
         },
         _sum: { subtotal: true },
+      }),
+      this.prisma.orderItem.aggregate({
+        where: { ...sellerItemsWhere, order: { status: { in: PAID }, createdAt: { gte: since } } },
+        _sum: { quantity: true },
       }),
       this.prisma.orderItem.groupBy({
         by: ['productId', 'name'],
         where: sellerItemsWhere,
         _sum: { quantity: true, subtotal: true },
         orderBy: { _sum: { quantity: 'desc' } },
-        take: 5,
+        take: 10,
       }),
       this.prisma.orderItem.findMany({
         where: sellerItemsWhere,
@@ -184,26 +203,76 @@ export class AnalyticsService {
         take: 10,
       }),
       this.prisma.orderItem.findMany({
+        where: { ...sellerItemsWhere, order: { status: { in: PAID }, createdAt: { gte: since } } },
+        select: { subtotal: true, orderId: true, order: { select: { createdAt: true } } },
+      }),
+      // Distinct orders touching this seller's products, for order-count and status breakdown.
+      this.prisma.order.findMany({
         where: {
-          ...sellerItemsWhere,
-          order: { status: { in: PAID }, createdAt: { gte: thirtyDaysAgo } },
+          items: { some: { product: { createdById: sellerId } } },
+          createdAt: { gte: since },
         },
-        select: { subtotal: true, order: { select: { createdAt: true } } },
+        select: { id: true, status: true },
+      }),
+      this.prisma.order.findMany({
+        where: { items: { some: { product: { createdById: sellerId } } } },
+        select: { status: true },
+      }),
+      this.prisma.order.count({
+        where: {
+          items: { some: { product: { createdById: sellerId } } },
+          createdAt: { gte: today },
+        },
       }),
     ]);
 
-    const chartMap = new Map<string, number>();
+    const chartMap = new Map<string, { revenue: number; orderIds: Set<string> }>();
     for (const item of chartItems) {
       const date = item.order.createdAt.toISOString().split('T')[0];
-      const prev = chartMap.get(date) ?? 0;
-      chartMap.set(date, prev + (item.subtotal as unknown as { toNumber(): number }).toNumber());
+      const prev = chartMap.get(date) ?? { revenue: 0, orderIds: new Set<string>() };
+      prev.revenue += (item.subtotal as unknown as { toNumber(): number }).toNumber();
+      prev.orderIds.add(item.orderId);
+      chartMap.set(date, prev);
+    }
+    const revenueChart: { date: string; revenue: number; orders: number }[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const date = d.toISOString().split('T')[0];
+      const entry = chartMap.get(date);
+      revenueChart.push({ date, revenue: entry?.revenue ?? 0, orders: entry?.orderIds.size ?? 0 });
     }
 
+    const statusMap = new Map<string, number>();
+    for (const o of statusOrders) statusMap.set(o.status, (statusMap.get(o.status) ?? 0) + 1);
+
+    const revenuePeriod =
+      (revenuePeriodAgg._sum.subtotal as unknown as { toNumber(): number } | null)?.toNumber() ?? 0;
+    const revenuePrevPeriod =
+      (
+        revenuePrevPeriodAgg._sum.subtotal as unknown as { toNumber(): number } | null
+      )?.toNumber() ?? 0;
+    const totalOrders = periodOrders.length;
+
     return {
+      period: { days, since: since.toISOString(), until: now.toISOString() },
       revenueToday:
         (revenueToday._sum.subtotal as unknown as { toNumber(): number } | null)?.toNumber() ?? 0,
-      revenueMonth:
-        (revenueMonth._sum.subtotal as unknown as { toNumber(): number } | null)?.toNumber() ?? 0,
+      revenueMonth: revenuePeriod,
+      revenuePeriod,
+      revenuePrevPeriod,
+      revenueChangePct:
+        revenuePrevPeriod > 0
+          ? ((revenuePeriod - revenuePrevPeriod) / revenuePrevPeriod) * 100
+          : null,
+      totalOrders,
+      ordersToday: ordersTodayCount,
+      ordersTotal: statusOrders.length,
+      totalUnitsSold: unitsPeriodAgg._sum.quantity ?? 0,
+      avgTicket: totalOrders > 0 ? revenuePeriod / totalOrders : 0,
+      ordersByStatus: Array.from(statusMap.entries()).map(([status, count]) => ({
+        status,
+        count,
+      })),
       topProducts: topProducts.map((p) => ({
         productId: p.productId,
         name: p.name,
@@ -219,9 +288,7 @@ export class AnalyticsService {
         quantity: item.quantity,
         subtotal: (item.subtotal as unknown as { toNumber(): number }).toNumber(),
       })),
-      revenueChart: Array.from(chartMap.entries())
-        .map(([date, revenue]) => ({ date, revenue }))
-        .sort((a, b) => a.date.localeCompare(b.date)),
+      revenueChart,
     };
   }
 

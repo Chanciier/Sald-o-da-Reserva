@@ -18,7 +18,9 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { AuthResult, AuthenticatedUser, JwtRefreshPayload } from './types/auth.types';
+import { AuthResult, JwtRefreshPayload, PublicUser } from './types/auth.types';
+import type { User } from '@prisma/client';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 @Injectable()
 export class AuthService {
@@ -52,7 +54,7 @@ export class AuthService {
       userAgent,
     });
 
-    return { user: { id: user.id, email: user.email, role: user.role }, ...tokens };
+    return { user: this.toPublicUser(user), ...tokens };
   }
 
   async login(dto: LoginDto, ip: string, userAgent: string): Promise<AuthResult> {
@@ -81,7 +83,7 @@ export class AuthService {
       userAgent,
     });
 
-    return { user: { id: user.id, email: user.email, role: user.role }, ...tokens };
+    return { user: this.toPublicUser(user), ...tokens };
   }
 
   async logout(userId: string, refreshToken: string, ip: string, userAgent: string): Promise<void> {
@@ -154,7 +156,7 @@ export class AuthService {
     await this.auditService.log(AuditAction.REFRESH_TOKEN, { userId, ipAddress: ip, userAgent });
 
     return {
-      user: { id: stored.user.id, email: stored.user.email, role: stored.user.role },
+      user: this.toPublicUser(stored.user),
       ...tokens,
     };
   }
@@ -230,13 +232,52 @@ export class AuthService {
     });
   }
 
-  async getMe(
-    userId: string,
-  ): Promise<AuthenticatedUser & { name: string | null; createdAt: Date }> {
-    return this.prisma.user.findUniqueOrThrow({
+  async getMe(userId: string): Promise<PublicUser & { createdAt: Date }> {
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, email: true, role: true, name: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        name: true,
+        phone: true,
+        avatarUrl: true,
+        createdAt: true,
+      },
     });
+    return { ...this.toPublicUser(user), createdAt: user.createdAt };
+  }
+
+  async updateMe(userId: string, dto: UpdateMeDto): Promise<PublicUser> {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}),
+      },
+    });
+    return this.toPublicUser(user);
+  }
+
+  async updateAvatarUrl(userId: string, avatarUrl: string): Promise<PublicUser> {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+    });
+    return this.toPublicUser(user);
+  }
+
+  private toPublicUser(
+    user: Pick<User, 'id' | 'email' | 'name' | 'role' | 'phone' | 'avatarUrl'>,
+  ): PublicUser {
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      phone: user.phone,
+      avatarUrl: user.avatarUrl,
+    };
   }
 
   private async issueTokenPair(

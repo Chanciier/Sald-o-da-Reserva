@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { fetchSellerStats } from '@/actions/analytics';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { BarChart } from '@/components/dashboard/bar-chart';
-import { OrdersTable } from '@/components/dashboard/orders-table';
+import { SellerOrdersTable } from '@/components/dashboard/seller-orders-table';
 
 function fmt(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -119,9 +119,9 @@ export default function VendedorDashboard() {
         />
         <StatCard
           label="Produtos Vendidos"
-          value={data.productsSold.toLocaleString('pt-BR')}
+          value={data.totalUnitsSold.toLocaleString('pt-BR')}
           icon={<Package className="h-4 w-4" />}
-          description="itens totais"
+          description="últimos 30 dias"
         />
       </div>
 
@@ -133,8 +133,8 @@ export default function VendedorDashboard() {
           icon={<ShoppingCart className="h-4 w-4" />}
         />
         <StatCard
-          label="Pedidos no Mês"
-          value={data.ordersMonth.toLocaleString('pt-BR')}
+          label="Pedidos nos Últimos 30 dias"
+          value={data.totalOrders.toLocaleString('pt-BR')}
           icon={<Calendar className="h-4 w-4" />}
         />
         <StatCard
@@ -206,7 +206,7 @@ export default function VendedorDashboard() {
 
         <div className="lg:col-span-3 rounded-xl border bg-card p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold">Pedidos recentes</h2>
-          <OrdersTable orders={data.recentOrders} />
+          <SellerOrdersTable orders={data.recentOrders} />
         </div>
       </div>
     </div>

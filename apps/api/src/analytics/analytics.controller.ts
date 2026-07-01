@@ -22,8 +22,12 @@ export class AnalyticsController {
 
   @Get('seller')
   @Roles(Role.ADMIN, Role.VENDEDOR)
-  getSellerOverview(@CurrentUser('id') userId: string) {
-    return this.analyticsService.getSellerOverview(userId);
+  getSellerOverview(@CurrentUser('id') userId: string, @Query('days') days?: string) {
+    const parsed = days ? parseInt(days, 10) : 30;
+    return this.analyticsService.getSellerOverview(
+      userId,
+      Number.isFinite(parsed) && parsed > 0 ? parsed : 30,
+    );
   }
 
   @Get('customer')

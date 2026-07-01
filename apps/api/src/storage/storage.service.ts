@@ -43,6 +43,20 @@ export class StorageService {
     return Promise.all(files.map((f) => this.uploadOne(f, folder)));
   }
 
+  async uploadAvatar(file: Express.Multer.File, userId: string) {
+    const image = await this.uploadOne(file, 'users');
+    await this.prisma.image.update({ where: { id: image.id }, data: { userId } });
+
+    const previous = await this.prisma.image.findMany({
+      where: { userId, folder: 'users', id: { not: image.id } },
+    });
+    if (previous.length) {
+      await this.deleteManyByKeys(previous.map((p) => p.key));
+    }
+
+    return image;
+  }
+
   private async uploadOne(file: Express.Multer.File, folder: StorageFolder) {
     const cfg = RESIZE[folder];
 

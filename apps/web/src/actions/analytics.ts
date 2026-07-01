@@ -14,8 +14,8 @@ export async function fetchAdminStats(token: string) {
   return apiFetch<AdminOverview>('/analytics/admin', token);
 }
 
-export async function fetchSellerStats(token: string) {
-  return apiFetch<AdminOverview>('/analytics/seller', token);
+export async function fetchSellerStats(token: string, days = 30) {
+  return apiFetch<SellerOverview>(`/analytics/seller?days=${days}`, token);
 }
 
 export async function fetchCustomerStats(token: string) {
@@ -38,6 +38,32 @@ export interface AdminOverview {
   ordersByStatus: { status: string; count: number }[];
   recentOrders: RecentOrder[];
   topProducts: TopProduct[];
+  revenueChart: ChartPoint[];
+}
+
+export interface SellerOverview {
+  period: { days: number; since: string; until: string };
+  revenueToday: number;
+  revenueMonth: number;
+  revenuePeriod: number;
+  revenuePrevPeriod: number;
+  revenueChangePct: number | null;
+  totalOrders: number;
+  ordersToday: number;
+  ordersTotal: number;
+  totalUnitsSold: number;
+  avgTicket: number;
+  ordersByStatus: { status: string; count: number }[];
+  topProducts: TopProduct[];
+  recentOrders: {
+    orderId: string;
+    orderStatus: string;
+    createdAt: string;
+    customer: { name: string | null; email: string } | null;
+    product: string;
+    quantity: number;
+    subtotal: number;
+  }[];
   revenueChart: ChartPoint[];
 }
 

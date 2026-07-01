@@ -81,7 +81,7 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
 
   const loadInstallments = useCallback(
     async (bin: string) => {
-      if (!mp || bin.length < 6 || !allowInstallments) {
+      if (!mp || bin.length < 6) {
         setInstallmentOptions([]);
         return;
       }
@@ -89,8 +89,14 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
       try {
         const result = await mp.getInstallments({ amount: amount.toFixed(2), bin });
         const first = result[0];
-        const costs = first?.payer_costs ?? [];
         if (first?.payment_method_id) setDetectedPaymentMethodId(first.payment_method_id);
+
+        // Installment options only matter when the order qualifies for parcelamento —
+        // but the bin lookup above must always run, since it's the only place the
+        // card's payment_method_id (bandeira) gets detected before submit.
+        if (!allowInstallments) return;
+
+        const costs = first?.payer_costs ?? [];
         setInstallmentOptions(
           costs.map((c) => ({
             installments: c.installments,
@@ -102,9 +108,11 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
           setInstallments(costs[0].installments);
         }
       } catch {
-        setInstallmentOptions([
-          { installments: 1, recommended_message: '1x', total_amount: amount },
-        ]);
+        if (allowInstallments) {
+          setInstallmentOptions([
+            { installments: 1, recommended_message: '1x', total_amount: amount },
+          ]);
+        }
       } finally {
         setLoadingInstallments(false);
       }
@@ -116,7 +124,6 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
     if (!allowInstallments) {
       setInstallments(1);
       setInstallmentOptions([]);
-      return;
     }
     const bin = cardNumber.replace(/\D/g, '').slice(0, 6);
     if (bin.length === 6) loadInstallments(bin);
@@ -155,7 +162,21 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
 
       if (!tokenResult.id) throw new Error('Falha ao tokenizar o cartão.');
 
-      const pmId = tokenResult.payment_method_id || detectedPaymentMethodId;
+      let pmId = tokenResult.payment_method_id || detectedPaymentMethodId;
+      if (!pmId && mp) {
+        // Fallback for the case where the user submits before the bin lookup
+        // (triggered on card-number change) has finished resolving.
+        const bin = cardNumber.replace(/\D/g, '').slice(0, 6);
+        if (bin.length === 6) {
+          try {
+            const result = await mp.getInstallments({ amount: amount.toFixed(2), bin });
+            pmId = result[0]?.payment_method_id ?? '';
+            if (pmId) setDetectedPaymentMethodId(pmId);
+          } catch {
+            // ignore — falls through to the error below
+          }
+        }
+      }
       if (!pmId)
         throw new Error(
           'Não foi possível identificar a bandeira do cartão. Verifique o número e tente novamente.',

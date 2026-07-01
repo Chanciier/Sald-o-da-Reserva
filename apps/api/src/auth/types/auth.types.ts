@@ -19,8 +19,17 @@ export interface AuthenticatedUser {
   role: Role;
 }
 
+export interface PublicUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: Role;
+  phone: string | null;
+  avatarUrl: string | null;
+}
+
 export interface AuthResult {
-  user: AuthenticatedUser;
+  user: PublicUser;
   accessToken: string;
   refreshToken: string;
 }

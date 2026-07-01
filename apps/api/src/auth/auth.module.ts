@@ -15,6 +15,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { TurnstileGuard } from './guards/turnstile.guard';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { TurnstileGuard } from './guards/turnstile.guard';
         signOptions: { expiresIn: '15m' },
       }),
     }),
+    StorageModule,
   ],
   controllers: [AuthController],
   providers: [
