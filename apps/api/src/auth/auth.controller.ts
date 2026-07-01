@@ -9,6 +9,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -28,6 +29,7 @@ export class AuthController {
   @Post('register')
   @Public()
   @UseGuards(TurnstileGuard)
+  @Throttle({ medium: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.CREATED)
   async register(
     @Body() dto: RegisterDto,
@@ -46,6 +48,7 @@ export class AuthController {
   @Post('login')
   @Public()
   @UseGuards(TurnstileGuard)
+  @Throttle({ medium: { limit: 10, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
@@ -99,6 +102,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @Public()
+  @Throttle({ medium: { limit: 3, ttl: 3_600_000 } })
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
     await this.authService.forgotPassword(dto, this.getIp(req));
