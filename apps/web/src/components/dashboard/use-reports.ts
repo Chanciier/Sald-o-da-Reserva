@@ -31,9 +31,13 @@ export function useReports() {
     refetchInterval: 5 * 60 * 1000,
   });
 
-  function apply(next = draft) {
+  function navigateToRange(next: { from: string; to: string }) {
     const search = new URLSearchParams({ from: next.from, to: next.to });
     router.push(`${pathname}?${search}`);
+  }
+
+  function apply() {
+    navigateToRange(draft);
   }
 
   function preset(kind: 'today' | 'month' | '30days') {
@@ -46,7 +50,7 @@ export function useReports() {
     }
     const next = { from: nextFrom, to: today };
     setDraft(next);
-    apply(next);
+    navigateToRange(next);
   }
 
   return { ...query, from, to, draft, setDraft, apply, preset };

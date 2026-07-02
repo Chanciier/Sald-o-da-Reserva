@@ -100,7 +100,7 @@ export function ReportHeader(props: HeaderProps) {
               />
             </label>
             <button
-              onClick={props.apply}
+              onClick={() => props.apply()}
               disabled={!props.draft.from || !props.draft.to || props.draft.from > props.draft.to}
               className="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
