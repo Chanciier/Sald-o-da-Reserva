@@ -1,22 +1,21 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
-import { OllamaService } from '../ollama/ollama.service';
+import { AnthropicService } from '../anthropic/anthropic.service';
 import { VisionService } from './vision.service';
 
 /**
- * Testes unitários do VisionService. O Ollama é mockado via global.fetch, então
- * rodam sem o modelo instalado. Cobrem: normalização do JSON, tolerância de
- * parsing, degradação/erros e validação de entrada. Um teste de integração real
- * (com Ollama de pé) fica no script scripts/vision-smoke.ts.
+ * Testes unitários do VisionService. A Anthropic é mockada via um cliente
+ * fake injetado no AnthropicService (só `messages.create` é mockado), então
+ * rodam sem chamar a API de verdade. Cobrem: normalização do JSON, tolerância
+ * de parsing, degradação/erros e validação de entrada. Um teste de integração
+ * real (com a API de verdade) fica no script scripts/vision-smoke.ts.
  */
 
-/** Monta a resposta que o Ollama /api/chat devolveria com um dado content. */
-function ollamaOk(content: string) {
+/** Monta a resposta que `client.messages.create` devolveria com um dado texto. */
+function claudeOk(text: string): Anthropic.Message {
   return {
-    ok: true,
-    status: 200,
-    json: async () => ({ message: { content } }),
-    text: async () => '',
-  } as unknown as Response;
+    content: [{ type: 'text', text, citations: [] }],
+  } as unknown as Anthropic.Message;
 }
 
 const FULL_JSON = JSON.stringify({
@@ -32,17 +31,17 @@ const FULL_JSON = JSON.stringify({
   confianca: 0.87,
 });
 
-// base64 de "x" — conteúdo irrelevante pois o fetch é mockado.
+// base64 de "x" — conteúdo irrelevante pois a API é mockada.
 const B64 = Buffer.from('x').toString('base64');
 
 describe('VisionService', () => {
   let service: VisionService;
-  let fetchMock: jest.Mock;
+  let createMock: jest.Mock;
 
   beforeEach(() => {
-    service = new VisionService(new OllamaService());
-    fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    createMock = jest.fn();
+    const fakeClient = { messages: { create: createMock } } as unknown as Anthropic;
+    service = new VisionService(new AnthropicService(fakeClient));
   });
 
   afterEach(() => {
@@ -50,7 +49,7 @@ describe('VisionService', () => {
   });
 
   it('normaliza um JSON completo do modelo', async () => {
-    fetchMock.mockResolvedValue(ollamaOk(FULL_JSON));
+    createMock.mockResolvedValue(claudeOk(FULL_JSON));
 
     const result = await service.analyze({ imagesBase64: [B64] });
 
@@ -64,38 +63,37 @@ describe('VisionService', () => {
       condition: 'USADO_BOM', // normalizado para maiúsculas
       confidence: 0.87,
       imagesAnalyzed: 1,
-      modelUsed: 'qwen2.5vl',
+      modelUsed: 'claude-sonnet-5',
     });
     // dedup case-insensitive em características
     expect(result.features).toEqual(['display digital', 'cesto removível']);
     expect(result.keywords).toEqual(['air fryer', 'fritadeira', 'mondial']);
   });
 
-  it('envia todas as imagens em uma única chamada ao Ollama', async () => {
-    fetchMock.mockResolvedValue(ollamaOk(FULL_JSON));
+  it('envia todas as imagens em uma única chamada à Anthropic', async () => {
+    createMock.mockResolvedValue(claudeOk(FULL_JSON));
 
     await service.analyze({ imagesBase64: [B64, B64, B64] });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toContain('/api/chat');
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.model).toBe('qwen2.5vl');
-    expect(body.format).toBe('json');
-    expect(body.messages[0].images).toHaveLength(3);
+    expect(createMock).toHaveBeenCalledTimes(1);
+    const [params] = createMock.mock.calls[0];
+    expect(params.model).toBe('claude-sonnet-5');
+    const content = params.messages[0].content as Array<{ type: string }>;
+    expect(content.filter((c) => c.type === 'image')).toHaveLength(3);
+    expect(content.filter((c) => c.type === 'text')).toHaveLength(1);
   });
 
   it('extrai JSON mesmo quando vem cercado por texto', async () => {
     const noisy = 'Claro! Aqui está:\n```json\n' + FULL_JSON + '\n```\nEspero ter ajudado.';
-    fetchMock.mockResolvedValue(ollamaOk(noisy));
+    createMock.mockResolvedValue(claudeOk(noisy));
 
     const result = await service.analyze({ imagesBase64: [B64] });
     expect(result.brand).toBe('Mondial');
   });
 
   it('usa null para atributos ausentes ou "null" textual, e clampa confiança', async () => {
-    fetchMock.mockResolvedValue(
-      ollamaOk(
+    createMock.mockResolvedValue(
+      claudeOk(
         JSON.stringify({
           marca: 'null',
           cor: '   ',
@@ -116,36 +114,40 @@ describe('VisionService', () => {
   });
 
   it('lança UnprocessableEntity quando o modelo não devolve JSON', async () => {
-    fetchMock.mockResolvedValue(ollamaOk('desculpe, não consegui identificar o produto.'));
+    createMock.mockResolvedValue(claudeOk('desculpe, não consegui identificar o produto.'));
     await expect(service.analyze({ imagesBase64: [B64] })).rejects.toBeInstanceOf(
       UnprocessableEntityException,
     );
   });
 
-  it('lança ServiceUnavailable quando o Ollama está fora do ar', async () => {
-    fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
+  it('lança ServiceUnavailable quando a Anthropic está fora do ar', async () => {
+    createMock.mockRejectedValue(new Error('ECONNREFUSED'));
     await expect(service.analyze({ imagesBase64: [B64] })).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
   });
 
-  it('orienta pull do modelo quando o Ollama responde 404', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 404,
-      text: async () => 'model not found',
-    } as unknown as Response);
-
-    await expect(service.analyze({ imagesBase64: [B64] })).rejects.toThrow(/ollama pull/);
+  it('lança ServiceUnavailable quando a API retorna um erro (ex.: modelo inválido)', async () => {
+    createMock.mockRejectedValue(
+      new Anthropic.APIError(
+        404,
+        { error: { message: 'model not found' } },
+        'not found',
+        undefined,
+      ),
+    );
+    await expect(service.analyze({ imagesBase64: [B64] })).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
   });
 
   it('rejeita quando nenhuma imagem é enviada', async () => {
     await expect(service.analyze({})).rejects.toBeInstanceOf(UnprocessableEntityException);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(createMock).not.toHaveBeenCalled();
   });
 
   it('rejeita quando passa de 5 imagens', async () => {
     await expect(service.analyze({ imagesBase64: Array(6).fill(B64) })).rejects.toThrow(/Máximo/);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(createMock).not.toHaveBeenCalled();
   });
 });

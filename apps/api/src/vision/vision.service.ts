@@ -1,8 +1,8 @@
 import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import { AnthropicService, ClaudeImage } from '../anthropic/anthropic.service';
 import { extractJsonObject } from '../common/json-extract';
 import { toConfidence, toStringArray, toStringOrNull } from '../common/normalize';
-import { OllamaService } from '../ollama/ollama.service';
-import { fetchImageAsBase64, stripDataUrlPrefix } from './image-source';
+import { fetchImageAsBase64, normalizeMediaType, parseInlineImage } from './image-source';
 import {
   VISION_CONDITIONS,
   VisionAnalyzeInput,
@@ -52,9 +52,9 @@ interface RawVision {
 }
 
 /**
- * VisionModule — extração de atributos visuais de produtos via modelo LOCAL
- * (Qwen2.5-VL executado no Ollama). Recebe imagens (URL pública ou base64),
- * envia todas numa única chamada multimodal e devolve JSON estruturado.
+ * VisionModule — extração de atributos visuais de produtos via Claude Vision
+ * (API da Anthropic). Recebe imagens (URL pública ou base64), envia todas numa
+ * única chamada multimodal e devolve JSON estruturado.
  *
  * Não faz pesquisa de mercado nem sugestão de preço — isso é responsabilidade
  * de módulos posteriores do Funcionário Virtual.
@@ -65,20 +65,20 @@ export class VisionService {
   private readonly model: string;
   private readonly timeoutMs: number;
 
-  constructor(private readonly ollama: OllamaService) {
-    this.model = process.env.OLLAMA_VISION_MODEL ?? 'qwen2.5vl';
-    const parsed = Number(process.env.OLLAMA_TIMEOUT_MS);
+  constructor(private readonly anthropic: AnthropicService) {
+    this.model = process.env.ANTHROPIC_VISION_MODEL || 'claude-sonnet-5';
+    const parsed = Number(process.env.ANTHROPIC_TIMEOUT_MS);
     this.timeoutMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 120_000;
   }
 
   async analyze(input: VisionAnalyzeInput): Promise<VisionResult> {
     const images = await this.collectImages(input);
 
-    const raw = await this.ollama.chat(
-      this.model,
-      [{ role: 'user', content: VISION_PROMPT, images }],
-      { json: true, timeoutMs: this.timeoutMs },
-    );
+    const raw = await this.anthropic.chat(VISION_PROMPT, {
+      model: this.model,
+      images,
+      timeoutMs: this.timeoutMs,
+    });
     const parsed = extractJsonObject<RawVision>(raw);
     if (!parsed) {
       this.logger.warn(`vision: resposta não-parseável do modelo. Trecho: ${raw.slice(0, 200)}`);
@@ -94,10 +94,10 @@ export class VisionService {
     };
   }
 
-  /** Resolve a entrada (URLs e/ou base64) numa lista de base64 pronta p/ Ollama. */
-  private async collectImages(input: VisionAnalyzeInput): Promise<string[]> {
+  /** Resolve a entrada (URLs e/ou base64) numa lista de imagens prontas p/ Claude. */
+  private async collectImages(input: VisionAnalyzeInput): Promise<ClaudeImage[]> {
     const urls = input.imageUrls ?? [];
-    const inline = (input.imagesBase64 ?? []).map(stripDataUrlPrefix).filter((s) => s.length > 0);
+    const inline = input.imagesBase64 ?? [];
 
     const total = urls.length + inline.length;
     if (total === 0) {
@@ -109,7 +109,15 @@ export class VisionService {
 
     // URLs passam pela guarda anti-SSRF e viram base64.
     const fetched = await Promise.all(urls.map((u) => fetchImageAsBase64(u, this.timeoutMs)));
-    return [...fetched.map((f) => f.base64), ...inline];
+    const fromUrls: ClaudeImage[] = fetched.map((f) => ({
+      base64: f.base64,
+      mediaType: normalizeMediaType(f.mimeType),
+    }));
+    const fromInline: ClaudeImage[] = inline
+      .map(parseInlineImage)
+      .filter((img) => img.base64.length > 0);
+
+    return [...fromUrls, ...fromInline];
   }
 
   private normalize(raw: RawVision): VisionAttributes {

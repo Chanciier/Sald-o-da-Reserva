@@ -1,5 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
-import { assertPublicHttpUrl, isPrivateIp, stripDataUrlPrefix } from './image-source';
+import {
+  assertPublicHttpUrl,
+  isPrivateIp,
+  normalizeMediaType,
+  parseInlineImage,
+  stripDataUrlPrefix,
+} from './image-source';
 
 describe('image-source (anti-SSRF)', () => {
   describe('isPrivateIp', () => {
@@ -71,6 +77,35 @@ describe('image-source (anti-SSRF)', () => {
     });
     it('mantém base64 puro inalterado', () => {
       expect(stripDataUrlPrefix('AAAB')).toBe('AAAB');
+    });
+  });
+
+  describe('normalizeMediaType', () => {
+    it('aceita tipos suportados pela Claude Vision API', () => {
+      expect(normalizeMediaType('image/png')).toBe('image/png');
+      expect(normalizeMediaType('IMAGE/JPEG')).toBe('image/jpeg');
+    });
+    it('cai para image/jpeg em tipos não suportados', () => {
+      expect(normalizeMediaType('image/bmp')).toBe('image/jpeg');
+      expect(normalizeMediaType('')).toBe('image/jpeg');
+    });
+  });
+
+  describe('parseInlineImage', () => {
+    it('extrai base64 + tipo de mídia de uma data URL', () => {
+      expect(parseInlineImage('data:image/png;base64,AAAB')).toEqual({
+        base64: 'AAAB',
+        mediaType: 'image/png',
+      });
+    });
+    it('assume image/jpeg para base64 puro (sem prefixo)', () => {
+      expect(parseInlineImage('AAAB')).toEqual({ base64: 'AAAB', mediaType: 'image/jpeg' });
+    });
+    it('cai para image/jpeg quando o tipo declarado não é suportado', () => {
+      expect(parseInlineImage('data:image/bmp;base64,AAAB')).toEqual({
+        base64: 'AAAB',
+        mediaType: 'image/jpeg',
+      });
     });
   });
 });

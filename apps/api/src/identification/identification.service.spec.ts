@@ -1,22 +1,21 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { UnprocessableEntityException } from '@nestjs/common';
-import { OllamaService } from '../ollama/ollama.service';
+import { AnthropicService } from '../anthropic/anthropic.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentificationService } from './identification.service';
 import { IdentificationInput } from './identification.types';
 
 /**
- * Testes unitários do IdentificationService. Ollama é mockado via
- * global.fetch (mesma estratégia do VisionService); Prisma é mockado com um
- * stub mínimo de `category.findMany`, sem banco real.
+ * Testes unitários do IdentificationService. A Anthropic é mockada via um
+ * cliente fake injetado no AnthropicService (mesma estratégia do
+ * VisionService); Prisma é mockado com um stub mínimo de
+ * `category.findMany`, sem banco real.
  */
 
-function ollamaOk(content: string) {
+function claudeOk(text: string): Anthropic.Message {
   return {
-    ok: true,
-    status: 200,
-    json: async () => ({ message: { content } }),
-    text: async () => '',
-  } as unknown as Response;
+    content: [{ type: 'text', text, citations: [] }],
+  } as unknown as Anthropic.Message;
 }
 
 const VISION_OUTPUT: IdentificationInput = {
@@ -48,13 +47,13 @@ const FULL_JSON = JSON.stringify({
 
 describe('IdentificationService', () => {
   let service: IdentificationService;
-  let fetchMock: jest.Mock;
+  let createMock: jest.Mock;
   let findManyMock: jest.Mock;
   let prisma: { category: { findMany: jest.Mock } };
 
   beforeEach(() => {
-    fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    createMock = jest.fn();
+    const fakeClient = { messages: { create: createMock } } as unknown as Anthropic;
 
     findManyMock = jest.fn().mockResolvedValue([
       { id: 'cat-eletro', name: 'Eletroportáteis' },
@@ -62,7 +61,10 @@ describe('IdentificationService', () => {
     ]);
     prisma = { category: { findMany: findManyMock } };
 
-    service = new IdentificationService(new OllamaService(), prisma as unknown as PrismaService);
+    service = new IdentificationService(
+      new AnthropicService(fakeClient),
+      prisma as unknown as PrismaService,
+    );
   });
 
   afterEach(() => {
@@ -70,7 +72,7 @@ describe('IdentificationService', () => {
   });
 
   it('gera todos os campos pedidos a partir do JSON do Vision', async () => {
-    fetchMock.mockResolvedValue(ollamaOk(FULL_JSON));
+    createMock.mockResolvedValue(claudeOk(FULL_JSON));
 
     const result = await service.generate(VISION_OUTPUT);
 
@@ -95,7 +97,7 @@ describe('IdentificationService', () => {
   });
 
   it('inclui especificações do modelo + do Vision, sem duplicar por label', async () => {
-    fetchMock.mockResolvedValue(ollamaOk(FULL_JSON));
+    createMock.mockResolvedValue(claudeOk(FULL_JSON));
 
     const result = await service.generate(VISION_OUTPUT);
 
@@ -111,8 +113,8 @@ describe('IdentificationService', () => {
   });
 
   it('deduplica tags entre Vision e modelo, case-insensitive', async () => {
-    fetchMock.mockResolvedValue(
-      ollamaOk(
+    createMock.mockResolvedValue(
+      claudeOk(
         JSON.stringify({
           titulo_seo: 'Produto X',
           descricao: 'desc',
@@ -131,8 +133,8 @@ describe('IdentificationService', () => {
   });
 
   it('casa categoria por correspondência parcial quando não há match exato', async () => {
-    fetchMock.mockResolvedValue(
-      ollamaOk(
+    createMock.mockResolvedValue(
+      claudeOk(
         JSON.stringify({
           titulo_seo: 'Cadeira de escritório',
           descricao: 'desc',
@@ -150,8 +152,8 @@ describe('IdentificationService', () => {
 
   it('deixa categoryId nulo quando nenhuma categoria cadastrada bate', async () => {
     findManyMock.mockResolvedValue([{ id: 'cat-x', name: 'Categoria Totalmente Diferente' }]);
-    fetchMock.mockResolvedValue(
-      ollamaOk(
+    createMock.mockResolvedValue(
+      claudeOk(
         JSON.stringify({
           titulo_seo: 'Produto Y',
           descricao: 'desc',
@@ -169,8 +171,8 @@ describe('IdentificationService', () => {
   });
 
   it('usa título de fallback (marca+modelo) quando o modelo não devolve titulo_seo', async () => {
-    fetchMock.mockResolvedValue(
-      ollamaOk(
+    createMock.mockResolvedValue(
+      claudeOk(
         JSON.stringify({
           descricao: 'desc',
           especificacoes: [],
@@ -191,8 +193,8 @@ describe('IdentificationService', () => {
   it('trunca título e meta description nos limites do schema', async () => {
     const longTitle = 'T'.repeat(250);
     const longMeta = 'M'.repeat(300);
-    fetchMock.mockResolvedValue(
-      ollamaOk(
+    createMock.mockResolvedValue(
+      claudeOk(
         JSON.stringify({
           titulo_seo: longTitle,
           descricao: 'desc',
@@ -210,19 +212,20 @@ describe('IdentificationService', () => {
   });
 
   it('lança UnprocessableEntity quando o modelo não devolve JSON', async () => {
-    fetchMock.mockResolvedValue(ollamaOk('não consigo gerar isso agora.'));
+    createMock.mockResolvedValue(claudeOk('não consigo gerar isso agora.'));
     await expect(service.generate({})).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
-  it('envia os atributos do Vision no prompt enviado ao Ollama', async () => {
-    fetchMock.mockResolvedValue(ollamaOk(FULL_JSON));
+  it('envia os atributos do Vision no prompt enviado à Anthropic', async () => {
+    createMock.mockResolvedValue(claudeOk(FULL_JSON));
 
     await service.generate(VISION_OUTPUT);
 
-    const [, init] = fetchMock.mock.calls[0];
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.messages[0].content).toContain('Mondial');
-    expect(body.messages[0].content).toContain('Air Fryer AF-31');
-    expect(body.format).toBe('json');
+    const [params] = createMock.mock.calls[0];
+    const textBlock = params.messages[0].content.find(
+      (c: { type: string }) => c.type === 'text',
+    ) as { text: string };
+    expect(textBlock.text).toContain('Mondial');
+    expect(textBlock.text).toContain('Air Fryer AF-31');
   });
 });

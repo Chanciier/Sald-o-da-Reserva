@@ -1,23 +1,19 @@
 /**
- * Smoke-test REAL do VisionModule contra um Ollama de verdade.
+ * Smoke-test REAL do VisionModule contra a API da Anthropic de verdade.
  *
- * Diferente dos testes unitários (que mockam o Ollama), este script chama o
- * modelo local de fato. Use quando o Ollama estiver instalado e o modelo
- * baixado.
- *
- * Pré-requisitos:
- *   1. Instalar Ollama:      https://ollama.com/download
- *   2. Baixar o modelo:      ollama pull qwen2.5vl
- *      (o daemon já sobe sozinho; confira: curl http://127.0.0.1:11434/api/tags)
+ * Diferente dos testes unitários (que mockam o cliente da Anthropic), este
+ * script chama a API de fato. Requer uma ANTHROPIC_API_KEY válida.
  *
  * Uso:
  *   npx ts-node scripts/vision-smoke.ts <url-da-imagem>
  *   npx ts-node scripts/vision-smoke.ts ./caminho/para/foto.jpg
  *
- * Variáveis (opcionais): OLLAMA_BASE_URL, OLLAMA_VISION_MODEL, OLLAMA_TIMEOUT_MS
+ * Variáveis (opcionais): ANTHROPIC_VISION_MODEL, ANTHROPIC_TIMEOUT_MS
+ * Obrigatória: ANTHROPIC_API_KEY
  */
+import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync } from 'fs';
-import { OllamaService } from '../src/ollama/ollama.service';
+import { AnthropicService } from '../src/anthropic/anthropic.service';
 import { VisionService } from '../src/vision/vision.service';
 
 async function main() {
@@ -26,8 +22,13 @@ async function main() {
     console.error('Uso: ts-node scripts/vision-smoke.ts <url-ou-caminho-da-imagem>');
     process.exit(1);
   }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('ANTHROPIC_API_KEY não configurada.');
+    process.exit(1);
+  }
 
-  const service = new VisionService(new OllamaService());
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const service = new VisionService(new AnthropicService(client));
   const isUrl = /^https?:\/\//i.test(arg);
 
   const input = isUrl
@@ -35,8 +36,8 @@ async function main() {
     : { imagesBase64: [readFileSync(arg).toString('base64')] };
 
   console.log(`Analisando ${isUrl ? 'URL' : 'arquivo'}: ${arg}`);
-  console.log(`Modelo: ${process.env.OLLAMA_VISION_MODEL ?? 'qwen2.5vl'}`);
-  console.log('Aguarde (a primeira execução carrega o modelo e pode demorar)...\n');
+  console.log(`Modelo: ${process.env.ANTHROPIC_VISION_MODEL || 'claude-sonnet-5'}`);
+  console.log('Aguarde...\n');
 
   const started = Date.now();
   const result = await service.analyze(input);

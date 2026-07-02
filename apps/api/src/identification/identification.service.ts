@@ -1,7 +1,7 @@
 import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import { AnthropicService } from '../anthropic/anthropic.service';
 import { extractJsonObject } from '../common/json-extract';
 import { toStringArray, toStringOrNull } from '../common/normalize';
-import { OllamaService } from '../ollama/ollama.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { slugify } from '../utils/slugify';
 import {
@@ -52,7 +52,7 @@ interface RawIdentification {
  * IdentificationModule — segunda etapa do Funcionário Virtual. Recebe o JSON
  * do VisionModule e gera o conteúdo comercial do anúncio (título SEO,
  * descrição, especificações, categoria, tags, slug, meta description) via
- * modelo LOCAL (Ollama).
+ * Claude (API da Anthropic).
  *
  * Não persiste nada — devolve um rascunho para o painel de revisão, onde todo
  * campo é editável antes de virar um Product de verdade.
@@ -64,21 +64,22 @@ export class IdentificationService {
   private readonly timeoutMs: number;
 
   constructor(
-    private readonly ollama: OllamaService,
+    private readonly anthropic: AnthropicService,
     private readonly prisma: PrismaService,
   ) {
-    // Reaproveita o modelo de visão por padrão (Qwen2.5-VL também gera texto
-    // puro bem); permite apontar um modelo de texto dedicado via env.
-    this.model = process.env.OLLAMA_TEXT_MODEL || process.env.OLLAMA_VISION_MODEL || 'qwen2.5vl';
-    const parsed = Number(process.env.OLLAMA_TIMEOUT_MS);
+    // Reaproveita o modelo de visão por padrão; permite apontar um modelo de
+    // texto dedicado (ex.: mais barato) via env.
+    this.model =
+      process.env.ANTHROPIC_TEXT_MODEL || process.env.ANTHROPIC_VISION_MODEL || 'claude-sonnet-5';
+    const parsed = Number(process.env.ANTHROPIC_TIMEOUT_MS);
     this.timeoutMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 120_000;
   }
 
   async generate(input: IdentificationInput): Promise<IdentificationResult> {
     const prompt = this.buildPrompt(input);
 
-    const raw = await this.ollama.chat(this.model, [{ role: 'user', content: prompt }], {
-      json: true,
+    const raw = await this.anthropic.chat(prompt, {
+      model: this.model,
       timeoutMs: this.timeoutMs,
     });
 

@@ -125,3 +125,31 @@ export function stripDataUrlPrefix(input: string): string {
   const match = input.match(/^data:[^;]+;base64,(.*)$/s);
   return match ? match[1] : input;
 }
+
+/** Tipos de mídia aceitos pela Claude Vision API. */
+export type ClaudeMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+const SUPPORTED_MEDIA_TYPES: readonly ClaudeMediaType[] = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
+
+/** Normaliza um Content-Type/mimeType livre para um tipo aceito pela Claude Vision API. */
+export function normalizeMediaType(mimeType: string): ClaudeMediaType {
+  const lower = mimeType.toLowerCase().trim();
+  return (SUPPORTED_MEDIA_TYPES as readonly string[]).includes(lower)
+    ? (lower as ClaudeMediaType)
+    : 'image/jpeg';
+}
+
+/**
+ * Extrai base64 + tipo de mídia de uma string inline. Se vier como data URL
+ * (`data:image/png;base64,...`), usa o tipo declarado (quando suportado);
+ * caso contrário (base64 puro, sem prefixo), assume `image/jpeg`.
+ */
+export function parseInlineImage(input: string): { base64: string; mediaType: ClaudeMediaType } {
+  const match = input.match(/^data:([^;]+);base64,(.*)$/s);
+  if (!match) return { base64: input, mediaType: 'image/jpeg' };
+  return { base64: match[2], mediaType: normalizeMediaType(match[1]) };
+}

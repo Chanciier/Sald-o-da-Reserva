@@ -1,16 +1,17 @@
 /**
- * Smoke-test REAL do IdentificationModule contra um Ollama de verdade.
+ * Smoke-test REAL do IdentificationModule contra a API da Anthropic de verdade.
  *
  * Encadeia Vision → Identification, exatamente como o painel de revisão faz.
- * Requer Ollama rodando (ver scripts/vision-smoke.ts para pré-requisitos) e o
- * banco configurado (para o match de categoria via Prisma).
+ * Requer ANTHROPIC_API_KEY válida e o banco configurado (para o match de
+ * categoria via Prisma).
  *
  * Uso:
  *   npx ts-node scripts/identification-smoke.ts <url-ou-caminho-da-imagem>
  */
+import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync } from 'fs';
+import { AnthropicService } from '../src/anthropic/anthropic.service';
 import { IdentificationService } from '../src/identification/identification.service';
-import { OllamaService } from '../src/ollama/ollama.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { VisionService } from '../src/vision/vision.service';
 
@@ -20,11 +21,16 @@ async function main() {
     console.error('Uso: ts-node scripts/identification-smoke.ts <url-ou-caminho-da-imagem>');
     process.exit(1);
   }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('ANTHROPIC_API_KEY não configurada.');
+    process.exit(1);
+  }
 
-  const ollama = new OllamaService();
-  const vision = new VisionService(ollama);
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = new AnthropicService(client);
+  const vision = new VisionService(anthropic);
   const prisma = new PrismaService();
-  const identification = new IdentificationService(ollama, prisma);
+  const identification = new IdentificationService(anthropic, prisma);
 
   const isUrl = /^https?:\/\//i.test(arg);
   const input = isUrl
