@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DollarSign, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
+import { SectionGate } from '@/components/admin/section-gate';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -67,7 +68,15 @@ function fmt(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function AdminPagamentos() {
+export default function AdminPagamentosPage() {
+  return (
+    <SectionGate section="FINANCEIRO">
+      <AdminPagamentos />
+    </SectionGate>
+  );
+}
+
+function AdminPagamentos() {
   const { token } = useAuth();
   const [page, setPage] = useState(1);
   const [methodFilter, setMethodFilter] = useState('');

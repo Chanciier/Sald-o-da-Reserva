@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchProducts, deleteProduct } from '@/actions/products';
+import { SectionGate } from '@/components/admin/section-gate';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos' },
@@ -46,7 +47,15 @@ function fmt(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function AdminProdutos() {
+export default function AdminProdutosPage() {
+  return (
+    <SectionGate section="PRODUTOS">
+      <AdminProdutos />
+    </SectionGate>
+  );
+}
+
+function AdminProdutos() {
   const { token } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);

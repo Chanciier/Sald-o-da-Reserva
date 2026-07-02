@@ -2,6 +2,7 @@
 
 import { Banknote, PackageCheck, ReceiptText, ShoppingCart } from 'lucide-react';
 import { useReports } from '@/components/dashboard/use-reports';
+import { SectionGate } from '@/components/admin/section-gate';
 import {
   Bars,
   Kpi,
@@ -36,7 +37,15 @@ const statuses: Record<string, string> = {
   REFUNDED: 'Reembolsado',
 };
 
-export default function RelatorioVendas() {
+export default function RelatorioVendasPage() {
+  return (
+    <SectionGate section="VENDAS">
+      <RelatorioVendas />
+    </SectionGate>
+  );
+}
+
+function RelatorioVendas() {
   const report = useReports();
   if (report.isLoading) return <LoadingReport />;
   if (!report.data)

@@ -11,12 +11,14 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { AdminSection } from '@prisma/client';
 import { InvoiceService } from './invoice.service';
 import { QueryInvoiceDto } from './dto/query-invoice.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { AuthenticatedUser } from '../auth/types/auth.types';
+import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
 
 @Controller('invoices')
 export class InvoiceController {
@@ -26,6 +28,7 @@ export class InvoiceController {
 
   @Get()
   @Roles('ADMIN', 'VENDEDOR')
+  @RequireSection(AdminSection.FINANCEIRO)
   findAll(@Query() query: QueryInvoiceDto, @CurrentUser() user: AuthenticatedUser) {
     return this.invoiceService.findAll(query, user);
   }
@@ -38,6 +41,7 @@ export class InvoiceController {
 
   @Get(':id')
   @Roles('ADMIN', 'VENDEDOR')
+  @RequireSection(AdminSection.FINANCEIRO)
   findById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.invoiceService.findById(id, user);
   }
@@ -75,18 +79,21 @@ export class InvoiceController {
 
   @Get(':id/xml')
   @Roles('ADMIN', 'VENDEDOR')
+  @RequireSection(AdminSection.FINANCEIRO)
   getXml(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.invoiceService.getXmlUrl(id, user);
   }
 
   @Get(':id/pdf')
   @Roles('ADMIN', 'VENDEDOR')
+  @RequireSection(AdminSection.FINANCEIRO)
   getPdf(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.invoiceService.getDanfeUrl(id, user);
   }
 
   @Get(':id/danfe')
   @Roles('ADMIN', 'VENDEDOR')
+  @RequireSection(AdminSection.FINANCEIRO)
   async getDanfe(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -100,6 +107,7 @@ export class InvoiceController {
 
   @Get(':id/xml/download')
   @Roles('ADMIN', 'VENDEDOR')
+  @RequireSection(AdminSection.FINANCEIRO)
   async getXmlDownload(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,

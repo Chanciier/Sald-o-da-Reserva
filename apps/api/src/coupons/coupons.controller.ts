@@ -10,26 +10,29 @@ import {
   Post,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Role } from '@prisma/client';
+import { AdminSection, Role } from '@prisma/client';
 import { CouponsService } from './coupons.service';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
 
 @Controller('coupons')
 export class CouponsController {
   constructor(private readonly coupons: CouponsService) {}
 
   @Post()
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.CUPONS)
   @HttpCode(HttpStatus.CREATED)
   create(@Body() dto: CreateCouponDto) {
     return this.coupons.create(dto);
   }
 
   @Get()
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.CUPONS)
   findAll() {
     return this.coupons.findAll();
   }
@@ -43,13 +46,15 @@ export class CouponsController {
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.CUPONS)
   update(@Param('id') id: string, @Body() dto: UpdateCouponDto) {
     return this.coupons.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.CUPONS)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {
     return this.coupons.remove(id);

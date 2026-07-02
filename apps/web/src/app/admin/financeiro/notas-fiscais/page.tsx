@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FileText, Search, RefreshCw, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchInvoices, type Invoice } from '@/actions/invoices';
+import { SectionGate } from '@/components/admin/section-gate';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos' },
@@ -55,7 +56,15 @@ function StatusBadge({ status }: { status: Invoice['status'] }) {
   );
 }
 
-export default function NotasFiscaisPage() {
+export default function NotasFiscaisPageRoot() {
+  return (
+    <SectionGate section="FINANCEIRO">
+      <NotasFiscaisPage />
+    </SectionGate>
+  );
+}
+
+function NotasFiscaisPage() {
   const { token } = useAuth();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');

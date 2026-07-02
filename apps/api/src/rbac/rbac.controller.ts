@@ -10,12 +10,13 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Role } from '@prisma/client';
+import { AdminSection, Role } from '@prisma/client';
 import { RbacService } from './rbac.service';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/auth.types';
+import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
 
 @Controller('admin/rbac')
 @Roles(Role.ADMIN)
@@ -51,6 +52,25 @@ export class RbacController {
   async getUserPermissions(@Param('id') userId: string) {
     const permissions = await this.rbacService.getUserPermissions(userId);
     return { userId, permissions };
+  }
+
+  // Listagem somente-leitura de clientes, liberada a vendedores com a seção
+  // "Clientes" configurada — não expõe VENDEDOR/ADMIN nem permite troca de role.
+  @Get('clientes')
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.CLIENTES)
+  @HttpCode(HttpStatus.OK)
+  listClientes(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.rbacService.listUsers({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      role: Role.CLIENTE,
+      search: search || undefined,
+    });
   }
 
   @Get('users')

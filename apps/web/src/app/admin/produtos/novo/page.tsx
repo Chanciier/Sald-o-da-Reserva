@@ -5,8 +5,17 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { createProduct } from '@/actions/products';
 import { ProductForm } from '@/components/products/product-form';
+import { SectionGate } from '@/components/admin/section-gate';
 
-export default function AdminNovoProduto() {
+export default function AdminNovoProdutoPage() {
+  return (
+    <SectionGate section="PRODUTOS_CRIAR">
+      <AdminNovoProduto />
+    </SectionGate>
+  );
+}
+
+function AdminNovoProduto() {
   const { token } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);

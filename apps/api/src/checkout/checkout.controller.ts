@@ -10,12 +10,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { AdminSection, Role } from '@prisma/client';
 import { CheckoutService } from './checkout.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/types/auth.types';
+import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
 
 @Controller()
 export class CheckoutController {
@@ -39,7 +40,8 @@ export class CheckoutController {
   }
 
   @Get('orders/admin/all')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PEDIDOS)
   findAllOrders(
     @Query('page') page?: string,
     @Query('status') status?: string,
@@ -53,15 +55,17 @@ export class CheckoutController {
   }
 
   @Patch('orders/admin/:id/status')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PEDIDOS)
   updateOrderStatus(@Param('id') orderId: string, @Body('status') status: string) {
     return this.checkout.updateOrderStatus(orderId, status);
   }
 
-  // Exclui um pedido PENDENTE (somente admin). Diferente de "cancelar", remove
-  // o registro do banco — útil para limpar pedidos abandonados/não pagos.
+  // Exclui um pedido PENDENTE. Diferente de "cancelar", remove o registro do
+  // banco — útil para limpar pedidos abandonados/não pagos.
   @Delete('orders/admin/:id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PEDIDOS)
   @HttpCode(HttpStatus.OK)
   deletePendingOrder(@Param('id') orderId: string) {
     return this.checkout.deletePendingOrder(orderId);

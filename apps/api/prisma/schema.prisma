@@ -13,6 +13,34 @@ enum Role {
   CLIENTE
 }
 
+// ── Permissões granulares de vendedor no painel admin ──────────────────────────
+enum AdminSection {
+  DASHBOARD
+  PRODUTOS
+  PRODUTOS_CRIAR
+  PRODUTOS_EDITAR
+  PEDIDOS
+  VENDAS
+  CLIENTES
+  CUPONS
+  CONFIGURACOES
+  RELATORIOS
+  FINANCEIRO
+}
+
+enum SectionAccessMode {
+  NONE
+  FREE
+  PASSWORD
+  AUTHORIZATION
+}
+
+enum SectionRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
 enum ProductStatus {
   ACTIVE
   INACTIVE
@@ -190,6 +218,9 @@ model User {
   notifications   Notification[]
   pushSubscriptions PushSubscription[]
   recoveryCoupons Coupon[] @relation("RecoveryCouponOwner")
+  sellerSectionPermissions SellerSectionPermission[] @relation("SellerSectionPermissions")
+  sellerAccessRequests     SellerAccessRequest[]     @relation("SellerAccessRequests")
+  resolvedAccessRequests   SellerAccessRequest[]     @relation("SellerAccessRequestsResolved")
 
   @@map("users")
 }
@@ -856,4 +887,51 @@ model AnalyticsEvent {
   @@index([productId])
   @@index([createdAt])
   @@map("analytics_events")
+}
+
+// ── Permissões granulares de vendedor no painel admin ──────────────────────────
+
+// Configuração de acesso de um vendedor a uma seção do painel admin. Uma linha
+// por (vendedor, seção); ausência de linha equivale a NONE (sem acesso).
+model SellerSectionPermission {
+  id                     String            @id @default(cuid())
+  userId                 String            @map("user_id")
+  section                AdminSection
+  mode                   SectionAccessMode @default(NONE)
+  // Hash da senha específica desta seção (apenas quando mode = PASSWORD).
+  passwordHash           String?           @map("password_hash")
+  passwordGrantedAt      DateTime?         @map("password_granted_at")
+  passwordGrantExpiresAt DateTime?         @map("password_grant_expires_at")
+  // Preenchido quando uma SellerAccessRequest para esta seção é aprovada
+  // (mode = AUTHORIZATION). Qualquer atualização da permissão limpa este campo.
+  authorizationGrantedAt DateTime?         @map("authorization_granted_at")
+  updatedByUserId        String?           @map("updated_by_user_id")
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
+
+  user User @relation("SellerSectionPermissions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, section])
+  @@index([userId])
+  @@map("seller_section_permissions")
+}
+
+// Solicitação de acesso criada pelo vendedor para uma seção em modo
+// AUTHORIZATION, aguardando aprovação/negação de um admin.
+model SellerAccessRequest {
+  id           String               @id @default(cuid())
+  userId       String               @map("user_id")
+  section      AdminSection
+  status       SectionRequestStatus @default(PENDING)
+  message      String?              @db.Text
+  resolvedById String?              @map("resolved_by_id")
+  resolvedAt   DateTime?            @map("resolved_at")
+  createdAt    DateTime             @default(now()) @map("created_at")
+
+  user       User  @relation("SellerAccessRequests", fields: [userId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation("SellerAccessRequestsResolved", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, section])
+  @@index([status])
+  @@map("seller_access_requests")
 }

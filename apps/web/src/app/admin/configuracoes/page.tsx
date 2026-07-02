@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Shield, Wrench, Plug } from 'lucide-react';
+import { SectionGate } from '@/components/admin/section-gate';
 
 const TABS = [
   { id: 'integracoes', label: 'Integrações', icon: Plug },
@@ -70,7 +71,15 @@ const SYSTEM_ITEMS = [
   },
 ];
 
-export default function AdminConfiguracoes() {
+export default function AdminConfiguracoesPage() {
+  return (
+    <SectionGate section="CONFIGURACOES">
+      <AdminConfiguracoes />
+    </SectionGate>
+  );
+}
+
+function AdminConfiguracoes() {
   const searchParams = useSearchParams();
   const tab = searchParams.get('tab') ?? 'integracoes';
 

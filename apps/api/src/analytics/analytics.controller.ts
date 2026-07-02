@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Role } from '@prisma/client';
+import { AdminSection, Role } from '@prisma/client';
 import { AnalyticsService } from './analytics.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -9,6 +9,7 @@ import { ReportsService } from './reports.service';
 import { TrackingService } from './tracking.service';
 import { BehaviorService } from './behavior.service';
 import { TrackSessionDto } from './dto/track-event.dto';
+import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
 
 @Controller('analytics')
 export class AnalyticsController {
@@ -32,19 +33,22 @@ export class AnalyticsController {
   }
 
   @Get('behavior')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.RELATORIOS)
   getBehavior(@Query('from') from?: string, @Query('to') to?: string) {
     return this.behaviorService.overview(from, to);
   }
 
   @Get('reports')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.VENDAS, AdminSection.RELATORIOS)
   getReports(@Query('from') from?: string, @Query('to') to?: string) {
     return this.reportsService.overview(from, to);
   }
 
   @Get('admin')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.DASHBOARD)
   getAdminOverview() {
     return this.analyticsService.getAdminOverview();
   }

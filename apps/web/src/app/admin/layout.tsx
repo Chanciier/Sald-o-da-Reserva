@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { useMySections } from '@/components/admin/section-gate';
+import { getNavVisibility } from '@/lib/admin-section-map';
 import {
   LayoutDashboard,
   Users,
@@ -28,6 +30,7 @@ import {
   FileText,
   MessageCircle,
   Boxes,
+  Lock,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -52,6 +55,7 @@ const NAV: NavItem[] = [
       { href: '/admin/usuarios?role=CLIENTE', label: 'Clientes' },
       { href: '/admin/usuarios?role=VENDEDOR', label: 'Vendedores' },
       { href: '/admin/usuarios?role=ADMIN', label: 'Administradores' },
+      { href: '/admin/permissoes-vendedores', label: 'Permissões de Vendedores' },
     ],
   },
   {
@@ -183,6 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { data: mySections } = useMySections();
 
   useEffect(() => {
     if (!loading && (!user || (user.role !== 'ADMIN' && user.role !== 'VENDEDOR'))) {
@@ -213,19 +218,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  // Vendedores enxergam apenas o que o admin liberou em "Permissões de
+  // Vendedores" (GET /seller-permissions/me), mais Expedição, que continua
+  // sempre disponível e fora do novo sistema de permissões por seção.
+  const sections = mySections ?? [];
   const visibleNav =
     user.role === 'VENDEDOR'
-      ? NAV.filter((i) => i.label === 'Expedição' || i.label === 'Produtos').map((i) => {
-          if (i.label === 'Produtos' && i.children) {
-            return {
-              ...i,
-              children: i.children.filter(
-                (c) => c.href === '/admin/produtos' || c.href === '/admin/produtos/novo',
-              ),
-            };
+      ? NAV.reduce<NavItem[]>((acc, item) => {
+          if (item.label === 'Expedição') {
+            acc.push(item);
+            return acc;
           }
-          return i;
-        })
+          if (!item.children) {
+            if (getNavVisibility(item.href!, sections) !== 'hidden') acc.push(item);
+            return acc;
+          }
+          const children = item.children.filter(
+            (c) => getNavVisibility(c.href, sections) !== 'hidden',
+          );
+          if (children.length > 0) acc.push({ ...item, children });
+          return acc;
+        }, [])
       : NAV;
 
   function toggle(label: string) {
@@ -266,6 +279,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {visibleNav.map((item) => {
             if (!item.children) {
               const active = isActive(pathname, item.href!);
+              const locked =
+                user.role === 'VENDEDOR' && getNavVisibility(item.href!, sections) === 'locked';
               return (
                 <Link
                   key={item.href}
@@ -277,7 +292,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   }`}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {locked && <Lock className="h-3 w-3 shrink-0 opacity-60" />}
                 </Link>
               );
             }
@@ -308,17 +324,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-3">
                     {item.children.map((child) => {
                       const childActive = isActive(pathname, child.href);
+                      const locked =
+                        user.role === 'VENDEDOR' &&
+                        getNavVisibility(child.href, sections) === 'locked';
                       return (
                         <Link
                           key={child.href}
                           href={child.href}
-                          className={`flex items-center rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                          className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition-colors ${
                             childActive
                               ? 'bg-primary/10 text-primary font-medium'
                               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                           }`}
                         >
-                          {child.label}
+                          <span className="flex-1">{child.label}</span>
+                          {locked && <Lock className="h-3 w-3 shrink-0 opacity-60" />}
                         </Link>
                       );
                     })}

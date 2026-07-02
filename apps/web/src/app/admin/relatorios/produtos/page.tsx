@@ -11,8 +11,17 @@ import {
   Panel,
   ReportHeader,
 } from '@/components/dashboard/report-ui';
+import { SectionGate } from '@/components/admin/section-gate';
 
-export default function RelatorioProdutos() {
+export default function RelatorioProdutosPage() {
+  return (
+    <SectionGate section="RELATORIOS">
+      <RelatorioProdutos />
+    </SectionGate>
+  );
+}
+
+function RelatorioProdutos() {
   const report = useReports();
   if (report.isLoading) return <LoadingReport />;
   if (!report.data)

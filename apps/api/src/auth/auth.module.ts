@@ -45,6 +45,6 @@ import { StorageModule } from '../storage/storage.module';
     JwtRefreshGuard,
     TurnstileGuard,
   ],
-  exports: [JwtAuthGuard],
+  exports: [JwtAuthGuard, HashService],
 })
 export class AuthModule {}

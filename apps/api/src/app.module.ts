@@ -42,6 +42,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
 import { PermissionsGuard } from './rbac/guards/permissions.guard';
 import { ResourceOwnerGuard } from './rbac/guards/resource-owner.guard';
+import { SellerPermissionsModule } from './seller-permissions/seller-permissions.module';
+import { SectionAccessGuard } from './seller-permissions/guards/section-access.guard';
 import { envValidation } from './config/env.validation';
 
 @Module({
@@ -88,6 +90,7 @@ import { envValidation } from './config/env.validation';
     PricingModule,
     LearningModule,
     VirtualEmployeeModule,
+    SellerPermissionsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -97,6 +100,7 @@ import { envValidation } from './config/env.validation';
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: ResourceOwnerGuard },
+    { provide: APP_GUARD, useClass: SectionAccessGuard },
   ],
 })
 export class AppModule {}

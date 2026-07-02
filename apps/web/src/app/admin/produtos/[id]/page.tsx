@@ -6,8 +6,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchProduct, updateProduct } from '@/actions/products';
 import { ProductForm, ProductFormSkeleton } from '@/components/products/product-form';
+import { SectionGate } from '@/components/admin/section-gate';
 
-export default function AdminEditarProduto() {
+export default function AdminEditarProdutoPage() {
+  return (
+    <SectionGate section="PRODUTOS_EDITAR">
+      <AdminEditarProduto />
+    </SectionGate>
+  );
+}
+
+function AdminEditarProduto() {
   const { id } = useParams<{ id: string }>();
   const { token } = useAuth();
   const router = useRouter();

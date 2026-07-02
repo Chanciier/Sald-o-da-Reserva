@@ -11,7 +11,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { AdminSection, Role } from '@prisma/client';
 import { ProductsService } from './products.service';
 import { AnalyzeImageService } from './analyze-image.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -23,6 +23,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/types/auth.types';
+import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
 
 @Controller('products')
 export class ProductsController {
@@ -33,12 +34,14 @@ export class ProductsController {
 
   @Post('analyze-image')
   @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PRODUTOS_CRIAR)
   analyzeImage(@Body() body: { imageUrl: string }) {
     return this.analyzeImageService.analyze(body.imageUrl);
   }
 
   @Post()
   @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PRODUTOS_CRIAR)
   @HttpCode(HttpStatus.CREATED)
   create(@Body() dto: CreateProductDto, @CurrentUser() user: AuthenticatedUser) {
     return this.productsService.create(dto, user.id);
@@ -64,6 +67,7 @@ export class ProductsController {
 
   @Get('id/:id')
   @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PRODUTOS, AdminSection.PRODUTOS_EDITAR)
   findById(@Param('id') id: string) {
     return this.productsService.findById(id);
   }
@@ -76,6 +80,7 @@ export class ProductsController {
 
   @Patch(':id/stock')
   @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PRODUTOS_EDITAR)
   updateStock(
     @Param('id') id: string,
     @Body() dto: UpdateStockDto,
@@ -86,6 +91,7 @@ export class ProductsController {
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PRODUTOS_EDITAR)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
@@ -96,6 +102,7 @@ export class ProductsController {
 
   @Delete(':id')
   @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PRODUTOS_EDITAR)
   @HttpCode(HttpStatus.OK)
   remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.productsService.remove(id, user);

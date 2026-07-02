@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, RefreshCw, ChevronLeft, ChevronRight, Trash2, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { SectionGate } from '@/components/admin/section-gate';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -571,7 +572,15 @@ function TodosTab({ token }: { token: string }) {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default function AdminPedidos() {
+export default function AdminPedidosPage() {
+  return (
+    <SectionGate section="PEDIDOS">
+      <AdminPedidos />
+    </SectionGate>
+  );
+}
+
+function AdminPedidos() {
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState<'todos' | 'pendentes'>('todos');
 

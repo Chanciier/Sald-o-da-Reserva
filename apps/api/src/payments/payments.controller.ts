@@ -1,11 +1,12 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { AdminSection, Role } from '@prisma/client';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePixPaymentDto } from './dto/create-pix-payment.dto';
 import { CreateCardPaymentDto } from './dto/create-card-payment.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
 
 @Controller('payments')
 export class PaymentsController {
@@ -24,7 +25,8 @@ export class PaymentsController {
   }
 
   @Get('admin/all')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.FINANCEIRO)
   findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,

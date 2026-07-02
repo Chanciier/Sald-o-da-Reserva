@@ -16,9 +16,18 @@ import { fetchAdminStats } from '@/actions/analytics';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { BarChart } from '@/components/dashboard/bar-chart';
 import { OrdersTable } from '@/components/dashboard/orders-table';
+import { SectionGate } from '@/components/admin/section-gate';
 
 function fmt(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <SectionGate section="DASHBOARD">
+      <AdminDashboard />
+    </SectionGate>
+  );
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -41,7 +50,7 @@ const STATUS_COLOR: Record<string, string> = {
   REFUNDED: 'bg-gray-400',
 };
 
-export default function AdminDashboard() {
+function AdminDashboard() {
   const { token, loading: authLoading, user } = useAuth();
 
   const { data, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useQuery({

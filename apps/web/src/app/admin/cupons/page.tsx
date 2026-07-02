@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ticket, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, X } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { SectionGate } from '@/components/admin/section-gate';
 
 const API = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
@@ -116,7 +117,15 @@ function StatusBadge({ active, expiresAt }: { active: boolean; expiresAt?: strin
   );
 }
 
-export default function AdminCupons() {
+export default function AdminCuponsPage() {
+  return (
+    <SectionGate section="CUPONS">
+      <AdminCupons />
+    </SectionGate>
+  );
+}
+
+function AdminCupons() {
   const { token } = useAuth();
   const qc = useQueryClient();
   const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null);

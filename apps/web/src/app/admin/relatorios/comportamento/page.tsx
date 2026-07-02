@@ -12,6 +12,7 @@ import {
   integer,
   percent,
 } from '@/components/dashboard/report-ui';
+import { SectionGate } from '@/components/admin/section-gate';
 
 const DEVICE_LABELS: Record<string, string> = {
   MOBILE: 'Celular',
@@ -26,7 +27,15 @@ function formatDuration(totalSeconds: number) {
   return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
 }
 
-export default function RelatorioComportamento() {
+export default function RelatorioComportamentoPage() {
+  return (
+    <SectionGate section="RELATORIOS">
+      <RelatorioComportamento />
+    </SectionGate>
+  );
+}
+
+function RelatorioComportamento() {
   const report = useBehaviorReport();
   if (report.isLoading) return <LoadingReport />;
   if (!report.data)

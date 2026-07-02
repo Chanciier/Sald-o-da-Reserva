@@ -11,8 +11,17 @@ import {
   percent,
   ReportHeader,
 } from '@/components/dashboard/report-ui';
+import { SectionGate } from '@/components/admin/section-gate';
 
-export default function RelatorioClientes() {
+export default function RelatorioClientesPage() {
+  return (
+    <SectionGate section="RELATORIOS">
+      <RelatorioClientes />
+    </SectionGate>
+  );
+}
+
+function RelatorioClientes() {
   const report = useReports();
   if (report.isLoading) return <LoadingReport />;
   if (!report.data)
