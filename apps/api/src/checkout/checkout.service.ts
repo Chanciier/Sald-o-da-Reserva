@@ -77,15 +77,18 @@ export class CheckoutService {
     }
 
     const cart = await this.cartService.getCart(userId);
-    if (!cart.items.length) throw new BadRequestException('Carrinho está vazio.');
+    const availableItems = cart.items.filter((item) => item.available);
+    if (!availableItems.length) {
+      throw new BadRequestException('Nenhum item do carrinho está disponível.');
+    }
 
-    const productIds = cart.items.map((i) => i.productId);
+    const productIds = availableItems.map((i) => i.productId);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
     });
     const productMap = new Map(products.map((p) => [p.id, p]));
 
-    for (const item of cart.items) {
+    for (const item of availableItems) {
       const product = productMap.get(item.productId);
       if (!product || product.status !== 'ACTIVE') {
         throw new BadRequestException(`Produto "${item.name}" não está disponível.`);
@@ -166,7 +169,7 @@ export class CheckoutService {
           buyerName: dto.buyerName ?? null,
           customerPhone: dto.customerPhone ?? null,
           items: {
-            create: cart.items.map((item) => {
+            create: availableItems.map((item) => {
               const unitPrice = item.salePrice ?? item.price;
               return {
                 productId: item.productId,

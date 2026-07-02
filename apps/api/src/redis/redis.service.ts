@@ -42,6 +42,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return result === 1;
   }
 
+  async ttl(key: string): Promise<number> {
+    return this.client.ttl(key);
+  }
+
   async getJson<T>(key: string): Promise<T | null> {
     const value = await this.get(key);
     if (!value) return null;
@@ -61,6 +65,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     if (keys.length > 0) {
       await this.client.del(...keys);
     }
+  }
+
+  async zadd(key: string, score: number, member: string): Promise<void> {
+    await this.client.zadd(key, score, member);
+  }
+
+  async zrem(key: string, member: string): Promise<void> {
+    await this.client.zrem(key, member);
+  }
+
+  async zrangeByScore(key: string, maxScore: number, limit: number): Promise<string[]> {
+    return this.client.zrangebyscore(key, '-inf', maxScore, 'LIMIT', 0, limit);
   }
 
   // Atomic increment with TTL set only on first call (for rate limiting)

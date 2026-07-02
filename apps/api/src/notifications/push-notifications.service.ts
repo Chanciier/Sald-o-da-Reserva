@@ -17,6 +17,7 @@ interface PushPayload {
   body: string;
   orderId?: string;
   productId?: string;
+  url?: string;
   type: string;
 }
 
@@ -88,11 +89,13 @@ export class PushNotificationsService {
     if (!this.configured) return false;
     const subscriptions = await this.prisma.pushSubscription.findMany({ where: { userId } });
     if (subscriptions.length === 0) return false;
-    const url = payload.orderId
-      ? `/pedidos/${payload.orderId}`
-      : payload.productId
-        ? `/admin/produtos`
-        : '/admin';
+    const url =
+      payload.url ??
+      (payload.orderId
+        ? `/pedidos/${payload.orderId}`
+        : payload.productId
+          ? `/admin/produtos`
+          : '/');
     const body = JSON.stringify({
       title: payload.title,
       body: payload.body,

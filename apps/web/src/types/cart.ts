@@ -8,6 +8,7 @@ export interface CartItem {
   image: string | null;
   quantity: number;
   stock: number;
+  available: boolean;
 }
 
 export interface CouponSummary {

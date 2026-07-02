@@ -8,12 +8,18 @@ export interface CartItem {
   image: string | null;
   quantity: number;
   stock: number;
+  available?: boolean;
 }
 
 export interface CartData {
   items: CartItem[];
   couponCode: string | null;
   updatedAt: string;
+  recoveryId?: string;
+  reminderCreatedAt?: string;
+  reminderPushSentAt?: string;
+  couponCreatedAt?: string;
+  couponPushSentAt?: string;
 }
 
 export interface CouponSummary {

@@ -17,6 +17,7 @@ export function CartDrawer() {
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
+  const hasAvailableItems = cart?.items.some((item) => item.available) ?? false;
 
   if (!open) return null;
 
@@ -99,7 +100,9 @@ export function CartDrawer() {
               {cart.items.map((item) => (
                 <div
                   key={item.productId}
-                  className="flex gap-3 rounded-lg border border-border p-3"
+                  className={`flex gap-3 rounded-lg border border-border p-3 ${
+                    item.available ? '' : 'opacity-60'
+                  }`}
                 >
                   {item.image ? (
                     <Image
@@ -122,13 +125,16 @@ export function CartDrawer() {
                       {item.name}
                     </Link>
                     <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
+                    {!item.available && (
+                      <p className="text-xs font-medium text-destructive">Indisponível</p>
+                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-primary">
                         {formatBRL((item.salePrice ?? item.price) * item.quantity)}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
-                          disabled={loading}
+                          disabled={loading || !item.available}
                           onClick={() => updateItem(item.productId, item.quantity - 1)}
                           className="flex h-6 w-6 items-center justify-center rounded border border-border text-xs hover:bg-muted disabled:opacity-50"
                         >
@@ -136,7 +142,7 @@ export function CartDrawer() {
                         </button>
                         <span className="w-6 text-center text-sm">{item.quantity}</span>
                         <button
-                          disabled={loading || item.quantity >= item.stock}
+                          disabled={loading || !item.available || item.quantity >= item.stock}
                           onClick={() => updateItem(item.productId, item.quantity + 1)}
                           className="flex h-6 w-6 items-center justify-center rounded border border-border text-xs hover:bg-muted disabled:opacity-50"
                         >
@@ -218,13 +224,19 @@ export function CartDrawer() {
                 </div>
               </div>
 
-              <Link
-                href="/checkout"
-                onClick={() => setOpen(false)}
-                className="flex w-full items-center justify-center rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Finalizar compra
-              </Link>
+              {hasAvailableItems ? (
+                <Link
+                  href="/checkout"
+                  onClick={() => setOpen(false)}
+                  className="flex w-full items-center justify-center rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Finalizar itens disponíveis
+                </Link>
+              ) : (
+                <p className="text-center text-xs font-medium text-destructive">
+                  Nenhum item disponível para finalizar.
+                </p>
+              )}
 
               <Link
                 href="/carrinho"

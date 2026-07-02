@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import { useSavedProducts } from '@/hooks/use-saved-products';
 import { pad } from '@/hooks/use-countdown';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 
 const anchorLinks = [
   { label: 'Produtos', href: '/produtos' },
@@ -150,6 +151,8 @@ export function Header() {
 
         {/* Actions */}
         <div className="flex items-center gap-1">
+          {user && <NotificationBell />}
+
           {/* Cart icon */}
           <button
             onClick={() => setOpen(true)}

@@ -2,8 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import type { CartData, CartItem, CartResponse, CouponSummary } from './cart.types';
+import { randomUUID } from 'crypto';
 
 const CART_TTL = 7 * 24 * 60 * 60;
+const CART_RECOVERY_INDEX = 'cart:recovery:index';
+const CART_REMINDER_DELAY_MS = 30 * 60 * 1000;
 
 @Injectable()
 export class CartService {
@@ -23,7 +26,15 @@ export class CartService {
 
   private async save(userId: string, cart: CartData): Promise<void> {
     cart.updatedAt = new Date().toISOString();
+    cart.recoveryId ??= randomUUID();
+    cart.reminderCreatedAt = undefined;
+    cart.reminderPushSentAt = undefined;
     await this.redis.setJson(this.cartKey(userId), cart, CART_TTL);
+    await this.redis.zadd(
+      CART_RECOVERY_INDEX,
+      new Date(cart.updatedAt).getTime() + CART_REMINDER_DELAY_MS,
+      userId,
+    );
   }
 
   private round2(n: number) {
@@ -31,7 +42,24 @@ export class CartService {
   }
 
   private async enrich(userId: string, cart: CartData): Promise<CartResponse> {
-    const subtotal = cart.items.reduce((sum, i) => {
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: cart.items.map((item) => item.productId) } },
+      select: { id: true, status: true, stock: true, price: true, salePrice: true },
+    });
+    const productById = new Map(products.map((product) => [product.id, product]));
+    const items = cart.items.map((item) => {
+      const product = productById.get(item.productId);
+      const available = product?.status === 'ACTIVE' && product.stock >= item.quantity;
+      return {
+        ...item,
+        stock: product?.stock ?? 0,
+        price: product?.price.toNumber() ?? item.price,
+        salePrice: product?.salePrice?.toNumber() ?? null,
+        available,
+      };
+    });
+    const availableItems = items.filter((item) => item.available);
+    const subtotal = availableItems.reduce((sum, i) => {
       return sum + (i.salePrice ?? i.price) * i.quantity;
     }, 0);
 
@@ -70,10 +98,10 @@ export class CartService {
     }
 
     const total = Math.max(0, subtotal - discount);
-    const itemCount = cart.items.reduce((sum, i) => sum + i.quantity, 0);
+    const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
     return {
-      items: cart.items,
+      items,
       couponCode: cart.couponCode,
       coupon,
       subtotal: this.round2(subtotal),
@@ -86,6 +114,13 @@ export class CartService {
 
   async getCart(userId: string): Promise<CartResponse> {
     const cart = await this.getRaw(userId);
+    if (cart.items.length) {
+      await this.redis.zadd(
+        CART_RECOVERY_INDEX,
+        new Date(cart.updatedAt).getTime() + CART_REMINDER_DELAY_MS,
+        userId,
+      );
+    }
     return this.enrich(userId, cart);
   }
 
@@ -160,6 +195,7 @@ export class CartService {
 
   async clearCart(userId: string): Promise<void> {
     await this.redis.del(this.cartKey(userId));
+    await this.redis.zrem(CART_RECOVERY_INDEX, userId);
   }
 
   async applyCoupon(userId: string, code: string): Promise<CartResponse> {
@@ -181,10 +217,7 @@ export class CartService {
     const cart = await this.getRaw(userId);
 
     if (coupon.minOrderValue) {
-      const subtotal = cart.items.reduce(
-        (sum, i) => sum + (i.salePrice ?? i.price) * i.quantity,
-        0,
-      );
+      const subtotal = (await this.enrich(userId, cart)).subtotal;
       if (subtotal < coupon.minOrderValue.toNumber()) {
         throw new BadRequestException(
           `Valor mínimo para este cupom: R$ ${coupon.minOrderValue.toNumber().toFixed(2).replace('.', ',')}.`,

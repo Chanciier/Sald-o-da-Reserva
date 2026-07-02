@@ -18,6 +18,7 @@ export default function CartPage() {
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
+  const hasAvailableItems = cart?.items.some((item) => item.available) ?? false;
 
   if (!user) {
     return (
@@ -65,7 +66,12 @@ export default function CartPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
           {cart.items.map((item) => (
-            <div key={item.productId} className="flex gap-4 rounded-xl border border-border p-4">
+            <div
+              key={item.productId}
+              className={`flex gap-4 rounded-xl border border-border p-4 ${
+                item.available ? '' : 'opacity-60'
+              }`}
+            >
               {item.image ? (
                 <Image
                   src={item.image}
@@ -103,6 +109,9 @@ export default function CartPage() {
                 </div>
 
                 <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
+                {!item.available && (
+                  <p className="text-xs font-medium text-destructive">Indisponível</p>
+                )}
 
                 {item.salePrice !== null && item.salePrice < item.price && (
                   <p className="text-xs text-muted-foreground line-through">
@@ -113,7 +122,7 @@ export default function CartPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <button
-                      disabled={loading}
+                      disabled={loading || !item.available}
                       onClick={() => updateItem(item.productId, item.quantity - 1)}
                       className="flex h-7 w-7 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-50"
                     >
@@ -121,7 +130,7 @@ export default function CartPage() {
                     </button>
                     <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                     <button
-                      disabled={loading || item.quantity >= item.stock}
+                      disabled={loading || !item.available || item.quantity >= item.stock}
                       onClick={() => updateItem(item.productId, item.quantity + 1)}
                       className="flex h-7 w-7 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-50"
                     >
@@ -202,9 +211,10 @@ export default function CartPage() {
 
             <button
               onClick={() => router.push('/checkout')}
+              disabled={!hasAvailableItems}
               className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              Finalizar compra
+              {hasAvailableItems ? 'Finalizar itens disponíveis' : 'Nenhum item disponível'}
             </button>
           </div>
 

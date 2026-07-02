@@ -96,7 +96,9 @@ export function NotificationBell() {
     }
     setOpen(false);
     // Pedido → tela do pedido; senão produto → edição do produto no admin.
-    if (notification.orderId) {
+    if (notification.type.startsWith('CART_')) {
+      router.push('/carrinho');
+    } else if (notification.orderId) {
       router.push(`/pedidos/${notification.orderId}`);
     } else if (notification.productId) {
       router.push(`/admin/produtos/${notification.productId}`);
