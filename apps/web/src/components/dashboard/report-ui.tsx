@@ -68,6 +68,18 @@ export function ReportHeader(props: HeaderProps) {
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="text-xs font-medium text-muted-foreground">
+              Dia específico
+              <input
+                type="date"
+                value={props.draft.from === props.draft.to ? props.draft.from : ''}
+                onChange={(e) => props.setDraft({ from: e.target.value, to: e.target.value })}
+                className="mt-1 block min-h-11 rounded-lg border border-primary/40 bg-primary/5 px-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+            <span className="hidden pb-3 text-xs font-medium text-muted-foreground sm:block">
+              ou período
+            </span>
+            <label className="text-xs font-medium text-muted-foreground">
               De
               <input
                 type="date"
