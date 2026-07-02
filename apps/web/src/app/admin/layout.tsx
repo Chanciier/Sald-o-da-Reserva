@@ -127,6 +127,7 @@ const NAV: NavItem[] = [
       { href: '/admin/relatorios/vendas', label: 'Vendas' },
       { href: '/admin/relatorios/produtos', label: 'Produtos' },
       { href: '/admin/relatorios/clientes', label: 'Clientes' },
+      { href: '/admin/relatorios/comportamento', label: 'Comportamento' },
     ],
   },
   {

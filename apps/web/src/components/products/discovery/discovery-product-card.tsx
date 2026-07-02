@@ -14,6 +14,7 @@ import {
 } from '@/lib/discovery';
 import { ProductBadge } from '@/components/products/discovery/product-badge';
 import { useSavedProducts } from '@/hooks/use-saved-products';
+import { trackProductClick } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
 export function DiscoveryProductCard({
@@ -38,7 +39,11 @@ export function DiscoveryProductCard({
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-foreground/5">
-      <Link href={`/produtos/${product.slug}`} className="relative block">
+      <Link
+        href={`/produtos/${product.slug}`}
+        onClick={() => trackProductClick(product.id, 'discovery_card')}
+        className="relative block"
+      >
         <div className="relative aspect-square overflow-hidden bg-muted">
           <Image
             src={image}
@@ -84,6 +89,7 @@ export function DiscoveryProductCard({
         </span>
         <Link
           href={`/produtos/${product.slug}`}
+          onClick={() => trackProductClick(product.id, 'discovery_card')}
           className="line-clamp-2 text-sm font-semibold leading-snug text-card-foreground hover:underline"
         >
           {product.name}

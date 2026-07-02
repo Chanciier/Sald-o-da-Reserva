@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ShoppingCart, Zap } from 'lucide-react';
 import { useCart } from '@/contexts/cart-context';
+import { trackProductClick } from '@/lib/analytics';
 import type { Product } from '@/types/product';
 
 function formatPrice(value: number) {
@@ -78,6 +79,7 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <Link
       href={`/produtos/${product.slug}`}
+      onClick={() => trackProductClick(product.id, 'product_card')}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-1 hover:shadow-xl"
     >
       <div className="relative aspect-square overflow-hidden bg-muted/40 p-4">

@@ -31,6 +31,11 @@ export async function fetchMarketingStats(token: string, days = 30) {
   return apiFetch<MarketingOverview>(`/analytics/marketing?days=${days}`, token);
 }
 
+export async function fetchBehaviorReport(token: string, from: string, to: string) {
+  const query = new URLSearchParams({ from, to });
+  return apiFetch<BehaviorOverview>(`/analytics/behavior?${query}`, token);
+}
+
 export interface AdminOverview {
   inventoryValue: number;
   revenueToday: number;
@@ -177,6 +182,46 @@ export interface MarketingProduct {
   name: string;
   sold: number;
   revenue: number;
+}
+
+export interface BehaviorOverview {
+  period: { from: string; to: string; days: number; timeZone: string };
+  engagement: {
+    sessions: number;
+    uniqueVisitors: number;
+    newVisitors: number;
+    returningVisitors: number;
+    avgDurationSeconds: number;
+    avgPageViewsPerSession: number;
+    bounceRate: number;
+  };
+  funnel: { name: string; count: number; pct: number }[];
+  topProducts: {
+    byClicks: BehaviorProduct[];
+    byViews: BehaviorProduct[];
+    mostAbandoned: BehaviorProduct[];
+  };
+  devices: { name: string; count: number; pct: number }[];
+  browsers: { name: string; count: number }[];
+  operatingSystems: { name: string; count: number }[];
+  traffic: {
+    sources: { name: string; count: number }[];
+    topReferrers: { name: string; count: number }[];
+    topLandingPages: { name: string; count: number }[];
+    topExitPages: { name: string; count: number }[];
+  };
+  searches: {
+    topTerms: { term: string; count: number }[];
+    zeroResults: { term: string; count: number }[];
+  };
+  timeline: { date: string; sessions: number; pageViews: number }[];
+}
+
+export interface BehaviorProduct {
+  productId: string;
+  name: string;
+  slug: string | null;
+  count: number;
 }
 
 export interface MarketingOverview {

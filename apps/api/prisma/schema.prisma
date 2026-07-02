@@ -147,6 +147,24 @@ enum ReturnStatus {
   COMPLETED
 }
 
+// ── Analytics de comportamento (funil, tráfego, engajamento) ──────────────────
+enum AnalyticsEventType {
+  PAGE_VIEW
+  PRODUCT_VIEW
+  PRODUCT_CLICK
+  ADD_TO_CART
+  REMOVE_FROM_CART
+  CHECKOUT_START
+  PURCHASE
+  SEARCH
+}
+
+enum DeviceType {
+  MOBILE
+  TABLET
+  DESKTOP
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -271,6 +289,7 @@ model Product {
   publications    MarketplacePublication[]
   syncLogs        MarketplaceSyncLog[]
   notifications   Notification[]
+  analyticsEvents AnalyticsEvent[]
 
   @@index([categoryId])
   @@index([status])
@@ -778,4 +797,50 @@ model WebhookLog {
   @@index([source, status])
   @@index([createdAt])
   @@map("webhook_logs")
+}
+
+// Sessão de navegação anônima (id gerado no cliente). `visitorId` persiste em
+// localStorage entre sessões e permite distinguir visitantes novos/recorrentes.
+model AnalyticsSession {
+  id              String      @id
+  visitorId       String      @map("visitor_id")
+  startedAt       DateTime    @default(now()) @map("started_at")
+  lastSeenAt      DateTime    @default(now()) @updatedAt @map("last_seen_at")
+  durationSeconds Int         @default(0) @map("duration_seconds")
+  pageViews       Int         @default(0) @map("page_views")
+  device          DeviceType?
+  browser         String?
+  os              String?
+  referrer        String?     @db.VarChar(500)
+  utmSource       String?     @map("utm_source")
+  utmMedium       String?     @map("utm_medium")
+  utmCampaign     String?     @map("utm_campaign")
+  landingPath     String?     @map("landing_path") @db.VarChar(500)
+  exitPath        String?     @map("exit_path") @db.VarChar(500)
+  converted       Boolean     @default(false)
+
+  events AnalyticsEvent[]
+
+  @@index([startedAt])
+  @@index([visitorId])
+  @@map("analytics_sessions")
+}
+
+model AnalyticsEvent {
+  id        String             @id @default(cuid())
+  sessionId String             @map("session_id")
+  type      AnalyticsEventType
+  path      String?            @db.VarChar(500)
+  productId String?            @map("product_id")
+  metadata  Json?
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  session AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([type, createdAt])
+  @@index([productId])
+  @@index([createdAt])
+  @@map("analytics_events")
 }

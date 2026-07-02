@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import { createOrder } from '@/lib/cart-api';
 import { getShippingQuote } from '@/lib/shipping';
+import { trackCheckoutStart } from '@/lib/analytics';
 import type { ShippingOption } from '@/types/cart';
 import type { PaymentMethod } from '@/types/payment';
 
@@ -134,8 +135,15 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const lastQuotedCep = useRef('');
+  const checkoutStartTracked = useRef(false);
 
   const isPickup = deliveryMethod === 'PICKUP';
+
+  useEffect(() => {
+    if (checkoutStartTracked.current || !cart?.items?.length) return;
+    checkoutStartTracked.current = true;
+    trackCheckoutStart();
+  }, [cart]);
 
   const { data: orders = [] } = useQuery({
     queryKey: ['checkout-saved-addresses'],

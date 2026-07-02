@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
+import { notifyConsentChanged } from '@/lib/analytics';
 
 type Consent = { necessary: true; analytics: boolean; marketing: boolean };
 
@@ -29,6 +30,7 @@ export function CookieBanner() {
     } catch {
       // ignore
     }
+    notifyConsentChanged();
     setVisible(false);
     setCustomizing(false);
   }

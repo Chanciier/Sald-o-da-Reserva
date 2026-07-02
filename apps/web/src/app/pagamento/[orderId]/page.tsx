@@ -13,6 +13,7 @@ import {
 } from '@/lib/payments';
 import { PixDisplay } from '@/components/payment/pix-display';
 import { CardForm } from '@/components/payment/card-form';
+import { trackPurchase } from '@/lib/analytics';
 import type { Payment, PaymentMethod } from '@/types/payment';
 
 interface PageProps {
@@ -161,6 +162,18 @@ export default function PaymentPage({ params }: PageProps) {
     if (!TERMINAL_STATUSES.has(result.status)) startPolling(result);
   }
 
+  const showSuccess = payment?.status === 'APPROVED' || payment?.status === 'AUTHORIZED';
+  const showRejected = payment && ['REJECTED', 'CANCELLED'].includes(payment.status);
+  const showPix = payment && !TERMINAL_STATUSES.has(payment.status) && method === 'PIX';
+  const showCard = isCard && !showSuccess && !showRejected;
+
+  const purchaseTracked = useRef(false);
+  useEffect(() => {
+    if (!showSuccess || purchaseTracked.current) return;
+    purchaseTracked.current = true;
+    trackPurchase(orderId, payment?.amount ?? orderTotal);
+  }, [showSuccess, orderId, payment?.amount, orderTotal]);
+
   if (!user) {
     return (
       <main className="mx-auto max-w-lg px-4 py-16 text-center">
@@ -174,11 +187,6 @@ export default function PaymentPage({ params }: PageProps) {
       </main>
     );
   }
-
-  const showSuccess = payment?.status === 'APPROVED' || payment?.status === 'AUTHORIZED';
-  const showRejected = payment && ['REJECTED', 'CANCELLED'].includes(payment.status);
-  const showPix = payment && !TERMINAL_STATUSES.has(payment.status) && method === 'PIX';
-  const showCard = isCard && !showSuccess && !showRejected;
 
   return (
     <main className="mx-auto max-w-lg px-4 py-8">

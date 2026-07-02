@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import * as cartApi from '@/lib/cart-api';
+import { trackAddToCart } from '@/lib/analytics';
 import type { Cart } from '@/types/cart';
 import { useAuth } from './auth-context';
 
@@ -61,6 +62,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addItem = useCallback(
     async (productId: string, quantity = 1) => {
       await wrap(() => cartApi.addToCart(token!, productId, quantity));
+      trackAddToCart(productId, quantity);
       setOpen(true);
     },
     [token, wrap],

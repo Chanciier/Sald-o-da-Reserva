@@ -5,6 +5,7 @@ import './globals.css';
 import { AuthProvider } from '@/contexts/auth-context';
 import { CartProvider } from '@/contexts/cart-context';
 import { QueryProvider } from '@/providers/query-provider';
+import { AnalyticsProvider } from '@/providers/analytics-provider';
 import { ConditionalHeader } from '@/components/layout/conditional-header';
 import { ConditionalFooter } from '@/components/layout/conditional-footer';
 import { CookieBanner } from '@/components/cookie-banner';
@@ -48,10 +49,12 @@ export default function RootLayout({
         <QueryProvider>
           <AuthProvider>
             <CartProvider>
-              <ConditionalHeader />
-              {children}
-              <ConditionalFooter />
-              <CookieBanner />
+              <AnalyticsProvider>
+                <ConditionalHeader />
+                {children}
+                <ConditionalFooter />
+                <CookieBanner />
+              </AnalyticsProvider>
             </CartProvider>
           </AuthProvider>
         </QueryProvider>

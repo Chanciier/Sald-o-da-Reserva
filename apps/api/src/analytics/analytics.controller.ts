@@ -1,16 +1,41 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { AnalyticsService } from './analytics.service';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ReportsService } from './reports.service';
+import { TrackingService } from './tracking.service';
+import { BehaviorService } from './behavior.service';
+import { TrackSessionDto } from './dto/track-event.dto';
 
 @Controller('analytics')
 export class AnalyticsController {
   constructor(
     private readonly analyticsService: AnalyticsService,
     private readonly reportsService: ReportsService,
+    private readonly trackingService: TrackingService,
+    private readonly behaviorService: BehaviorService,
   ) {}
+
+  // Ingestão de eventos de comportamento (cliques, page views, funil...).
+  // Público e sem cookies de sessão — visitante anônimo identificado só pelo
+  // sessionId/visitorId gerados no navegador. Throttle mais generoso que o
+  // padrão pois o cliente agrupa vários eventos por flush.
+  @Public()
+  @Post('track')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ medium: { limit: 60, ttl: 60_000 } })
+  track(@Body() dto: TrackSessionDto) {
+    return this.trackingService.ingest(dto);
+  }
+
+  @Get('behavior')
+  @Roles(Role.ADMIN)
+  getBehavior(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.behaviorService.overview(from, to);
+  }
 
   @Get('reports')
   @Roles(Role.ADMIN)

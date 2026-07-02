@@ -10,6 +10,7 @@ import { DiscoveryFeed } from '@/components/products/discovery/discovery-feed';
 import { RandomButton } from '@/components/products/discovery/random-button';
 import { DiscoveryProductCard } from '@/components/products/discovery/discovery-product-card';
 import { Pagination } from '@/components/ui/pagination';
+import { SearchTracker } from '@/components/products/search-tracker';
 import type { ProductQuery } from '@/types/product';
 
 interface PageProps {
@@ -54,6 +55,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
 
     return (
       <main className="flex-1">
+        {search && <SearchTracker term={search} resultsCount={productsResult.total} />}
         <CategoryNav categories={categories} activeSlug={categorySlug} />
 
         <div className="mx-auto max-w-7xl px-4 py-8">

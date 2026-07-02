@@ -20,6 +20,7 @@ import { ProductImages } from '@/components/products/product-images';
 import { AddToCartButton } from '@/components/products/add-to-cart-button';
 import { ProductReviews } from '@/components/products/product-reviews';
 import { ShareButton } from '@/components/products/share-button';
+import { ProductViewTracker } from '@/components/products/product-view-tracker';
 import { ProductBadge } from '@/components/products/discovery/product-badge';
 import { ProductSection } from '@/components/products/discovery/product-section';
 import { SaveButton } from '@/components/products/discovery/save-button';
@@ -82,6 +83,7 @@ export default async function ProductPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-4">
+      <ProductViewTracker productId={product.id} />
       {/* Back link */}
       <div className="mb-6">
         <Link

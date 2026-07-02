@@ -115,6 +115,7 @@ export function ReportHeader(props: HeaderProps) {
           ['Vendas', '/admin/relatorios/vendas'],
           ['Produtos', '/admin/relatorios/produtos'],
           ['Clientes', '/admin/relatorios/clientes'],
+          ['Comportamento', '/admin/relatorios/comportamento'],
         ].map(([label, href]) => (
           <Link
             key={href}
@@ -200,6 +201,40 @@ export function Bars<T>({
                 style={{ width: `${Math.max((amount / max) * 100, amount ? 2 : 0)}%` }}
               />
             </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function Funnel({ steps }: { steps: { name: string; count: number; pct: number }[] }) {
+  if (!steps.length) return <Empty />;
+  return (
+    <div className="space-y-3">
+      {steps.map((step, index) => {
+        const prev = steps[index - 1];
+        const dropoff = prev && prev.count > 0 ? 100 - (step.count / prev.count) * 100 : null;
+        return (
+          <div key={step.name}>
+            <div className="mb-1 flex items-center justify-between gap-4 text-xs">
+              <span className="font-medium text-foreground">{step.name}</span>
+              <span className="flex items-center gap-2">
+                <span className="font-semibold">{integer(step.count)}</span>
+                <span className="text-muted-foreground">({percent(step.pct)})</span>
+              </span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300"
+                style={{ width: `${Math.max(step.pct, step.count ? 2 : 0)}%` }}
+              />
+            </div>
+            {dropoff !== null && dropoff > 0 && (
+              <p className="mt-1 text-[11px] text-destructive">
+                -{percent(dropoff)} em relação à etapa anterior
+              </p>
+            )}
           </div>
         );
       })}
