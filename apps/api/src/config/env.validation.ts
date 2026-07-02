@@ -183,6 +183,24 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   META_CATALOG_ACCESS_TOKEN: string = '';
+
+  // VisionModule (Funcionário Virtual): modelo local Qwen2.5-VL via Ollama.
+  @IsString()
+  @IsOptional()
+  OLLAMA_BASE_URL: string = 'http://127.0.0.1:11434';
+
+  @IsString()
+  @IsOptional()
+  OLLAMA_VISION_MODEL: string = 'qwen2.5vl';
+
+  // IdentificationModule: geração de texto. Vazio = reaproveita OLLAMA_VISION_MODEL.
+  @IsString()
+  @IsOptional()
+  OLLAMA_TEXT_MODEL: string = '';
+
+  @IsString()
+  @IsOptional()
+  OLLAMA_TIMEOUT_MS: string = '120000';
 }
 
 export function envValidation(config: Record<string, unknown>) {

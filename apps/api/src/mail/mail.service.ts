@@ -326,9 +326,36 @@ export class MailService {
     await this.send({ to, subject, html });
   }
 
+  // ── Campaigns ─────────────────────────────────────────────────────────────
+
+  async sendCreditCardAnnouncementEmail(email: string, name?: string | null): Promise<boolean> {
+    const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
+    const subject = 'Novidade: pague com cartão de crédito no Saldão da Reserva';
+    const shopUrl = `${this.frontendUrl}/produtos`;
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:20px;color:#1a1a1a">Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 16px">${greeting}</p>
+          <p style="margin:0 0 24px">Agora você pode finalizar sua compra pagando com <strong>cartão de crédito</strong>, em qualquer valor, com opção de parcelamento. É só escolher essa forma de pagamento na hora de fechar o pedido.</p>
+          <a href="${shopUrl}" style="display:inline-block;background:#f59e0b;color:#1a1a1a;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700">
+            Ver produtos
+          </a>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#999">Saldão da Reserva · Se não quiser mais receber avisos como este, responda este e-mail pedindo para ser removido da lista.</p>
+        </div>
+      </div>
+    `;
+
+    return this.send({ to: email, subject, html });
+  }
+
   // ── Private ───────────────────────────────────────────────────────────────
 
-  private async send(opts: { to: string; subject: string; html: string }): Promise<void> {
+  private async send(opts: { to: string; subject: string; html: string }): Promise<boolean> {
     if (this.resend) {
       try {
         // O SDK do Resend NÃO lança em erro de API — retorna { data, error }.
@@ -343,13 +370,14 @@ export class MailService {
           this.logger.error(
             `Resend recusou e-mail para ${opts.to} (from ${this.from}): ${error.name} — ${error.message}`,
           );
-        } else {
-          this.logger.log(`Resend: "${opts.subject}" enviado para ${opts.to} (id ${data?.id})`);
+          return false;
         }
+        this.logger.log(`Resend: "${opts.subject}" enviado para ${opts.to} (id ${data?.id})`);
+        return true;
       } catch (err) {
         this.logger.error(`Resend error to ${opts.to}: ${(err as Error).message}`);
+        return false;
       }
-      return;
     }
 
     if (this.smtp) {
@@ -360,12 +388,14 @@ export class MailService {
           subject: opts.subject,
           html: opts.html,
         });
+        return true;
       } catch (err) {
         this.logger.error(`SMTP error to ${opts.to}: ${(err as Error).message}`);
+        return false;
       }
-      return;
     }
 
     this.logger.log(`[DEV — sem provedor] Email to ${opts.to} | ${opts.subject}`);
+    return true;
   }
 }

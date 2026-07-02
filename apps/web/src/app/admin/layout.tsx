@@ -152,6 +152,7 @@ const NAV: NavItem[] = [
     children: [
       { href: '/admin/marketing', label: 'Dashboard' },
       { href: '/admin/whatsapp', label: 'Grupos WhatsApp' },
+      { href: '/admin/campanhas', label: 'Campanhas de E-mail' },
       { href: '/admin/marketing/meta-catalog', label: 'Meta Catalog' },
     ],
   },

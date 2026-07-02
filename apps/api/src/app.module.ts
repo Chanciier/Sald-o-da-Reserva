@@ -31,6 +31,8 @@ import { EventBusModule } from './events/event-bus.module';
 import { QueueModule } from './queue/queue.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { OmsModule } from './oms/oms.module';
+import { VisionModule } from './vision/vision.module';
+import { IdentificationModule } from './identification/identification.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -76,6 +78,8 @@ import { envValidation } from './config/env.validation';
     QueueModule,
     MarketplaceModule,
     OmsModule,
+    VisionModule,
+    IdentificationModule,
   ],
   controllers: [AppController],
   providers: [

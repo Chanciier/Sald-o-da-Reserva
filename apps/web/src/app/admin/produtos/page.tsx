@@ -4,7 +4,16 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Trash2,
+  Sparkles,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchProducts, deleteProduct } from '@/actions/products';
 
@@ -108,6 +117,13 @@ export default function AdminProdutos() {
             <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
             Atualizar
           </button>
+          <Link
+            href="/admin/produtos/funcionario-virtual"
+            className="flex items-center gap-1.5 rounded-lg border border-violet-600 px-3 py-1.5 text-xs text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Funcionário Virtual
+          </Link>
           <Link
             href="/admin/produtos/novo"
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 transition-colors"

@@ -321,7 +321,8 @@
       "Bash(timeout 40 railway deployments)",
       "Bash(echo \"TSC_EXIT:$?\")",
       "Bash(cd \"c:\\\\Users\\\\Adrian\\\\Desktop\\\\Saldão da Reserva\")",
-      "Bash(DATABASE_URL=\"postgresql://x:x@localhost/x\" npx prisma generate)"
+      "Bash(DATABASE_URL=\"postgresql://x:x@localhost/x\" npx prisma generate)",
+      "Bash(node -e \"console.log\\(require\\('./apps/web/package.json'\\).dependencies.next\\)\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\Adrian\\.claude\\projects\\c--Users-Adrian-Desktop-Sald-o-da-Reserva\\memory",
