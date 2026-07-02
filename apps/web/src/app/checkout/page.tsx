@@ -99,16 +99,20 @@ const STATES = [
   'TO',
 ];
 
-// Cartão de crédito temporariamente removido do checkout: a Public Key de
-// produção (Vercel) e o Access Token de produção (Railway) estão de contas
-// Mercado Pago diferentes, então o dinheiro cairia na conta errada. Reativar
-// assim que as duas credenciais forem sincronizadas na mesma conta.
 const PAYMENT_METHODS: {
   method: PaymentMethod;
   label: string;
   description: string;
   icon: string;
-}[] = [{ method: 'PIX', label: 'PIX', description: 'Aprovação imediata', icon: '⚡' }];
+}[] = [
+  { method: 'PIX', label: 'PIX', description: 'Aprovação imediata', icon: '⚡' },
+  {
+    method: 'CREDIT_CARD',
+    label: 'Cartão de crédito',
+    description: 'Visa, Mastercard, Elo e outros',
+    icon: '💳',
+  },
+];
 
 export default function CheckoutPage() {
   const { user, token } = useAuth();
