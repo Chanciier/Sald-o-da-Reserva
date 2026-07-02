@@ -70,6 +70,16 @@ export class PaymentsService {
   // ── POST /payments/card ───────────────────────────────────────────────────
 
   async createCard(orderId: string, userId: string, dto: CreateCardPaymentDto) {
+    // Temporariamente desativado: a Public Key de produção (Vercel) e o Access
+    // Token de produção (Railway) estão de contas Mercado Pago diferentes —
+    // aceitar cartão agora faria o dinheiro cair na conta errada. Setar
+    // CARD_PAYMENTS_ENABLED=true assim que as credenciais forem sincronizadas.
+    if (this.config.get<string>('CARD_PAYMENTS_ENABLED', 'false') !== 'true') {
+      throw new BadRequestException(
+        'Pagamento por cartão temporariamente indisponível. Use PIX para finalizar sua compra.',
+      );
+    }
+
     const order = await this.loadOrder(orderId, userId);
 
     const MIN_INSTALLMENT_AMOUNT = 100;
