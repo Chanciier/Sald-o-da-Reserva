@@ -1,117 +1,118 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { RefreshCw, Package } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
-import { fetchAdminStats } from '@/actions/analytics';
-
-function fmt(n: number) {
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+import { Boxes, CircleDollarSign, PackageCheck, TriangleAlert } from 'lucide-react';
+import { useReports } from '@/components/dashboard/use-reports';
+import {
+  Bars,
+  Empty,
+  Kpi,
+  LoadingReport,
+  money,
+  Panel,
+  ReportHeader,
+} from '@/components/dashboard/report-ui';
 
 export default function RelatorioProdutos() {
-  const { token, loading: authLoading } = useAuth();
-
-  const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['admin-stats'],
-    queryFn: () => fetchAdminStats(token!),
-    enabled: !!token && !authLoading,
-  });
-
-  if (isLoading) {
+  const report = useReports();
+  if (report.isLoading) return <LoadingReport />;
+  if (!report.data)
     return (
-      <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />
-        ))}
+      <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">
+        Não foi possível carregar o relatório.
       </div>
     );
-  }
-
-  if (!data) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-24">
-        <p className="text-muted-foreground">Erro ao carregar relatório.</p>
-        <button
-          onClick={() => refetch()}
-          className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted"
-        >
-          <RefreshCw className="h-4 w-4" /> Tentar novamente
-        </button>
-      </div>
-    );
-  }
-
+  const { products } = report.data;
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold">Relatório de Produtos</h1>
-          <p className="text-sm text-muted-foreground">Top produtos por volume de vendas</p>
-        </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-          Atualizar
-        </button>
+      <ReportHeader
+        title="Relatório de produtos"
+        description="Performance do catálogo, categorias e riscos de estoque no período"
+        from={report.from}
+        to={report.to}
+        draft={report.draft}
+        setDraft={report.setDraft}
+        apply={report.apply}
+        preset={report.preset}
+        fetching={report.isFetching}
+        refresh={() => report.refetch()}
+      />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi
+          label="Receita dos produtos"
+          value={money(products.revenue)}
+          icon={<CircleDollarSign className="h-5 w-5" />}
+        />
+        <Kpi
+          label="Unidades vendidas"
+          value={products.units.toLocaleString('pt-BR')}
+          icon={<PackageCheck className="h-5 w-5" />}
+        />
+        <Kpi
+          label="Valor em estoque"
+          value={money(products.inventoryValue)}
+          icon={<Boxes className="h-5 w-5" />}
+          detail={`${products.active} produtos ativos`}
+        />
+        <Kpi
+          label="Estoque crítico"
+          value={products.lowStockCount.toLocaleString('pt-BR')}
+          icon={<TriangleAlert className="h-5 w-5" />}
+          detail="No mínimo ou abaixo dele"
+        />
       </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border bg-card p-4 shadow-sm text-center">
-          <p className="text-3xl font-bold">{data.productsSold.toLocaleString('pt-BR')}</p>
-          <p className="text-sm text-muted-foreground mt-1">Unidades vendidas (total)</p>
-        </div>
-        <div className="rounded-xl border bg-card p-4 shadow-sm text-center">
-          <p className="text-3xl font-bold">{data.topProducts.length}</p>
-          <p className="text-sm text-muted-foreground mt-1">Produtos com vendas</p>
-        </div>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Panel title="Produtos com maior receita" subtitle="Ranking limitado aos 20 primeiros">
+          <Bars
+            data={products.top.slice(0, 10)}
+            value={(item) => item.revenue}
+            label={(item) => `${item.name} · ${item.sold} un.`}
+            format={money}
+          />
+        </Panel>
+        <Panel title="Desempenho por categoria" subtitle="Receita e unidades no período">
+          <Bars
+            data={products.categories}
+            value={(item) => item.revenue}
+            label={(item) => `${item.name} · ${item.sold} un.`}
+            format={money}
+          />
+        </Panel>
       </div>
-
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b">
-          <h2 className="text-sm font-semibold">Top produtos por quantidade vendida</h2>
-        </div>
-        {data.topProducts.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <Package className="h-10 w-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">Sem dados de vendas ainda</p>
-          </div>
+      <Panel
+        title="Produtos que pedem reposição"
+        subtitle="Estoque atual igual ou inferior ao mínimo configurado"
+      >
+        {!products.lowStock.length ? (
+          <Empty />
         ) : (
-          <div className="divide-y">
-            {data.topProducts.map(
-              (
-                p: { productId: string; name: string; sold: number; revenue: number },
-                i: number,
-              ) => {
-                const max = data.topProducts[0].sold;
-                return (
-                  <div key={p.productId} className="flex items-center gap-4 px-5 py-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground">
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{p.name}</p>
-                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${(p.sold / max) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-sm font-semibold">{p.sold} und.</p>
-                      <p className="text-xs text-muted-foreground">{fmt(p.revenue)}</p>
-                    </div>
-                  </div>
-                );
-              },
-            )}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="pb-3 font-medium">Produto</th>
+                  <th className="pb-3 font-medium">SKU</th>
+                  <th className="pb-3 text-right font-medium">Atual</th>
+                  <th className="pb-3 text-right font-medium">Mínimo</th>
+                  <th className="pb-3 text-right font-medium">Déficit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.lowStock.map((item) => (
+                  <tr key={item.id} className="border-b last:border-0">
+                    <td className="py-3 font-medium">{item.name}</td>
+                    <td className="py-3 text-muted-foreground">{item.sku}</td>
+                    <td className="py-3 text-right font-semibold text-red-700">{item.stock}</td>
+                    <td className="py-3 text-right">{item.minimumStock}</td>
+                    <td className="py-3 text-right">
+                      {Math.max(item.minimumStock - item.stock, 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

@@ -14,6 +14,11 @@ export async function fetchAdminStats(token: string) {
   return apiFetch<AdminOverview>('/analytics/admin', token);
 }
 
+export async function fetchReports(token: string, from: string, to: string) {
+  const query = new URLSearchParams({ from, to });
+  return apiFetch<ReportsOverview>(`/analytics/reports?${query}`, token);
+}
+
 export async function fetchSellerStats(token: string, days = 30) {
   return apiFetch<SellerOverview>(`/analytics/seller?days=${days}`, token);
 }
@@ -39,6 +44,57 @@ export interface AdminOverview {
   recentOrders: RecentOrder[];
   topProducts: TopProduct[];
   revenueChart: ChartPoint[];
+}
+
+export interface ReportsOverview {
+  period: { from: string; to: string; days: number; timeZone: string };
+  sales: {
+    revenue: number;
+    paidOrders: number;
+    allOrders: number;
+    units: number;
+    avgTicket: number;
+    cancellationRate: number;
+    comparison: { revenue: number; orders: number; units: number };
+    timeline: { date: string; revenue: number; orders: number; units: number }[];
+    hourly: { hour: number; revenue: number; orders: number }[];
+    weekdays: { weekday: number; revenue: number; orders: number }[];
+    channels: BreakdownPoint[];
+    payments: BreakdownPoint[];
+    status: { name: string; count: number }[];
+  };
+  products: {
+    units: number;
+    revenue: number;
+    inventoryValue: number;
+    active: number;
+    lowStockCount: number;
+    top: { productId: string; name: string; sold: number; revenue: number }[];
+    categories: { name: string; sold: number; revenue: number }[];
+    lowStock: { id: string; name: string; sku: string; stock: number; minimumStock: number }[];
+  };
+  customers: {
+    total: number;
+    buyers: number;
+    newCustomers: number;
+    repeatCustomers: number;
+    repeatRate: number;
+    revenuePerBuyer: number;
+    top: {
+      id: string;
+      name: string;
+      email: string;
+      orders: number;
+      spent: number;
+      lastOrderAt: string;
+    }[];
+  };
+}
+
+export interface BreakdownPoint {
+  name: string;
+  revenue: number;
+  orders: number;
 }
 
 export interface SellerOverview {

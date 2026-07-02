@@ -3,10 +3,20 @@ import { Role } from '@prisma/client';
 import { AnalyticsService } from './analytics.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ReportsService } from './reports.service';
 
 @Controller('analytics')
 export class AnalyticsController {
-  constructor(private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly analyticsService: AnalyticsService,
+    private readonly reportsService: ReportsService,
+  ) {}
+
+  @Get('reports')
+  @Roles(Role.ADMIN)
+  getReports(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.reportsService.overview(from, to);
+  }
 
   @Get('admin')
   @Roles(Role.ADMIN)
