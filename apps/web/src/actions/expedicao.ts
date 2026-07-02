@@ -178,7 +178,7 @@ export async function fetchEnviados(
 
 export async function fetchRetirada(
   token: string,
-  params?: { page?: number; grupo?: 'separados' | 'prontos' },
+  params?: { page?: number; grupo?: 'separados' | 'prontos'; search?: string },
 ): Promise<ExpedicaoListResponse> {
   return apiFetch<ExpedicaoListResponse>(token, `/expedicao/retirada${qs(params)}`);
 }

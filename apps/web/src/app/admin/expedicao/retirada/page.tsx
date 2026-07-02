@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Store, PackageCheck, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Store, PackageCheck, Clock, Search, X } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import {
   fetchRetirada,
@@ -52,6 +52,18 @@ export default function RetiradaPage() {
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundWarning, setRefundWarning] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleSearch(value: string) {
+    setSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(value.trim());
+      setPage(1);
+    }, 300);
+  }
 
   const cancelMutation = useMutation({
     mutationFn: (orderId: string) => cancelarPedido(token!, orderId),
@@ -67,8 +79,8 @@ export default function RetiradaPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['expedicao-retirada', grupo, page],
-    queryFn: () => fetchRetirada(token!, { page, grupo }),
+    queryKey: ['expedicao-retirada', grupo, page, debouncedSearch],
+    queryFn: () => fetchRetirada(token!, { page, grupo, search: debouncedSearch || undefined }),
     enabled: !!token,
   });
 
@@ -85,6 +97,8 @@ export default function RetiradaPage() {
   function handleGrupo(g: Grupo) {
     setGrupo(g);
     setPage(1);
+    setSearch('');
+    setDebouncedSearch('');
     setConfirmCancel(null);
   }
 
@@ -121,6 +135,26 @@ export default function RetiradaPage() {
           <Clock className="h-4 w-4" />
           Aguardando Retirada
         </button>
+      </div>
+
+      {/* Busca por código de retirada */}
+      <div className="relative w-64">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Buscar código (ex: A-0006)"
+          className="w-full rounded-lg border bg-background py-2 pl-8 pr-8 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        {search && (
+          <button
+            onClick={() => handleSearch('')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {cancelError && (

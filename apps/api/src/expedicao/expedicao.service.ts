@@ -311,8 +311,9 @@ export class ExpedicaoService {
     page: number;
     userId?: string | null;
     grupo?: 'separados' | 'prontos';
+    search?: string;
   }) {
-    const { page, userId, grupo } = opts;
+    const { page, userId, grupo, search } = opts;
     const skip = (page - 1) * PAGE_SIZE;
 
     const statusFilter =
@@ -327,12 +328,15 @@ export class ExpedicaoService {
       status: statusFilter,
     };
     if (userId) where.userId = userId;
+    if (search) {
+      where.pickupCode = { contains: search, mode: 'insensitive' };
+    }
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
         include: ORDER_INCLUDE_BASE,
-        orderBy: { updatedAt: 'asc' },
+        orderBy: { pickupCode: 'desc' },
         skip,
         take: PAGE_SIZE,
       }),

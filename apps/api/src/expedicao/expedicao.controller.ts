@@ -78,11 +78,13 @@ export class ExpedicaoController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('page') page = '1',
     @Query('grupo') grupo?: string,
+    @Query('search') search?: string,
   ) {
     return this.expedicaoService.getRetirada({
       page: parseInt(page, 10) || 1,
       userId: this.resolveUserId(user),
       grupo: grupo as 'separados' | 'prontos' | undefined,
+      search,
     });
   }
 
