@@ -6,12 +6,18 @@ import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
 import { PushNotificationsService } from './push-notifications.service';
 import { PushNotificationsController } from './push-notifications.controller';
+import { PendingOrderRecoveryService } from './pending-order-recovery.service';
 
 @Global()
 @Module({
   imports: [PrismaModule, JwtModule.register({})],
   controllers: [NotificationsController, PushNotificationsController],
-  providers: [NotificationsGateway, NotificationsService, PushNotificationsService],
-  exports: [NotificationsService],
+  providers: [
+    NotificationsGateway,
+    NotificationsService,
+    PushNotificationsService,
+    PendingOrderRecoveryService,
+  ],
+  exports: [NotificationsService, PushNotificationsService],
 })
 export class NotificationsModule {}

@@ -30,7 +30,7 @@ export class CartService {
     return Math.round(n * 100) / 100;
   }
 
-  private async enrich(cart: CartData): Promise<CartResponse> {
+  private async enrich(userId: string, cart: CartData): Promise<CartResponse> {
     const subtotal = cart.items.reduce((sum, i) => {
       return sum + (i.salePrice ?? i.price) * i.quantity;
     }, 0);
@@ -40,9 +40,17 @@ export class CartService {
 
     if (cart.couponCode) {
       const dbCoupon = await this.prisma.coupon.findFirst({
-        where: { code: cart.couponCode, isActive: true },
+        where: {
+          code: cart.couponCode,
+          isActive: true,
+          OR: [{ ownerUserId: null }, { ownerUserId: userId }],
+        },
       });
-      if (dbCoupon) {
+      const usable =
+        dbCoupon &&
+        (!dbCoupon.expiresAt || dbCoupon.expiresAt > new Date()) &&
+        (dbCoupon.usageLimit === null || dbCoupon.usageCount < dbCoupon.usageLimit);
+      if (usable) {
         if (dbCoupon.type === 'PERCENT') {
           discount = subtotal * (dbCoupon.value.toNumber() / 100);
           if (dbCoupon.maxDiscount) {
@@ -78,7 +86,7 @@ export class CartService {
 
   async getCart(userId: string): Promise<CartResponse> {
     const cart = await this.getRaw(userId);
-    return this.enrich(cart);
+    return this.enrich(userId, cart);
   }
 
   async addItem(userId: string, productId: string, quantity: number): Promise<CartResponse> {
@@ -118,7 +126,7 @@ export class CartService {
     }
 
     await this.save(userId, cart);
-    return this.enrich(cart);
+    return this.enrich(userId, cart);
   }
 
   async updateItem(userId: string, productId: string, quantity: number): Promise<CartResponse> {
@@ -140,14 +148,14 @@ export class CartService {
     item.salePrice = product.salePrice?.toNumber() ?? null;
 
     await this.save(userId, cart);
-    return this.enrich(cart);
+    return this.enrich(userId, cart);
   }
 
   async removeItem(userId: string, productId: string): Promise<CartResponse> {
     const cart = await this.getRaw(userId);
     cart.items = cart.items.filter((i) => i.productId !== productId);
     await this.save(userId, cart);
-    return this.enrich(cart);
+    return this.enrich(userId, cart);
   }
 
   async clearCart(userId: string): Promise<void> {
@@ -156,7 +164,11 @@ export class CartService {
 
   async applyCoupon(userId: string, code: string): Promise<CartResponse> {
     const coupon = await this.prisma.coupon.findFirst({
-      where: { code, isActive: true },
+      where: {
+        code: code.toUpperCase(),
+        isActive: true,
+        OR: [{ ownerUserId: null }, { ownerUserId: userId }],
+      },
     });
     if (!coupon) throw new NotFoundException('Cupom não encontrado ou inativo.');
     if (coupon.expiresAt && coupon.expiresAt < new Date()) {
@@ -182,13 +194,13 @@ export class CartService {
 
     cart.couponCode = coupon.code;
     await this.save(userId, cart);
-    return this.enrich(cart);
+    return this.enrich(userId, cart);
   }
 
   async removeCoupon(userId: string): Promise<CartResponse> {
     const cart = await this.getRaw(userId);
     cart.couponCode = null;
     await this.save(userId, cart);
-    return this.enrich(cart);
+    return this.enrich(userId, cart);
   }
 }

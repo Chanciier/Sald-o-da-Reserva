@@ -5,7 +5,6 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Role } from '@prisma/client';
 import * as webpush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -64,7 +63,7 @@ export class PushNotificationsService {
 
   async subscribe(userId: string, dto: SavePushSubscriptionDto) {
     this.ensureConfigured();
-    await this.ensureActiveAdmin(userId);
+    await this.ensureActiveUser(userId);
     await this.prisma.pushSubscription.upsert({
       where: { endpoint: dto.endpoint },
       update: { userId, p256dh: dto.keys.p256dh, auth: dto.keys.auth },
@@ -85,9 +84,10 @@ export class PushNotificationsService {
     return { subscribed: false };
   }
 
-  async sendToUser(userId: string, payload: PushPayload): Promise<void> {
-    if (!this.configured) return;
+  async sendToUser(userId: string, payload: PushPayload): Promise<boolean> {
+    if (!this.configured) return false;
     const subscriptions = await this.prisma.pushSubscription.findMany({ where: { userId } });
+    if (subscriptions.length === 0) return false;
     const url = payload.orderId
       ? `/pedidos/${payload.orderId}`
       : payload.productId
@@ -100,7 +100,7 @@ export class PushNotificationsService {
       tag: `${payload.type}:${payload.orderId ?? payload.productId ?? 'geral'}`,
     });
 
-    await Promise.all(
+    const results = await Promise.all(
       subscriptions.map(async (subscription) => {
         try {
           await webpush.sendNotification(
@@ -120,9 +120,12 @@ export class PushNotificationsService {
           this.logger.warn(
             `Falha no Web Push user=${userId}: ${pushError.message ?? 'erro desconhecido'}`,
           );
+          throw error;
         }
       }),
     );
+    void results;
+    return true;
   }
 
   private ensureConfigured(): void {
@@ -131,13 +134,13 @@ export class PushNotificationsService {
     }
   }
 
-  private async ensureActiveAdmin(userId: string): Promise<void> {
+  private async ensureActiveUser(userId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true, isActive: true },
+      select: { isActive: true },
     });
-    if (!user?.isActive || user.role !== Role.ADMIN) {
-      throw new ForbiddenException('Apenas administradores podem ativar Web Push.');
+    if (!user?.isActive) {
+      throw new ForbiddenException('Usuário inativo não pode ativar Web Push.');
     }
   }
 }

@@ -9,7 +9,7 @@ import {
 import { PushNotificationsService } from './push-notifications.service';
 
 @Controller('notifications/push')
-@Roles(Role.ADMIN)
+@Roles(Role.ADMIN, Role.CLIENTE)
 export class PushNotificationsController {
   constructor(private readonly push: PushNotificationsService) {}
 

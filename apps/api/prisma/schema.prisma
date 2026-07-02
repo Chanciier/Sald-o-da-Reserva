@@ -189,6 +189,7 @@ model User {
   reviews         Review[]
   notifications   Notification[]
   pushSubscriptions PushSubscription[]
+  recoveryCoupons Coupon[] @relation("RecoveryCouponOwner")
 
   @@map("users")
 }
@@ -396,9 +397,15 @@ model Coupon {
   expiresAt     DateTime?  @map("expires_at")
   createdAt     DateTime   @default(now()) @map("created_at")
   updatedAt     DateTime   @updatedAt @map("updated_at")
+  ownerUserId   String?    @map("owner_user_id")
+  sourceOrderId String?    @unique @map("source_order_id")
 
-  orders Order[]
+  orders      Order[] @relation("AppliedCoupon")
+  owner       User?   @relation("RecoveryCouponOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sourceOrder Order?  @relation("RecoveryCouponSource", fields: [sourceOrderId], references: [id], onDelete: Cascade)
 
+  @@index([ownerUserId])
+  @@index([sourceOrderId])
   @@map("coupons")
 }
 
@@ -430,9 +437,14 @@ model Order {
   stockApplied    Boolean  @default(false) @map("stock_applied")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
+  cartReminderCreatedAt DateTime? @map("cart_reminder_created_at")
+  cartReminderPushSentAt DateTime? @map("cart_reminder_push_sent_at")
+  recoveryCouponCreatedAt DateTime? @map("recovery_coupon_created_at")
+  recoveryCouponPushSentAt DateTime? @map("recovery_coupon_push_sent_at")
 
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coupon         Coupon?          @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  coupon         Coupon?          @relation("AppliedCoupon", fields: [couponId], references: [id], onDelete: SetNull)
+  recoveryCoupon Coupon?          @relation("RecoveryCouponSource")
   items          OrderItem[]
   payment        Payment?
   shipment       Shipment?
@@ -444,6 +456,7 @@ model Order {
   @@unique([channel, externalId], map: "orders_channel_external_id_key")
   @@index([userId])
   @@index([channel])
+  @@index([status, channel, createdAt])
   @@map("orders")
 }
 

@@ -111,11 +111,16 @@ export class CheckoutService {
     // Coupon
     const couponCode = dto.couponCode?.toUpperCase() ?? cart.couponCode ?? null;
     let couponId: string | null = null;
+    let couponUsageLimit: number | null = null;
     let discount = 0;
 
     if (couponCode) {
       const coupon = await this.prisma.coupon.findFirst({
-        where: { code: couponCode, isActive: true },
+        where: {
+          code: couponCode,
+          isActive: true,
+          OR: [{ ownerUserId: null }, { ownerUserId: userId }],
+        },
       });
       if (coupon) {
         const eligible = !coupon.minOrderValue || cart.subtotal >= coupon.minOrderValue.toNumber();
@@ -131,6 +136,7 @@ export class CheckoutService {
           }
           discount = Math.min(discount, cart.subtotal);
           couponId = coupon.id;
+          couponUsageLimit = coupon.usageLimit;
         }
       }
     }
@@ -186,10 +192,21 @@ export class CheckoutService {
       // abandoned/unpaid order never removes the product from the store.
 
       if (couponId) {
-        await tx.coupon.update({
-          where: { id: couponId },
+        const consumed = await tx.coupon.updateMany({
+          where: {
+            id: couponId,
+            isActive: true,
+            OR: [{ ownerUserId: null }, { ownerUserId: userId }],
+            AND: [
+              { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+              ...(couponUsageLimit === null ? [] : [{ usageCount: { lt: couponUsageLimit } }]),
+            ],
+          },
           data: { usageCount: { increment: 1 } },
         });
+        if (consumed.count !== 1) {
+          throw new BadRequestException('Cupom expirado, esgotado ou indisponível.');
+        }
       }
 
       // Create shipment record (PICKUP orders have no shipment)

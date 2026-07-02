@@ -22,7 +22,7 @@ export function PushNotificationControl() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (user?.role !== 'ADMIN' || !token) return;
+    if (!user || !token) return;
     if (!isPushSupported()) {
       setState('unsupported');
       return;
@@ -46,9 +46,9 @@ export function PushNotificationControl() {
     return () => {
       active = false;
     };
-  }, [token, user?.role]);
+  }, [token, user]);
 
-  if (user?.role !== 'ADMIN') return null;
+  if (!user) return null;
 
   async function enablePush() {
     if (!token || !isPushSupported()) return;

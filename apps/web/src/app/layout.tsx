@@ -10,6 +10,7 @@ import { ConditionalHeader } from '@/components/layout/conditional-header';
 import { ConditionalFooter } from '@/components/layout/conditional-footer';
 import { CookieBanner } from '@/components/cookie-banner';
 import { SITE_URL } from '@/lib/site-url';
+import { PushPermissionPrompt } from '@/components/notifications/push-permission-prompt';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -54,6 +55,7 @@ export default function RootLayout({
                 {children}
                 <ConditionalFooter />
                 <CookieBanner />
+                <PushPermissionPrompt />
               </AnalyticsProvider>
             </CartProvider>
           </AuthProvider>
