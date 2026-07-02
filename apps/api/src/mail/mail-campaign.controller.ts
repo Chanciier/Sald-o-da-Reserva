@@ -1,33 +1,26 @@
-import { BadRequestException, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { CAMPAIGN_KEYS, CampaignKey, MailCampaignService } from './mail-campaign.service';
+import { MailCampaignService } from './mail-campaign.service';
+import { SendAnnouncementDto } from './dto/send-announcement.dto';
 
 @Controller('mail-campaigns')
 @Roles(Role.ADMIN)
 export class MailCampaignController {
   constructor(private readonly campaigns: MailCampaignService) {}
 
-  @Get(':key/status')
-  status(@Param('key') key: string) {
-    return this.campaigns.getStatus(this.assertKnown(key));
+  @Get('status')
+  status() {
+    return this.campaigns.getStatus();
   }
 
-  @Get(':key/recipient-count')
-  async recipientCount(@Param('key') key: string) {
-    this.assertKnown(key);
+  @Get('recipient-count')
+  async recipientCount() {
     return { count: await this.campaigns.recipientCount() };
   }
 
-  @Post(':key/send')
-  send(@Param('key') key: string) {
-    return this.campaigns.send(this.assertKnown(key));
-  }
-
-  private assertKnown(key: string): CampaignKey {
-    if (!(CAMPAIGN_KEYS as readonly string[]).includes(key)) {
-      throw new BadRequestException('Campanha desconhecida.');
-    }
-    return key as CampaignKey;
+  @Post('send')
+  send(@Body() dto: SendAnnouncementDto) {
+    return this.campaigns.send(dto.subject, dto.message);
   }
 }

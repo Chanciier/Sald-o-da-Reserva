@@ -6,10 +6,14 @@ import { Mail, Send, Loader2, CheckCircle2, Users, AlertTriangle } from 'lucide-
 import { useAuth } from '@/contexts/auth-context';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-const CAMPAIGN_KEY = 'credit-card-announcement';
+
+const DEFAULT_SUBJECT = 'Novidade: pague com cartão de crédito no Saldão da Reserva';
+const DEFAULT_MESSAGE =
+  'Agora você pode finalizar sua compra pagando com cartão de crédito à vista, em qualquer valor. Para compras a partir de R$100, também dá pra parcelar. É só escolher essa forma de pagamento na hora de fechar o pedido.';
 
 interface CampaignState {
-  key: string;
+  subject: string;
+  message: string;
   running: boolean;
   total: number;
   sent: number;
@@ -28,10 +32,11 @@ async function apiGet<T>(path: string, token: string): Promise<T> {
   return data as T;
 }
 
-async function apiPost<T>(path: string, token: string): Promise<T> {
+async function apiPost<T>(path: string, token: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}/api/v1${path}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { message?: string }).message ?? `Erro ${res.status}`);
@@ -41,39 +46,43 @@ async function apiPost<T>(path: string, token: string): Promise<T> {
 export default function AdminCampanhasPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
+  const [subject, setSubject] = useState(DEFAULT_SUBJECT);
+  const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const [confirming, setConfirming] = useState(false);
 
   const statusQuery = useQuery({
-    queryKey: ['mail-campaign-status', CAMPAIGN_KEY],
-    queryFn: () => apiGet<CampaignState | null>(`/mail-campaigns/${CAMPAIGN_KEY}/status`, token!),
+    queryKey: ['mail-campaign-status'],
+    queryFn: () => apiGet<CampaignState | null>('/mail-campaigns/status', token!),
     enabled: !!token,
     refetchInterval: (query) => (query.state.data?.running ? 3000 : false),
   });
 
   const countQuery = useQuery({
-    queryKey: ['mail-campaign-recipients', CAMPAIGN_KEY],
-    queryFn: () =>
-      apiGet<{ count: number }>(`/mail-campaigns/${CAMPAIGN_KEY}/recipient-count`, token!),
+    queryKey: ['mail-campaign-recipients'],
+    queryFn: () => apiGet<{ count: number }>('/mail-campaigns/recipient-count', token!),
     enabled: !!token && !statusQuery.data?.running,
   });
 
   const sendMutation = useMutation({
-    mutationFn: () => apiPost<CampaignState>(`/mail-campaigns/${CAMPAIGN_KEY}/send`, token!),
+    mutationFn: () => apiPost<CampaignState>('/mail-campaigns/send', token!, { subject, message }),
     onSuccess: (data) => {
-      qc.setQueryData(['mail-campaign-status', CAMPAIGN_KEY], data);
-      qc.invalidateQueries({ queryKey: ['mail-campaign-status', CAMPAIGN_KEY] });
+      qc.setQueryData(['mail-campaign-status'], data);
+      qc.invalidateQueries({ queryKey: ['mail-campaign-status'] });
       setConfirming(false);
     },
   });
 
   const status = statusQuery.data;
   const running = status?.running ?? false;
+  const canEdit = !running && !confirming;
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-xl font-bold">Campanhas de E-mail</h1>
-        <p className="text-sm text-muted-foreground">Avisos enviados por e-mail para os clientes</p>
+        <p className="text-sm text-muted-foreground">
+          Envie um aviso por e-mail para todos os clientes ativos
+        </p>
       </div>
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
@@ -82,26 +91,36 @@ export default function AdminCampanhasPage() {
             <Mail className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-semibold">Pagamento por cartão de crédito</h2>
+            <h2 className="font-semibold">Novo aviso</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Avisa os clientes que agora é possível pagar com cartão de crédito à vista em qualquer
-              valor, com parcelamento a partir de R$100.
+              Edite o assunto e o texto abaixo antes de disparar.
             </p>
           </div>
         </div>
 
-        {/* Preview do conteúdo */}
-        <div className="p-5 border-b bg-muted/30">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Prévia do e-mail</p>
-          <div className="rounded-lg border bg-background p-4 text-sm space-y-2">
-            <p className="font-medium">
-              Assunto: Novidade: pague com cartão de crédito no Saldão da Reserva
-            </p>
-            <p className="text-muted-foreground">
-              &quot;Agora você pode finalizar sua compra pagando com cartão de crédito à vista, em
-              qualquer valor. Para compras a partir de R$100, também dá pra parcelar. É só escolher
-              essa forma de pagamento na hora de fechar o pedido.&quot;
-            </p>
+        {/* Formulário editável */}
+        <div className="p-5 border-b space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Assunto</label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              disabled={!canEdit}
+              maxLength={150}
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Mensagem</label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              disabled={!canEdit}
+              maxLength={4000}
+              rows={5}
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
+            />
           </div>
         </div>
 
@@ -121,7 +140,7 @@ export default function AdminCampanhasPage() {
             <div className="flex items-center gap-3 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
               <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
               <div className="text-sm text-green-800">
-                Enviado para {status.sent} de {status.total} clientes em{' '}
+                Último envio: {status.sent} de {status.total} clientes em{' '}
                 {new Date(status.finishedAt).toLocaleString('pt-BR')}
                 {status.failed > 0 && ` — ${status.failed} falharam`}
               </div>
@@ -142,10 +161,11 @@ export default function AdminCampanhasPage() {
           {!running && !confirming && (
             <button
               onClick={() => setConfirming(true)}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+              disabled={!subject.trim() || !message.trim()}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
             >
               <Send className="h-4 w-4" />
-              {status?.finishedAt ? 'Enviar novamente' : 'Enviar agora'}
+              Enviar agora
             </button>
           )}
 

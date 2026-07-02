@@ -328,10 +328,17 @@ export class MailService {
 
   // ── Campaigns ─────────────────────────────────────────────────────────────
 
-  async sendCreditCardAnnouncementEmail(email: string, name?: string | null): Promise<boolean> {
+  async sendAnnouncementEmail(
+    email: string,
+    name: string | null | undefined,
+    subject: string,
+    message: string,
+  ): Promise<boolean> {
     const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
-    const subject = 'Novidade: pague com cartão de crédito no Saldão da Reserva';
     const shopUrl = `${this.frontendUrl}/produtos`;
+    const esc = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const bodyHtml = esc(message).replace(/\n/g, '<br>');
 
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
@@ -340,7 +347,7 @@ export class MailService {
         </div>
         <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
           <p style="margin:0 0 16px">${greeting}</p>
-          <p style="margin:0 0 24px">Agora você pode finalizar sua compra pagando com <strong>cartão de crédito</strong> à vista, em qualquer valor. Para compras a partir de R$100, também dá pra parcelar. É só escolher essa forma de pagamento na hora de fechar o pedido.</p>
+          <p style="margin:0 0 24px">${bodyHtml}</p>
           <a href="${shopUrl}" style="display:inline-block;background:#f59e0b;color:#1a1a1a;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700">
             Ver produtos
           </a>
