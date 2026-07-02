@@ -1,15 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import {
-  DeliveryMethod,
-  Marketplace,
-  OrderStatus,
-  PaymentStatus,
-  ShipmentStatus,
-} from '@prisma/client';
+import { DeliveryMethod, OrderStatus, PaymentStatus, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
-import { InvoiceService } from '../invoices/invoice.service';
 import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 import { recordOrderEvent } from '../common/order-timeline';
 
@@ -86,7 +79,6 @@ export class ExpedicaoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mp: MercadoPagoService,
-    private readonly invoiceService: InvoiceService,
     private readonly orderWa: OrderWhatsappService,
   ) {}
 
@@ -555,15 +547,6 @@ export class ExpedicaoService {
       void this.orderWa.notifyReadyToShip(target);
     }
 
-    // NF-e: emitimos automaticamente apenas para pedidos da loja própria. Em
-    // marketplaces (ex.: Mercado Livre) a parte fiscal segue o fluxo do canal —
-    // emitir aqui poderia gerar nota incorreta/duplicada.
-    if (order.channel === Marketplace.SITE) {
-      this.invoiceService
-        .emitForOrder(orderId)
-        .catch((e) => this.logger.warn(`NF-e emission failed for order ${orderId}`, e));
-    }
-
     return updated;
   }
 
@@ -640,11 +623,6 @@ export class ExpedicaoService {
       name: order.buyerName,
       orderId,
     });
-
-    // Emit NF-e now if not already emitted (handles PICKUP orders that skipped marcarPronto)
-    this.invoiceService
-      .emitForOrder(orderId)
-      .catch((e) => this.logger.warn(`NF-e emission failed for order ${orderId}`, e));
 
     return updated;
   }
