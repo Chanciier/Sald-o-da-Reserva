@@ -340,7 +340,7 @@ export class MailService {
         </div>
         <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
           <p style="margin:0 0 16px">${greeting}</p>
-          <p style="margin:0 0 24px">Agora você pode finalizar sua compra pagando com <strong>cartão de crédito</strong>, em qualquer valor, com opção de parcelamento. É só escolher essa forma de pagamento na hora de fechar o pedido.</p>
+          <p style="margin:0 0 24px">Agora você pode finalizar sua compra pagando com <strong>cartão de crédito</strong> à vista, em qualquer valor. Para compras a partir de R$100, também dá pra parcelar. É só escolher essa forma de pagamento na hora de fechar o pedido.</p>
           <a href="${shopUrl}" style="display:inline-block;background:#f59e0b;color:#1a1a1a;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700">
             Ver produtos
           </a>

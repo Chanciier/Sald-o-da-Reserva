@@ -84,8 +84,8 @@ export default function AdminCampanhasPage() {
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold">Pagamento por cartão de crédito</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Avisa os clientes que agora é possível pagar com cartão de crédito, com parcelamento,
-              em qualquer valor de compra.
+              Avisa os clientes que agora é possível pagar com cartão de crédito à vista em qualquer
+              valor, com parcelamento a partir de R$100.
             </p>
           </div>
         </div>
@@ -98,9 +98,9 @@ export default function AdminCampanhasPage() {
               Assunto: Novidade: pague com cartão de crédito no Saldão da Reserva
             </p>
             <p className="text-muted-foreground">
-              &quot;Agora você pode finalizar sua compra pagando com cartão de crédito, em qualquer
-              valor, com opção de parcelamento. É só escolher essa forma de pagamento na hora de
-              fechar o pedido.&quot;
+              &quot;Agora você pode finalizar sua compra pagando com cartão de crédito à vista, em
+              qualquer valor. Para compras a partir de R$100, também dá pra parcelar. É só escolher
+              essa forma de pagamento na hora de fechar o pedido.&quot;
             </p>
           </div>
         </div>
