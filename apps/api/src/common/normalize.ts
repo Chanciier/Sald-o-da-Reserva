@@ -43,3 +43,24 @@ export function toConfidence(v: unknown): number {
   if (typeof n !== 'number' || Number.isNaN(n)) return 0;
   return Math.max(0, Math.min(1, n));
 }
+
+/**
+ * Número positivo finito ou null. Aceita string com moeda/pontuação BR
+ * ("R$ 1.299,90" → 1299.9). Retorna null p/ 0, negativos, NaN ou vazio.
+ */
+export function toNumberOrNull(v: unknown): number | null {
+  let n: number;
+  if (typeof v === 'number') {
+    n = v;
+  } else if (typeof v === 'string') {
+    let s = v.replace(/[^\d.,-]/g, '').trim();
+    if (!s) return null;
+    // Formato BR: vírgula é decimal. Remove separador de milhar e troca vírgula.
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    n = Number(s);
+  } else {
+    return null;
+  }
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}

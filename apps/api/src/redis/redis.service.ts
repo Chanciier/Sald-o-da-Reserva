@@ -87,4 +87,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async llen(key: string): Promise<number> {
     return this.client.llen(key);
   }
+
+  /** Read a range of a list (0, -1 = the whole list). Used for event feeds (e.g. LearningModule). */
+  async lrange(key: string, start: number, stop: number): Promise<string[]> {
+    return this.client.lrange(key, start, stop);
+  }
+
+  /** Trim a list to a range, discarding everything outside it — caps unbounded event logs. */
+  async ltrim(key: string, start: number, stop: number): Promise<void> {
+    await this.client.ltrim(key, start, stop);
+  }
 }

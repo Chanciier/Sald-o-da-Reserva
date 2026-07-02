@@ -33,6 +33,10 @@ import { MarketplaceModule } from './marketplace/marketplace.module';
 import { OmsModule } from './oms/oms.module';
 import { VisionModule } from './vision/vision.module';
 import { IdentificationModule } from './identification/identification.module';
+import { MarketResearchModule } from './market-research/market-research.module';
+import { PricingModule } from './pricing/pricing.module';
+import { LearningModule } from './learning/learning.module';
+import { VirtualEmployeeModule } from './virtual-employee/virtual-employee.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './rbac/guards/roles.guard';
@@ -80,6 +84,10 @@ import { envValidation } from './config/env.validation';
     OmsModule,
     VisionModule,
     IdentificationModule,
+    MarketResearchModule,
+    PricingModule,
+    LearningModule,
+    VirtualEmployeeModule,
   ],
   controllers: [AppController],
   providers: [

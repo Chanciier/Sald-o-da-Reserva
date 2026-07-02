@@ -201,6 +201,12 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   ANTHROPIC_TIMEOUT_MS: string = '120000';
+
+  // MarketResearchModule (Hermes Agent): pesquisa de preços via web search.
+  // Vazio = reaproveita ANTHROPIC_TEXT_MODEL / ANTHROPIC_VISION_MODEL.
+  @IsString()
+  @IsOptional()
+  ANTHROPIC_RESEARCH_MODEL: string = '';
 }
 
 export function envValidation(config: Record<string, unknown>) {
