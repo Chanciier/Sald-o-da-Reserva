@@ -107,7 +107,8 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
         if (costs.length && !costs.find((c) => c.installments === installments)) {
           setInstallments(costs[0].installments);
         }
-      } catch {
+      } catch (err) {
+        console.error('[card-form] loadInstallments falhou', err);
         if (allowInstallments) {
           setInstallmentOptions([
             { installments: 1, recommended_message: '1x', total_amount: amount },
@@ -163,6 +164,7 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
       if (!tokenResult.id) throw new Error('Falha ao tokenizar o cartão.');
 
       let pmId = tokenResult.payment_method_id || detectedPaymentMethodId;
+      let debugInfo = '';
       if (!pmId && mp) {
         // Fallback for the case where the user submits before the bin lookup
         // (triggered on card-number change) has finished resolving.
@@ -171,15 +173,26 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
           try {
             const result = await mp.getInstallments({ amount: amount.toFixed(2), bin });
             pmId = result[0]?.payment_method_id ?? '';
-            if (pmId) setDetectedPaymentMethodId(pmId);
-          } catch {
-            // ignore — falls through to the error below
+            if (pmId) {
+              setDetectedPaymentMethodId(pmId);
+            } else {
+              debugInfo = `MP retornou ${result.length} método(s) para o BIN ${bin}`;
+              console.error('[card-form] getInstallments sem payment_method_id', {
+                bin,
+                result,
+              });
+            }
+          } catch (err) {
+            debugInfo = `erro ao consultar bandeira: ${(err as Error)?.message ?? JSON.stringify(err)}`;
+            console.error('[card-form] getInstallments falhou', err);
           }
+        } else {
+          debugInfo = `BIN incompleto (${bin.length} dígitos)`;
         }
       }
       if (!pmId)
         throw new Error(
-          'Não foi possível identificar a bandeira do cartão. Verifique o número e tente novamente.',
+          `Não foi possível identificar a bandeira do cartão. Verifique o número e tente novamente.${debugInfo ? ` [${debugInfo}]` : ''}`,
         );
 
       await onSubmit({
