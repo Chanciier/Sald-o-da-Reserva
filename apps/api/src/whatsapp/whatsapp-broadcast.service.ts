@@ -30,6 +30,9 @@ export interface BroadcastState {
   nextAt: string | null;
   /** Produtos enviados por disparo (>1 quando a fila não cabe 1-a-1 na janela do dia). */
   batchSize: number;
+  /** Dia (America/Sao_Paulo, YYYY-MM-DD) do último refill da fila — usado para saber
+   * se ainda estamos na primeira volta do catálogo hoje ou reforçando com os top produtos. */
+  lastRefillDay: string | null;
   lastProductName: string | null;
   lastSentAt: string | null;
 }
@@ -76,6 +79,11 @@ export class WhatsappBroadcastService {
       Sat: 6,
     };
     return { dayOfWeek: weekdays[value('weekday')], time: `${value('hour')}:${value('minute')}` };
+  }
+
+  /** Chave de data (YYYY-MM-DD) no fuso da loja, pra saber se já viramos o dia. */
+  private dateKey(date: Date): string {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE }).format(date);
   }
 
   private dayAt(date: Date, schedule: BroadcastDay[]): BroadcastDay | undefined {
@@ -187,6 +195,7 @@ export class WhatsappBroadcastService {
       queue,
       nextAt: nextAt.toISOString(),
       batchSize: this.computeBatchSize(queue.length, nextAt, schedule),
+      lastRefillDay: this.dateKey(now),
       lastProductName: progress.lastProductName,
       lastSentAt: firstBatch.length ? now.toISOString() : null,
     };
@@ -215,6 +224,16 @@ export class WhatsappBroadcastService {
     return this.shuffle(ids);
   }
 
+  /** Quando o catálogo ativo já deu uma volta completa e ainda sobra horário no
+   * mesmo dia, reforça a fila com os produtos de maior engajamento (mais vistos/
+   * clicados/adicionados ao carrinho) em vez de repetir o catálogo todo de novo
+   * às cegas — maximiza a chance de conversão nos disparos "extras" do dia. */
+  private async refillTopQueue(): Promise<string[]> {
+    const topIds = await this.marketing.getTopProductIds(20);
+    if (!topIds.length) return this.refillQueue();
+    return this.shuffle(topIds);
+  }
+
   @Cron(CronExpression.EVERY_MINUTE)
   async tick(): Promise<void> {
     const state = await this.redis.getJson<BroadcastState>(STATE_KEY);
@@ -226,9 +245,14 @@ export class WhatsappBroadcastService {
     state.schedule = this.scheduleOf(state);
 
     // Fim da fila = fim do ciclo, não da rotina: busca produtos elegíveis de novo
-    // e recomeça, mantendo os disparos automáticos rodando dia após dia.
+    // e recomeça, mantendo os disparos automáticos rodando dia após dia. Se essa é
+    // a primeira volta do dia, pega o catálogo inteiro; se o catálogo já rodou por
+    // completo e ainda sobra horário hoje, reforça com os produtos de mais engajamento.
     if (!state.queue.length) {
-      state.queue = await this.refillQueue();
+      const today = this.dateKey(now);
+      const isFirstPassToday = state.lastRefillDay !== today;
+      state.queue = isFirstPassToday ? await this.refillQueue() : await this.refillTopQueue();
+      state.lastRefillDay = today;
       state.total = state.queue.length;
       state.sent = 0;
       state.failed = 0;

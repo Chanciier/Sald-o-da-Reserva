@@ -1,9 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { AnalyticsEventType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappProvider } from './whatsapp.provider';
 import { AIContentService } from './ai-content.service';
+
+// Peso de cada sinal de engajamento no ranking de "produtos em alta" — clique e
+// carrinho pesam mais que visualização por indicarem intenção de compra mais forte.
+const ENGAGEMENT_WEIGHTS: Partial<Record<AnalyticsEventType, number>> = {
+  [AnalyticsEventType.PRODUCT_VIEW]: 1,
+  [AnalyticsEventType.PRODUCT_CLICK]: 3,
+  [AnalyticsEventType.ADD_TO_CART]: 6,
+};
+const ENGAGEMENT_WINDOW_DAYS = 30;
 
 interface ProductLike {
   id: string;
@@ -120,6 +129,39 @@ export class WhatsappMarketingService {
       take: 200,
     });
     return products.map((p) => p.id);
+  }
+
+  // IDs dos produtos ativos com mais engajamento (visualização/clique/carrinho)
+  // nos últimos 30 dias, do mais procurado pro menos. Usado pela rotina de disparo
+  // pra reforçar itens com mais chance de conversão quando sobra horário no dia
+  // (catálogo ativo menor que a quantidade de disparos programados).
+  async getTopProductIds(limit: number): Promise<string[]> {
+    const since = new Date(Date.now() - ENGAGEMENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const rows = await this.prisma.analyticsEvent.groupBy({
+      by: ['productId', 'type'],
+      where: {
+        productId: { not: null },
+        type: { in: Object.keys(ENGAGEMENT_WEIGHTS) as AnalyticsEventType[] },
+        createdAt: { gte: since },
+      },
+      _count: { _all: true },
+    });
+    if (!rows.length) return [];
+
+    const scores = new Map<string, number>();
+    for (const row of rows) {
+      if (!row.productId) continue;
+      const weight = ENGAGEMENT_WEIGHTS[row.type] ?? 0;
+      scores.set(row.productId, (scores.get(row.productId) ?? 0) + row._count._all * weight);
+    }
+    const rankedIds = [...scores.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+
+    const eligible = await this.prisma.product.findMany({
+      where: { id: { in: rankedIds }, status: 'ACTIVE', stock: { gt: 0 } },
+      select: { id: true },
+    });
+    const eligibleSet = new Set(eligible.map((p) => p.id));
+    return rankedIds.filter((id) => eligibleSet.has(id)).slice(0, limit);
   }
 
   // Compara o preço/promoção salvos junto ao texto gerado com os valores atuais
