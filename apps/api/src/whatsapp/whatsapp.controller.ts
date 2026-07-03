@@ -118,7 +118,13 @@ export class WhatsappController {
     const content = await this.ai.generateAdCopy({ ...dto, productUrl });
 
     return this.prisma.whatsappContentHistory.create({
-      data: { productId: dto.productId, content, edited: false },
+      data: {
+        productId: dto.productId,
+        content,
+        price: dto.price,
+        salePrice: dto.salePrice,
+        edited: false,
+      },
     });
   }
 

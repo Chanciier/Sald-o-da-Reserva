@@ -363,6 +363,10 @@ model WhatsappContentHistory {
   productId String   @map("product_id")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   content   String
+  // Snapshot do preço no momento em que o texto foi gerado. Usado para detectar
+  // se o preço do produto mudou desde então e regenerar o anúncio automaticamente.
+  price     Decimal? @db.Decimal(10, 2)
+  salePrice Decimal? @map("sale_price") @db.Decimal(10, 2)
   edited    Boolean  @default(false)
   sent      Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")

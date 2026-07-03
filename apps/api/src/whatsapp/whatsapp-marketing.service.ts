@@ -122,6 +122,19 @@ export class WhatsappMarketingService {
     return products.map((p) => p.id);
   }
 
+  // Compara o preço/promoção salvos junto ao texto gerado com os valores atuais
+  // do produto. Se mudou, o texto ficou desatualizado e precisa ser regenerado.
+  private priceChanged(
+    existing: { price: Prisma.Decimal | null; salePrice: Prisma.Decimal | null },
+    product: { price: Prisma.Decimal; salePrice: Prisma.Decimal | null },
+  ): boolean {
+    if (!existing.price || !existing.price.equals(product.price)) return true;
+    if (existing.salePrice === null || product.salePrice === null) {
+      return existing.salePrice !== product.salePrice;
+    }
+    return !existing.salePrice.equals(product.salePrice);
+  }
+
   // Envia UM produto para todos os grupos ativos. Retorna o nome do produto e se
   // ao menos um envio teve sucesso — usado pelo disparo espaçado (1 a cada N min).
   async broadcastSingleProduct(productId: string): Promise<{ ok: boolean; name: string | null }> {
@@ -148,7 +161,7 @@ export class WhatsappMarketingService {
         where: { productId: product.id },
         orderBy: { createdAt: 'desc' },
       });
-      if (existing) {
+      if (existing && !this.priceChanged(existing, product)) {
         message = existing.content;
       } else {
         message = await this.ai.generateAdCopy({
@@ -162,7 +175,15 @@ export class WhatsappMarketingService {
           productUrl,
         });
         await this.prisma.whatsappContentHistory
-          .create({ data: { productId: product.id, content: message, sent: false } })
+          .create({
+            data: {
+              productId: product.id,
+              content: message,
+              price: product.price,
+              salePrice: product.salePrice,
+              sent: false,
+            },
+          })
           .catch(() => {});
       }
     } catch {
