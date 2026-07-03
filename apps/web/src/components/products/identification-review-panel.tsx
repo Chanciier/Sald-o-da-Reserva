@@ -2,41 +2,62 @@
 
 import { useMemo, useState } from 'react';
 import { Loader2, Plus, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import type { CategoryItem } from '@/actions/products';
 import type {
-  IdentificationResult,
+  CompetitionLevel,
   ProductSpecification,
-  VisionResult,
+  VirtualEmployeeReview,
+} from '@/types/virtual-employee';
+import {
+  COMPETITION_LABELS,
+  MARKETPLACE_LABELS,
+  PRICING_TIER_LABELS,
 } from '@/types/virtual-employee';
 
-/** Estado editável do painel — mesmos campos do IdentificationResult, todos livres para o operador alterar. */
+/** Estado editável do painel — tudo livre para o operador alterar antes de aprovar. */
 export interface ReviewPanelState {
-  seoTitle: string;
+  title: string;
   description: string;
   specifications: ProductSpecification[];
   categoryId: string; // '' = nenhuma selecionada
   tags: string[];
-  slug: string;
   metaDescription: string;
+  ncm: string;
+  brand: string;
+  price: number;
+  stock: number;
+  isUnique: boolean;
 }
 
-export function toReviewPanelState(result: IdentificationResult): ReviewPanelState {
+export function toReviewPanelState(review: VirtualEmployeeReview): ReviewPanelState {
   return {
-    seoTitle: result.seoTitle,
-    description: result.description,
-    specifications: result.specifications,
-    categoryId: result.categoryId ?? '',
-    tags: result.tags,
-    slug: result.slug,
-    metaDescription: result.metaDescription,
+    title: review.product.title,
+    description: review.product.description,
+    specifications: review.product.specifications,
+    categoryId: review.product.categoryId ?? '',
+    tags: review.product.tags,
+    metaDescription: review.product.metaDescription,
+    ncm: review.product.ncm ?? '',
+    brand: review.product.brand ?? '',
+    price: review.pricing.suggestedPrice,
+    stock: 1,
+    isUnique: true,
   };
 }
 
+const COMPETITION_BADGE_VARIANT: Record<CompetitionLevel, 'success' | 'warning' | 'destructive'> = {
+  BAIXA: 'success',
+  MEDIA: 'warning',
+  ALTA: 'destructive',
+};
+
 interface IdentificationReviewPanelProps {
-  vision: VisionResult;
+  review: VirtualEmployeeReview;
   categorySuggestion: string | null;
   categories: CategoryItem[];
   value: ReviewPanelState;
@@ -47,11 +68,11 @@ interface IdentificationReviewPanelProps {
 
 /**
  * Painel de revisão do Funcionário Virtual. Mostra o que o Vision identificou
- * (referência, só leitura) e o conteúdo gerado pelo Identification — TUDO
- * editável antes de salvar como produto de verdade.
+ * e as sugestões do orquestrador (preço, pesquisa de mercado, NCM) — TUDO
+ * editável antes de aprovar e criar o produto de verdade.
  */
 export function IdentificationReviewPanel({
-  vision,
+  review,
   categorySuggestion,
   categories,
   value,
@@ -60,11 +81,17 @@ export function IdentificationReviewPanel({
   isSaving,
 }: IdentificationReviewPanelProps) {
   const [newTag, setNewTag] = useState('');
+  const { vision, pricing, market } = review;
   const confidencePct = Math.round(vision.confidence * 100);
 
   const categoryMatched = useMemo(
     () => value.categoryId !== '' && categories.some((c) => c.id === value.categoryId),
     [value.categoryId, categories],
+  );
+
+  const selectedTier = useMemo(
+    () => pricing.suggestions.find((s) => s.price === value.price)?.tier ?? null,
+    [pricing.suggestions, value.price],
   );
 
   function update<K extends keyof ReviewPanelState>(key: K, next: ReviewPanelState[K]) {
@@ -136,13 +163,71 @@ export function IdentificationReviewPanel({
         </div>
       </div>
 
+      {/* Pesquisa de mercado (Hermes) */}
+      <div className="rounded-lg border bg-muted/30 p-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Pesquisa de mercado
+          </p>
+          <Badge variant={COMPETITION_BADGE_VARIANT[market.competition]}>
+            Concorrência {COMPETITION_LABELS[market.competition]}
+          </Badge>
+        </div>
+        <p className="text-sm">{market.summary}</p>
+        {market.byMarketplace.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            {market.byMarketplace.map((m) => (
+              <span key={m.marketplace}>
+                <strong>{MARKETPLACE_LABELS[m.marketplace]}:</strong>{' '}
+                {m.avgPrice != null ? `R$ ${m.avgPrice.toFixed(2)}` : 'sem dados'} ({m.listingCount}{' '}
+                anúncio{m.listingCount === 1 ? '' : 's'})
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Preço sugerido */}
+      <div>
+        <label className="mb-1 block text-sm font-medium">Preço sugerido pela IA</label>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {pricing.suggestions.map((s) => (
+            <button
+              type="button"
+              key={s.tier}
+              onClick={() => update('price', s.price)}
+              className={cn(
+                'rounded-lg border p-3 text-left transition-colors hover:border-primary/60',
+                selectedTier === s.tier ? 'border-primary bg-primary/5' : 'border-input',
+              )}
+            >
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                {PRICING_TIER_LABELS[s.tier]}
+              </p>
+              <p className="text-lg font-bold">R$ {s.price.toFixed(2)}</p>
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{s.reasoning}</p>
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 max-w-[200px]">
+          <label className="mb-1 block text-xs text-muted-foreground">Preço final (editável)</label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            value={value.price}
+            onChange={(e) => update('price', Number(e.target.value))}
+          />
+        </div>
+      </div>
+
       {/* Título SEO */}
       <div>
         <label className="mb-1 block text-sm font-medium">Título SEO</label>
         <Input
-          value={value.seoTitle}
+          value={value.title}
           maxLength={200}
-          onChange={(e) => update('seoTitle', e.target.value)}
+          onChange={(e) => update('title', e.target.value)}
         />
       </div>
 
@@ -196,23 +281,71 @@ export function IdentificationReviewPanel({
         </div>
       </div>
 
-      {/* Categoria */}
-      <div>
-        <label className="mb-1 block text-sm font-medium">Categoria</label>
-        <Select value={value.categoryId} onChange={(e) => update('categoryId', e.target.value)}>
-          <option value="">Selecione uma categoria</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
-        {categorySuggestion && !categoryMatched && (
-          <p className="mt-1 text-xs text-amber-600">
-            Sugestão da IA: &quot;{categorySuggestion}&quot; — não encontrada no catálogo, selecione
-            manualmente.
+      {/* Categoria + NCM */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Categoria</label>
+          <Select value={value.categoryId} onChange={(e) => update('categoryId', e.target.value)}>
+            <option value="">Selecione uma categoria</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+          {categorySuggestion && !categoryMatched && (
+            <p className="mt-1 text-xs text-amber-600">
+              Sugestão da IA: &quot;{categorySuggestion}&quot; — não encontrada no catálogo,
+              selecione manualmente.
+            </p>
+          )}
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">NCM</label>
+          <Input
+            value={value.ncm}
+            maxLength={20}
+            placeholder="Ex: 9404.90.00"
+            onChange={(e) => update('ncm', e.target.value)}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Herdado da categoria; ajuste se preciso.
           </p>
-        )}
+        </div>
+      </div>
+
+      {/* Marca */}
+      <div>
+        <label className="mb-1 block text-sm font-medium">Marca</label>
+        <Input
+          value={value.brand}
+          maxLength={100}
+          onChange={(e) => update('brand', e.target.value)}
+        />
+      </div>
+
+      {/* Estoque + Peça única */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Estoque</label>
+          <Input
+            type="number"
+            min="0"
+            value={value.stock}
+            onChange={(e) => update('stock', Number(e.target.value))}
+          />
+        </div>
+        <div className="flex items-end pb-2">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={value.isUnique}
+              onChange={(e) => update('isUnique', e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="text-sm">Peça única (sem reposição)</span>
+          </label>
+        </div>
       </div>
 
       {/* Tags */}
@@ -257,16 +390,6 @@ export function IdentificationReviewPanel({
         </p>
       </div>
 
-      {/* Slug */}
-      <div>
-        <label className="mb-1 block text-sm font-medium">Slug (URL)</label>
-        <Input
-          value={value.slug}
-          maxLength={200}
-          onChange={(e) => update('slug', e.target.value)}
-        />
-      </div>
-
       {/* Meta description */}
       <div>
         <label className="mb-1 block text-sm font-medium">Meta Description</label>
@@ -284,7 +407,7 @@ export function IdentificationReviewPanel({
       <div className="flex justify-end border-t pt-4">
         <Button type="button" onClick={onSave} disabled={isSaving}>
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isSaving ? 'Salvando...' : 'Salvar produto'}
+          {isSaving ? 'Salvando...' : 'Aprovar e salvar produto'}
         </Button>
       </div>
     </div>

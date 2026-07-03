@@ -12,9 +12,9 @@ import {
   type ReviewPanelState,
 } from '@/components/products/identification-review-panel';
 import { uploadImages } from '@/lib/upload';
-import { createProduct, fetchCategories, type CategoryItem } from '@/actions/products';
-import { analyzeVision, generateIdentification } from '@/actions/virtual-employee';
-import type { IdentificationResult, VisionResult } from '@/types/virtual-employee';
+import { fetchCategories, type CategoryItem } from '@/actions/products';
+import { analyzeVirtualEmployee, approveVirtualEmployee } from '@/actions/virtual-employee';
+import type { VirtualEmployeeReview } from '@/types/virtual-employee';
 import type { ImageData } from '@/types/image';
 
 const MAX_IMAGES = 5;
@@ -40,10 +40,7 @@ export default function FuncionarioVirtualPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
 
-  const [visionResult, setVisionResult] = useState<VisionResult | null>(null);
-  const [identificationResult, setIdentificationResult] = useState<IdentificationResult | null>(
-    null,
-  );
+  const [review, setReview] = useState<VirtualEmployeeReview | null>(null);
   const [panelState, setPanelState] = useState<ReviewPanelState | null>(null);
 
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -81,19 +78,15 @@ export default function FuncionarioVirtualPage() {
     if (!token || images.length === 0) return;
     setError('');
     setAnalyzing(true);
-    setVisionResult(null);
-    setIdentificationResult(null);
+    setReview(null);
     setPanelState(null);
     try {
-      const vision = await analyzeVision(
+      const result = await analyzeVirtualEmployee(
         token,
         images.map((i) => i.url),
       );
-      setVisionResult(vision);
-
-      const identification = await generateIdentification(token, vision);
-      setIdentificationResult(identification);
-      setPanelState(toReviewPanelState(identification));
+      setReview(result);
+      setPanelState(toReviewPanelState(result));
     } catch (err) {
       setError((err as Error).message ?? 'Não foi possível analisar as fotos. Tente novamente.');
     } finally {
@@ -102,25 +95,23 @@ export default function FuncionarioVirtualPage() {
   }
 
   async function handleSave() {
-    if (!token || !panelState) return;
+    if (!token || !review || !panelState) return;
     setError('');
     setIsSaving(true);
     try {
-      const payload: Record<string, unknown> = {
-        name: panelState.seoTitle,
-        slug: panelState.slug || undefined,
+      const product = await approveVirtualEmployee(token, {
+        reviewId: review.reviewId,
+        name: panelState.title,
         description: composeDescription(panelState.description, panelState.specifications),
-        shortDescription: panelState.description.slice(0, 500),
-        metaTitle: panelState.seoTitle.slice(0, 200),
         metaDescription: panelState.metaDescription,
-        categoryId: panelState.categoryId || undefined,
-        price: 0, // Preço vem do PricingModule (próxima etapa) — operador ajusta antes de publicar.
-        status: 'DRAFT',
+        categoryId: panelState.categoryId || null,
+        ncm: panelState.ncm || null,
+        brand: panelState.brand || null,
+        price: panelState.price,
+        stock: panelState.stock,
+        isUnique: panelState.isUnique,
         imageIds: images.map((i) => i.id),
-        brand: visionResult?.brand ?? undefined,
-        condition: visionResult?.condition === 'NOVO' ? 'new' : 'used',
-      };
-      const product = await createProduct(token, payload);
+      });
       router.push(`/admin/produtos/${product.id}`);
     } catch (err) {
       setError((err as Error).message ?? 'Erro ao salvar produto');
@@ -192,7 +183,11 @@ export default function FuncionarioVirtualPage() {
 
       {/* Etapa 2: analisar */}
       <div className="rounded-lg border p-4">
-        <h2 className="mb-3 text-sm font-semibold">2. Análise por IA (modelo local)</h2>
+        <h2 className="mb-3 text-sm font-semibold">2. Análise por IA</h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Identifica o produto, pesquisa preços no Mercado Livre e Shopee e sugere 3 estratégias de
+          preço — tudo em uma etapa.
+        </p>
         <Button type="button" onClick={handleAnalyze} disabled={images.length === 0 || analyzing}>
           {analyzing ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -204,12 +199,12 @@ export default function FuncionarioVirtualPage() {
       </div>
 
       {/* Etapa 3: revisão */}
-      {visionResult && panelState && (
+      {review && panelState && (
         <div className="rounded-lg border p-4">
           <h2 className="mb-4 text-sm font-semibold">3. Revisão (edite o que precisar)</h2>
           <IdentificationReviewPanel
-            vision={visionResult}
-            categorySuggestion={identificationResult?.category ?? null}
+            review={review}
+            categorySuggestion={review.product.category}
             categories={categories}
             value={panelState}
             onChange={setPanelState}

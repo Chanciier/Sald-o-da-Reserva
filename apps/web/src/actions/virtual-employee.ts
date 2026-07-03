@@ -1,4 +1,5 @@
-import type { IdentificationResult, VisionResult } from '@/types/virtual-employee';
+import type { Product } from '@/actions/products';
+import type { VirtualEmployeeApproveInput, VirtualEmployeeReview } from '@/types/virtual-employee';
 
 const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
@@ -14,27 +15,22 @@ async function post<T>(path: string, token: string, body: unknown): Promise<T> {
   return json as T;
 }
 
-/** VisionModule: extrai atributos visuais de 1-5 fotos já hospedadas (URLs públicas). */
-export async function analyzeVision(token: string, imageUrls: string[]): Promise<VisionResult> {
-  return post<VisionResult>('/vision/analyze', token, { imageUrls });
+/**
+ * VirtualEmployeeModule: orquestra Vision → Identification → Pesquisa de
+ * mercado → Preço (já com o viés aprendido da categoria) e devolve um painel
+ * único para revisão. Nada é persistido nesta etapa.
+ */
+export async function analyzeVirtualEmployee(
+  token: string,
+  imageUrls: string[],
+): Promise<VirtualEmployeeReview> {
+  return post<VirtualEmployeeReview>('/virtual-employee/analyze', token, { imageUrls });
 }
 
-/** IdentificationModule: gera título/descrição/especificações/categoria/tags/slug/meta a partir do Vision. */
-export async function generateIdentification(
+/** Operador aprova (com ou sem edições) → cria o produto de verdade. */
+export async function approveVirtualEmployee(
   token: string,
-  vision: VisionResult,
-): Promise<IdentificationResult> {
-  const { brand, model, category, color, material, dimensions, condition, features, keywords } =
-    vision;
-  return post<IdentificationResult>('/identification/generate', token, {
-    brand,
-    model,
-    category,
-    color,
-    material,
-    dimensions,
-    condition,
-    features,
-    keywords,
-  });
+  input: VirtualEmployeeApproveInput,
+): Promise<Product> {
+  return post<Product>('/virtual-employee/approve', token, input);
 }
