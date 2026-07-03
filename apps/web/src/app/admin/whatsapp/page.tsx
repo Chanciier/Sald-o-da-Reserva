@@ -65,6 +65,7 @@ interface BroadcastStatus {
   startedAt: string;
   finishedAt: string | null;
   intervalMin: number;
+  batchSize: number;
 }
 
 interface BroadcastDay {
@@ -560,6 +561,8 @@ export default function AdminWhatsappPage() {
                     {broadcastStatus.sent + broadcastStatus.failed} de {broadcastStatus.total}{' '}
                     enviados
                     {broadcastStatus.failed > 0 && ` · ${broadcastStatus.failed} falha(s)`}
+                    {broadcastStatus.batchSize > 1 &&
+                      ` · ${broadcastStatus.batchSize} produtos por disparo`}
                   </span>
                   {broadcastRunning && broadcastStatus.nextAt ? (
                     <span>próximo em ~{minutesUntil(broadcastStatus.nextAt)} min</span>
