@@ -196,6 +196,11 @@ export default function FuncionarioVirtualPage() {
           )}
           {analyzing ? 'Analisando...' : 'Analisar com IA'}
         </Button>
+        {analyzing && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            A pesquisa de preços na web pode levar 1–2 minutos. Mantenha esta página aberta.
+          </p>
+        )}
       </div>
 
       {/* Etapa 3: revisão */}

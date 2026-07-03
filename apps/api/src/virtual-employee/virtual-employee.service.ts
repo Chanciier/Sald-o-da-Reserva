@@ -22,6 +22,16 @@ const REVIEW_CACHE_PREFIX = 'virtual-employee:review:';
 /** Tempo que o operador tem para revisar/editar antes de precisar refazer a análise. */
 const REVIEW_TTL_SECONDS = 60 * 60;
 
+/**
+ * Orçamento máximo da pesquisa de mercado DENTRO do analyze síncrono. O Hermes
+ * (web search) pode levar vários minutos no pior caso, mas navegador e proxy
+ * cortam a requisição em ~300s — então a análise inteira precisa caber nisso.
+ * Se o orçamento estourar, seguimos sem dados de mercado (Pricing cai para o
+ * catálogo próprio) e a pesquisa continua rodando por baixo: quando terminar,
+ * o resultado fica cacheado (12h) e a PRÓXIMA análise do mesmo produto o usa.
+ */
+const RESEARCH_BUDGET_MS = Number(process.env.VIRTUAL_EMPLOYEE_RESEARCH_BUDGET_MS) || 90_000;
+
 /** A partir de quantos anúncios concorrentes a concorrência já é "Alta"/"Média". */
 const COMPETITION_THRESHOLDS = { medium: 4, high: 11 } as const;
 
@@ -151,7 +161,12 @@ export class VirtualEmployeeService {
     return product;
   }
 
-  /** Pesquisa de mercado nunca derruba a análise — sem ela, o Pricing cai para o catálogo próprio. */
+  /**
+   * Pesquisa de mercado nunca derruba a análise — sem ela, o Pricing cai para
+   * o catálogo próprio. Além de capturar erros, impõe RESEARCH_BUDGET_MS: sem
+   * esse teto, o Hermes pode passar dos ~300s que navegador/proxy toleram e a
+   * requisição inteira morre com 499 (visto em produção em 03/07/2026).
+   */
   private async safeResearch(query: {
     title: string;
     brand: string | null;
@@ -159,13 +174,37 @@ export class VirtualEmployeeService {
     keywords: string[];
   }): Promise<MarketResearchData | null> {
     try {
-      return await this.marketResearch.researchNow(query);
+      return await this.withBudget(this.marketResearch.researchNow(query), RESEARCH_BUDGET_MS);
     } catch (err) {
       this.logger.warn(
-        `virtual-employee: pesquisa de mercado falhou, seguindo sem ela: ${(err as Error).message}`,
+        `virtual-employee: pesquisa de mercado falhou/estourou o orçamento, seguindo sem ela: ${(err as Error).message}`,
       );
       return null;
     }
+  }
+
+  /**
+   * Corrida entre a promise e o orçamento. Ao estourar, a pesquisa perdedora
+   * NÃO é cancelada de propósito: `researchNow` grava o resultado no cache ao
+   * terminar, então a próxima análise do mesmo produto o encontra pronto.
+   */
+  private withBudget<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`orçamento de ${Math.round(ms / 1000)}s esgotado`)),
+        ms,
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      );
+    });
   }
 
   /**
