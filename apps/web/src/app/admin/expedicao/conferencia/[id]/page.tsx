@@ -83,6 +83,8 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const qc = useQueryClient();
   const [labelError, setLabelError] = useState('');
   const [invoiceError, setInvoiceError] = useState('');
+  const [buyerCpf, setBuyerCpf] = useState('');
+  const [buyerNameOverride, setBuyerNameOverride] = useState('');
   const [danfePending, setDanfePending] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelError, setCancelError] = useState('');
@@ -112,7 +114,11 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const invoice: Invoice | undefined = invoicesData?.data?.[0];
 
   const emitMutation = useMutation({
-    mutationFn: () => emitInvoice(token!, params.id),
+    mutationFn: () =>
+      emitInvoice(token!, params.id, {
+        cpf: buyerCpf.replace(/\D/g, '') || undefined,
+        name: buyerNameOverride.trim() || undefined,
+      }),
     onSuccess: () => {
       setInvoiceError('');
       refetchInvoice();
@@ -399,21 +405,41 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
               <Loader2 className="h-4 w-4 animate-spin" /> Verificando NF-e...
             </div>
           ) : !invoice || invoice.status === 'PENDING' ? (
-            <div className="flex items-center gap-3">
+            <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Nenhuma NF-e emitida.</p>
-              <button
-                onClick={() => emitMutation.mutate()}
-                disabled={emitMutation.isPending}
-                className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
-              >
-                {emitMutation.isPending ? (
-                  <span className="flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Emitindo...
-                  </span>
-                ) : (
-                  'Emitir NF-e'
-                )}
-              </button>
+              <p className="text-xs text-muted-foreground">
+                CPF/nome do comprador (opcional — use para pedidos de marketplace, onde o cadastro
+                não tem CPF, ex.: Mercado Livre)
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="CPF do comprador"
+                  value={buyerCpf}
+                  onChange={(e) => setBuyerCpf(e.target.value)}
+                  className="h-9 w-40 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <input
+                  type="text"
+                  placeholder="Nome completo (opcional)"
+                  value={buyerNameOverride}
+                  onChange={(e) => setBuyerNameOverride(e.target.value)}
+                  className="h-9 w-56 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <button
+                  onClick={() => emitMutation.mutate()}
+                  disabled={emitMutation.isPending}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {emitMutation.isPending ? (
+                    <span className="flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Emitindo...
+                    </span>
+                  ) : (
+                    'Emitir NF-e'
+                  )}
+                </button>
+              </div>
             </div>
           ) : invoice.status === 'PROCESSING' ? (
             <div className="flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-300">

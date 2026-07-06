@@ -69,8 +69,15 @@ export async function fetchInvoice(token: string, id: string): Promise<Invoice> 
   return apiFetch<Invoice>(token, `/invoices/${id}`);
 }
 
-export async function emitInvoice(token: string, orderId: string): Promise<Invoice> {
-  return apiFetch<Invoice>(token, `/invoices/emit/${orderId}`, { method: 'POST' });
+export async function emitInvoice(
+  token: string,
+  orderId: string,
+  overrides?: { cpf?: string; name?: string },
+): Promise<Invoice> {
+  return apiFetch<Invoice>(token, `/invoices/emit/${orderId}`, {
+    method: 'POST',
+    body: JSON.stringify(overrides ?? {}),
+  });
 }
 
 export async function reemitInvoice(token: string, id: string): Promise<Invoice> {

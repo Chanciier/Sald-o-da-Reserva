@@ -28,7 +28,7 @@ export class InvoiceService {
 
   // ── Emit for order (called from payments webhook, idempotent) ─────────────
 
-  async emitForOrder(orderId: string): Promise<void> {
+  async emitForOrder(orderId: string, overrides?: { cpf?: string; name?: string }): Promise<void> {
     const existing = await this.repo.findByOrderId(orderId);
 
     // Skip only if already authorized or currently being processed by Focus NFe
@@ -86,9 +86,9 @@ export class InvoiceService {
       const result = await this.focus.issueInvoice({
         reference,
         customer: {
-          name: order.buyerName ?? order.user.name ?? order.user.email,
+          name: overrides?.name || order.buyerName || order.user.name || order.user.email,
           email: order.user.email,
-          cpf: order.user.cpf ?? undefined,
+          cpf: overrides?.cpf || order.user.cpf || undefined,
           address: address?.cep
             ? {
                 cep: address.cep,
@@ -168,13 +168,17 @@ export class InvoiceService {
 
   // ── Manual emit / re-emit ─────────────────────────────────────────────────
 
-  async emit(orderId: string, user: AuthenticatedUser) {
+  async emit(
+    orderId: string,
+    user: AuthenticatedUser,
+    overrides?: { cpf?: string; name?: string },
+  ) {
     const existing = await this.repo.findByOrderId(orderId);
     if (existing && existing.status === 'AUTHORIZED') {
       throw new ConflictException('Já existe uma nota autorizada para este pedido.');
     }
-    await this.emitForOrder(orderId);
-    await this.audit('INVOICE_MANUAL_EMIT', user.id, { orderId });
+    await this.emitForOrder(orderId, overrides);
+    await this.audit('INVOICE_MANUAL_EMIT', user.id, { orderId, usedOverrides: !!overrides });
     return this.repo.findByOrderId(orderId);
   }
 

@@ -51,8 +51,13 @@ export class InvoiceController {
   @Post('emit/:orderId')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
-  emit(@Param('orderId') orderId: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.invoiceService.emit(orderId, user);
+  emit(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body('cpf') cpf?: string,
+    @Body('name') name?: string,
+  ) {
+    return this.invoiceService.emit(orderId, user, cpf || name ? { cpf, name } : undefined);
   }
 
   @Post(':id/reemit')
