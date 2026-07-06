@@ -63,7 +63,7 @@ describe('VisionService', () => {
       condition: 'USADO_BOM', // normalizado para maiúsculas
       confidence: 0.87,
       imagesAnalyzed: 1,
-      modelUsed: 'claude-sonnet-5',
+      modelUsed: 'claude-haiku-4-5',
     });
     // dedup case-insensitive em características
     expect(result.features).toEqual(['display digital', 'cesto removível']);
@@ -77,7 +77,7 @@ describe('VisionService', () => {
 
     expect(createMock).toHaveBeenCalledTimes(1);
     const [params] = createMock.mock.calls[0];
-    expect(params.model).toBe('claude-sonnet-5');
+    expect(params.model).toBe('claude-haiku-4-5');
     const content = params.messages[0].content as Array<{ type: string }>;
     expect(content.filter((c) => c.type === 'image')).toHaveLength(3);
     expect(content.filter((c) => c.type === 'text')).toHaveLength(1);

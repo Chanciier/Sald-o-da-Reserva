@@ -74,7 +74,7 @@ export class VisionService {
   private readonly timeoutMs: number;
 
   constructor(private readonly anthropic: AnthropicService) {
-    this.model = process.env.ANTHROPIC_VISION_MODEL || 'claude-sonnet-5';
+    this.model = process.env.ANTHROPIC_VISION_MODEL || 'claude-haiku-4-5';
     const parsed = Number(process.env.ANTHROPIC_TIMEOUT_MS);
     this.timeoutMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 120_000;
   }

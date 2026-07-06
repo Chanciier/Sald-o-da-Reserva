@@ -155,7 +155,7 @@ export class AnthropicService {
   }
 
   private defaultModel(): string {
-    return process.env.ANTHROPIC_VISION_MODEL || 'claude-sonnet-5';
+    return process.env.ANTHROPIC_VISION_MODEL || 'claude-haiku-4-5';
   }
 
   private defaultResearchModel(): string {
@@ -163,7 +163,7 @@ export class AnthropicService {
       process.env.ANTHROPIC_RESEARCH_MODEL ||
       process.env.ANTHROPIC_TEXT_MODEL ||
       process.env.ANTHROPIC_VISION_MODEL ||
-      'claude-sonnet-5'
+      'claude-haiku-4-5'
     );
   }
 }

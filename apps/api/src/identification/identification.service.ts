@@ -73,7 +73,7 @@ export class IdentificationService {
     // Reaproveita o modelo de visão por padrão; permite apontar um modelo de
     // texto dedicado (ex.: mais barato) via env.
     this.model =
-      process.env.ANTHROPIC_TEXT_MODEL || process.env.ANTHROPIC_VISION_MODEL || 'claude-sonnet-5';
+      process.env.ANTHROPIC_TEXT_MODEL || process.env.ANTHROPIC_VISION_MODEL || 'claude-haiku-4-5';
     const parsed = Number(process.env.ANTHROPIC_TIMEOUT_MS);
     this.timeoutMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 120_000;
   }

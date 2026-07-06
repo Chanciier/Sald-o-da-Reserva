@@ -322,7 +322,7 @@ export class MarketResearchService implements OnModuleInit {
       links: this.uniqueLinks(listings),
       summary,
       researchedAt: new Date().toISOString(),
-      modelUsed: process.env.ANTHROPIC_RESEARCH_MODEL || 'claude-sonnet-5',
+      modelUsed: process.env.ANTHROPIC_RESEARCH_MODEL || 'claude-haiku-4-5',
     };
   }
 

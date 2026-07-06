@@ -191,7 +191,7 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  ANTHROPIC_VISION_MODEL: string = 'claude-sonnet-5';
+  ANTHROPIC_VISION_MODEL: string = 'claude-haiku-4-5';
 
   // IdentificationModule: geração de texto. Vazio = reaproveita ANTHROPIC_VISION_MODEL.
   @IsString()

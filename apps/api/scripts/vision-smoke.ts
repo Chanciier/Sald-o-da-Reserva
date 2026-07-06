@@ -36,7 +36,7 @@ async function main() {
     : { imagesBase64: [readFileSync(arg).toString('base64')] };
 
   console.log(`Analisando ${isUrl ? 'URL' : 'arquivo'}: ${arg}`);
-  console.log(`Modelo: ${process.env.ANTHROPIC_VISION_MODEL || 'claude-sonnet-5'}`);
+  console.log(`Modelo: ${process.env.ANTHROPIC_VISION_MODEL || 'claude-haiku-4-5'}`);
   console.log('Aguarde...\n');
 
   const started = Date.now();
