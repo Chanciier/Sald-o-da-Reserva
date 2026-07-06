@@ -127,7 +127,11 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   });
 
   const reemitMutation = useMutation({
-    mutationFn: () => reemitInvoice(token!, invoice!.id),
+    mutationFn: () =>
+      reemitInvoice(token!, invoice!.id, {
+        cpf: buyerCpf.replace(/\D/g, '') || undefined,
+        name: buyerNameOverride.trim() || undefined,
+      }),
     onSuccess: () => {
       setInvoiceError('');
       refetchInvoice();
@@ -486,13 +490,33 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                   <span className="text-xs text-muted-foreground">— {invoice.errorMessage}</span>
                 )}
               </div>
-              <button
-                onClick={() => reemitMutation.mutate()}
-                disabled={reemitMutation.isPending}
-                className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
-              >
-                {reemitMutation.isPending ? 'Reemitindo...' : 'Reemitir NF-e'}
-              </button>
+              <p className="text-xs text-muted-foreground">
+                CPF/nome do comprador (obrigatório se o pedido não tiver CPF cadastrado, ex.:
+                Mercado Livre)
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="CPF do comprador"
+                  value={buyerCpf}
+                  onChange={(e) => setBuyerCpf(e.target.value)}
+                  className="h-9 w-40 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <input
+                  type="text"
+                  placeholder="Nome completo (opcional)"
+                  value={buyerNameOverride}
+                  onChange={(e) => setBuyerNameOverride(e.target.value)}
+                  className="h-9 w-56 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <button
+                  onClick={() => reemitMutation.mutate()}
+                  disabled={reemitMutation.isPending}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {reemitMutation.isPending ? 'Reemitindo...' : 'Reemitir NF-e'}
+                </button>
+              </div>
             </div>
           )}
         </div>

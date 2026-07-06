@@ -80,8 +80,15 @@ export async function emitInvoice(
   });
 }
 
-export async function reemitInvoice(token: string, id: string): Promise<Invoice> {
-  return apiFetch<Invoice>(token, `/invoices/${id}/reemit`, { method: 'POST' });
+export async function reemitInvoice(
+  token: string,
+  id: string,
+  overrides?: { cpf?: string; name?: string },
+): Promise<Invoice> {
+  return apiFetch<Invoice>(token, `/invoices/${id}/reemit`, {
+    method: 'POST',
+    body: JSON.stringify(overrides ?? {}),
+  });
 }
 
 export async function cancelInvoice(token: string, id: string, reason?: string): Promise<Invoice> {

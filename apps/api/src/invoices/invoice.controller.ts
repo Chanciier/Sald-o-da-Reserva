@@ -63,8 +63,13 @@ export class InvoiceController {
   @Post(':id/reemit')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
-  reemit(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.invoiceService.reemit(id, user);
+  reemit(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body('cpf') cpf?: string,
+    @Body('name') name?: string,
+  ) {
+    return this.invoiceService.reemit(id, user, cpf || name ? { cpf, name } : undefined);
   }
 
   // ── Cancel ────────────────────────────────────────────────────────────────

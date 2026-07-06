@@ -182,7 +182,11 @@ export class InvoiceService {
     return this.repo.findByOrderId(orderId);
   }
 
-  async reemit(invoiceId: string, user: AuthenticatedUser) {
+  async reemit(
+    invoiceId: string,
+    user: AuthenticatedUser,
+    overrides?: { cpf?: string; name?: string },
+  ) {
     const invoice = await this.repo.findById(invoiceId);
     if (!invoice) throw new NotFoundException('Nota não encontrada.');
     if (invoice.status === 'AUTHORIZED') {
@@ -200,8 +204,12 @@ export class InvoiceService {
       errorMessage: null,
     });
 
-    await this.emitForOrder(invoice.orderId);
-    await this.audit('INVOICE_REEMITTED', user.id, { invoiceId, orderId: invoice.orderId });
+    await this.emitForOrder(invoice.orderId, overrides);
+    await this.audit('INVOICE_REEMITTED', user.id, {
+      invoiceId,
+      orderId: invoice.orderId,
+      usedOverrides: !!overrides,
+    });
     return this.repo.findById(invoiceId);
   }
 
