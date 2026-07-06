@@ -280,7 +280,7 @@ export class MlOrderImportService {
     }
 
     const token = await this.tokenService.getToken();
-    const url = `${this.baseUrl}/shipments/${shipment.externalId}/labels?savExtension=pdf&response_type=pdf`;
+    const url = `${this.baseUrl}/shipment_labels?shipment_ids=${shipment.externalId}&response_type=pdf`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
