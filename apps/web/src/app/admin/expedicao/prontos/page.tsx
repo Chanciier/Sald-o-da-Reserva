@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Package, Printer, Truck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Package, Printer, Truck } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchProntos, cancelarPedido, marcarEnviado, abrirEtiquetaMl } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
@@ -195,6 +195,13 @@ export default function ProntosPage() {
                           <>
                             {o.channel === 'MERCADO_LIVRE' ? (
                               <>
+                                <Link
+                                  href={`/admin/expedicao/conferencia/${o.id}`}
+                                  className="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  Nota Fiscal
+                                </Link>
                                 <button
                                   onClick={() => handleMlLabel(o.id)}
                                   disabled={labelBusy === o.id}
