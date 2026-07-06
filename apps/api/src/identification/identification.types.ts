@@ -24,6 +24,8 @@ export interface IdentificationResult {
   seoTitle: string;
   /** Descrição completa (mapeia para `Product.description`). */
   description: string;
+  /** Resumo de 1-2 frases (mapeia para `Product.shortDescription`). */
+  shortDescription: string;
   /** Ficha técnica estruturada. Sem campo correspondente no schema hoje. */
   specifications: ProductSpecification[];
   /** Nome da categoria sugerida pela IA, em texto livre. */

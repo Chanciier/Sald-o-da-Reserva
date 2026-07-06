@@ -43,6 +43,9 @@ const VISION_RESULT: VisionResult = {
   color: 'azul',
   material: 'plástico e metal',
   dimensions: '25 x 20 x 8 cm',
+  estimatedDimensionsCm: { width: 25, height: 20, depth: 8 },
+  estimatedWeightKg: 1.8,
+  gtin: '7891234567895',
   condition: 'NOVO',
   features: ['reversível', 'mandril de 10mm'],
   keywords: ['furadeira', 'bosch', 'gsb 550'],
@@ -54,6 +57,7 @@ const VISION_RESULT: VisionResult = {
 const IDENTIFICATION_RESULT: IdentificationResult = {
   seoTitle: 'Furadeira Bosch GSB 550',
   description: 'Furadeira de impacto Bosch GSB 550, nova, com mandril de 10mm.',
+  shortDescription: 'Furadeira de impacto Bosch GSB 550 nova, com mandril de 10mm.',
   specifications: [{ label: 'Marca', value: 'Bosch' }],
   category: 'Ferramentas',
   categoryId: 'cat-ferramentas',
@@ -184,6 +188,11 @@ describe('VirtualEmployeeService', () => {
       expect(review.product.title).toBe('Furadeira Bosch GSB 550');
       expect(review.product.categoryId).toBe('cat-ferramentas');
       expect(review.product.ncm).toBe('82026000');
+      expect(review.product.shortDescription).toBe(IDENTIFICATION_RESULT.shortDescription);
+      expect(review.product.weight).toBe(1.8);
+      expect(review.product.dimensions).toEqual({ width: 25, height: 20, depth: 8, unit: 'cm' });
+      expect(review.product.gtin).toBe('7891234567895');
+      expect(review.product.condition).toBe('new');
       expect(review.confidence).toBe(0.98);
       expect(review.pricing.suggestedPrice).toBe(189.9); // BALANCED
       expect(review.pricing.suggestions).toHaveLength(3);
@@ -207,6 +216,28 @@ describe('VirtualEmployeeService', () => {
           categoryId: 'cat-ferramentas',
           learningBias: 0.2,
         }),
+      );
+    });
+
+    it('passa modelo e condição para a pesquisa de mercado (fidelidade ao objeto)', async () => {
+      await service.analyze({ imageUrls: ['https://ex.com/foto.jpg'] });
+
+      expect(marketResearch.researchNow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          brand: 'Bosch',
+          model: 'GSB 550',
+          condition: 'NOVO',
+        }),
+      );
+    });
+
+    it('mapeia estado USADO_* para condição de pesquisa USADO', async () => {
+      vision.analyze.mockResolvedValue({ ...VISION_RESULT, condition: 'USADO_BOM' });
+
+      await service.analyze({ imageUrls: ['https://ex.com/foto.jpg'] });
+
+      expect(marketResearch.researchNow).toHaveBeenCalledWith(
+        expect.objectContaining({ condition: 'USADO' }),
       );
     });
 
@@ -280,6 +311,32 @@ describe('VirtualEmployeeService', () => {
           stock: 1,
           isUnique: true,
           condition: 'new', // VisionCondition NOVO → 'new'
+          shortDescription: IDENTIFICATION_RESULT.shortDescription,
+          metaTitle: 'Furadeira Bosch GSB 550',
+          weight: 1.8,
+          dimensions: { width: 25, height: 20, depth: 8, unit: 'cm' },
+          gtin: '7891234567895',
+        }),
+        'user-1',
+      );
+    });
+
+    it('repassa WhatsApp e marketplaces para o disparo acontecer já na criação', async () => {
+      await service.approve(
+        {
+          reviewId: review.reviewId,
+          autoPublishWhatsapp: true,
+          whatsappGroupIds: ['grupo-1', 'grupo-2'],
+          publishTo: ['MERCADO_LIVRE'],
+        },
+        'user-1',
+      );
+
+      expect(products.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoPublishWhatsapp: true,
+          whatsappGroupIds: ['grupo-1', 'grupo-2'],
+          publishTo: ['MERCADO_LIVRE'],
         }),
         'user-1',
       );
@@ -317,13 +374,37 @@ describe('VirtualEmployeeService', () => {
       expect(products.create).not.toHaveBeenCalled();
     });
 
-    it('mapeia condição USADO_* para "used" na criação do produto', async () => {
+    it('usa a condição do draft (painel) na criação do produto', async () => {
       redis.getJson.mockResolvedValue({
         ...review,
+        product: { ...review.product, condition: 'used' },
+      });
+
+      await service.approve({ reviewId: review.reviewId }, 'user-1');
+
+      expect(products.create).toHaveBeenCalledWith(
+        expect.objectContaining({ condition: 'used' }),
+        'user-1',
+      );
+    });
+
+    it('cai para o estado do Vision quando o review em cache não tem condition (legado)', async () => {
+      redis.getJson.mockResolvedValue({
+        ...review,
+        product: { ...review.product, condition: undefined },
         vision: { ...VISION_RESULT, condition: 'USADO_BOM' },
       });
 
       await service.approve({ reviewId: review.reviewId }, 'user-1');
+
+      expect(products.create).toHaveBeenCalledWith(
+        expect.objectContaining({ condition: 'used' }),
+        'user-1',
+      );
+    });
+
+    it('override do operador vence a condição sugerida', async () => {
+      await service.approve({ reviewId: review.reviewId, condition: 'used' }, 'user-1');
 
       expect(products.create).toHaveBeenCalledWith(
         expect.objectContaining({ condition: 'used' }),

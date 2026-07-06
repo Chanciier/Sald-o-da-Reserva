@@ -20,10 +20,19 @@ export interface MarketplacePriceSummary {
   listingCount: number;
 }
 
+/** Dimensões estimadas da embalagem, em cm (mesmo shape do `Product.dimensions`). */
+export interface DraftDimensions {
+  width: number;
+  height: number;
+  depth: number;
+  unit: 'cm';
+}
+
 /** Os campos do produto sugeridos pela IA — tudo editável pelo operador antes de aprovar. */
 export interface VirtualEmployeeProductDraft {
   title: string;
   description: string;
+  shortDescription: string;
   category: string | null;
   categoryId: string | null;
   ncm: string | null;
@@ -32,6 +41,14 @@ export interface VirtualEmployeeProductDraft {
   specifications: ProductSpecification[];
   slug: string;
   metaDescription: string;
+  /** Peso estimado pela IA (kg) para frete — sempre revisável. */
+  weight: number | null;
+  /** Dimensões estimadas pela IA (cm) para frete — sempre revisáveis. */
+  dimensions: DraftDimensions | null;
+  /** GTIN/EAN lido de código de barras visível na foto. */
+  gtin: string | null;
+  /** Condição do anúncio derivada do estado visual (NOVO → 'new'; resto → 'used'). */
+  condition: 'new' | 'used';
 }
 
 /** O painel único devolvido por `POST /virtual-employee/analyze`. */
@@ -71,6 +88,7 @@ export interface VirtualEmployeeApproveInput {
   reviewId: string;
   name?: string;
   description?: string;
+  shortDescription?: string;
   categoryId?: string | null;
   ncm?: string | null;
   brand?: string | null;
@@ -79,4 +97,14 @@ export interface VirtualEmployeeApproveInput {
   stock?: number;
   isUnique?: boolean;
   imageIds?: string[];
+  weight?: number | null;
+  dimensions?: DraftDimensions | null;
+  gtin?: string | null;
+  condition?: 'new' | 'used';
+  pickupAvailable?: boolean;
+  /** Dispara o anúncio nos grupos de WhatsApp já na criação (com a 1ª imagem). */
+  autoPublishWhatsapp?: boolean;
+  whatsappGroupIds?: string[];
+  /** Marketplaces além do SITE onde publicar ao aprovar (ML/Shopee). */
+  publishTo?: ('MERCADO_LIVRE' | 'SHOPEE')[];
 }

@@ -11,13 +11,30 @@ import {
   toReviewPanelState,
   type ReviewPanelState,
 } from '@/components/products/identification-review-panel';
+import type { WhatsappGroupOption } from '@/components/products/review-publish-section';
 import { uploadImages } from '@/lib/upload';
 import { fetchCategories, type CategoryItem } from '@/actions/products';
 import { analyzeVirtualEmployee, approveVirtualEmployee } from '@/actions/virtual-employee';
-import type { VirtualEmployeeReview } from '@/types/virtual-employee';
+import type { DraftDimensions, VirtualEmployeeReview } from '@/types/virtual-employee';
 import type { ImageData } from '@/types/image';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const MAX_IMAGES = 5;
+
+/** Número positivo a partir de um input de texto ('' / inválido / ≤0 → null). */
+function parsePositive(text: string): number | null {
+  const n = Number(text.replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Monta as dimensões só quando os 3 eixos foram preenchidos. */
+function composeDimensions(state: ReviewPanelState): DraftDimensions | null {
+  const width = parsePositive(state.dimWidth);
+  const height = parsePositive(state.dimHeight);
+  const depth = parsePositive(state.dimDepth);
+  if (width === null || height === null || depth === null) return null;
+  return { width, height, depth, unit: 'cm' };
+}
 
 /** Junta a descrição editada com a ficha técnica — o schema de Product não tem coluna própria pra specs. */
 function composeDescription(
@@ -46,11 +63,33 @@ export default function FuncionarioVirtualPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [whatsappGroups, setWhatsappGroups] = useState<WhatsappGroupOption[]>([]);
+  // Ref espelho: handleAnalyze lê os grupos DEPOIS do await (1-2 min) — o
+  // closure do clique pode estar com o estado de antes de os grupos carregarem.
+  const whatsappGroupsRef = useRef<WhatsappGroupOption[]>([]);
+
   useEffect(() => {
     fetchCategories()
       .then((res) => setCategories(res.data))
       .catch(() => setCategories([]));
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/api/v1/whatsapp/groups`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((groups: { id: string; name: string; active: boolean }[]) => {
+        const active = groups.filter((g) => g.active).map(({ id, name }) => ({ id, name }));
+        whatsappGroupsRef.current = active;
+        setWhatsappGroups(active);
+      })
+      .catch(() => {
+        whatsappGroupsRef.current = [];
+        setWhatsappGroups([]);
+      });
+  }, [token]);
 
   async function handleFilesSelected(fileList: FileList | null) {
     if (!fileList || !token) return;
@@ -86,7 +125,12 @@ export default function FuncionarioVirtualPage() {
         images.map((i) => i.url),
       );
       setReview(result);
-      setPanelState(toReviewPanelState(result));
+      // Disparo no primeiro salvamento: todos os grupos ativos já pré-marcados.
+      setPanelState(
+        toReviewPanelState(result, {
+          whatsappGroupIds: whatsappGroupsRef.current.map((g) => g.id),
+        }),
+      );
     } catch (err) {
       setError((err as Error).message ?? 'Não foi possível analisar as fotos. Tente novamente.');
     } finally {
@@ -99,10 +143,14 @@ export default function FuncionarioVirtualPage() {
     setError('');
     setIsSaving(true);
     try {
+      const selectedGroups = panelState.whatsappGroupIds.filter((id) =>
+        whatsappGroups.some((g) => g.id === id),
+      );
       const product = await approveVirtualEmployee(token, {
         reviewId: review.reviewId,
         name: panelState.title,
         description: composeDescription(panelState.description, panelState.specifications),
+        shortDescription: panelState.shortDescription || undefined,
         metaDescription: panelState.metaDescription,
         categoryId: panelState.categoryId || null,
         ncm: panelState.ncm || null,
@@ -111,6 +159,14 @@ export default function FuncionarioVirtualPage() {
         stock: panelState.stock,
         isUnique: panelState.isUnique,
         imageIds: images.map((i) => i.id),
+        weight: parsePositive(panelState.weight),
+        dimensions: composeDimensions(panelState),
+        gtin: panelState.gtin.trim() || null,
+        condition: panelState.condition,
+        pickupAvailable: panelState.pickupAvailable,
+        autoPublishWhatsapp: panelState.autoPublishWhatsapp && selectedGroups.length > 0,
+        whatsappGroupIds: selectedGroups,
+        publishTo: panelState.publishTo.length > 0 ? panelState.publishTo : undefined,
       });
       router.push(`/admin/produtos/${product.id}`);
     } catch (err) {
@@ -211,6 +267,7 @@ export default function FuncionarioVirtualPage() {
             review={review}
             categorySuggestion={review.product.category}
             categories={categories}
+            whatsappGroups={whatsappGroups}
             value={panelState}
             onChange={setPanelState}
             onSave={handleSave}

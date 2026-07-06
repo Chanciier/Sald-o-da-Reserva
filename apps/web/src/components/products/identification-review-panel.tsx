@@ -8,6 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { CategoryItem } from '@/actions/products';
+import {
+  ReviewPublishSection,
+  type WhatsappGroupOption,
+} from '@/components/products/review-publish-section';
 import type {
   CompetitionLevel,
   ProductSpecification,
@@ -19,36 +23,11 @@ import {
   PRICING_TIER_LABELS,
 } from '@/types/virtual-employee';
 
-/** Estado editável do painel — tudo livre para o operador alterar antes de aprovar. */
-export interface ReviewPanelState {
-  title: string;
-  description: string;
-  specifications: ProductSpecification[];
-  categoryId: string; // '' = nenhuma selecionada
-  tags: string[];
-  metaDescription: string;
-  ncm: string;
-  brand: string;
-  price: number;
-  stock: number;
-  isUnique: boolean;
-}
-
-export function toReviewPanelState(review: VirtualEmployeeReview): ReviewPanelState {
-  return {
-    title: review.product.title,
-    description: review.product.description,
-    specifications: review.product.specifications,
-    categoryId: review.product.categoryId ?? '',
-    tags: review.product.tags,
-    metaDescription: review.product.metaDescription,
-    ncm: review.product.ncm ?? '',
-    brand: review.product.brand ?? '',
-    price: review.pricing.suggestedPrice,
-    stock: 1,
-    isUnique: true,
-  };
-}
+// Modelo de estado do painel — extraído para módulo próprio; re-exportado
+// aqui para os consumidores existentes.
+import type { ReviewPanelState } from './review-panel-state';
+export { toReviewPanelState } from './review-panel-state';
+export type { ReviewPanelState };
 
 const COMPETITION_BADGE_VARIANT: Record<CompetitionLevel, 'success' | 'warning' | 'destructive'> = {
   BAIXA: 'success',
@@ -60,6 +39,8 @@ interface IdentificationReviewPanelProps {
   review: VirtualEmployeeReview;
   categorySuggestion: string | null;
   categories: CategoryItem[];
+  /** Grupos de WhatsApp ativos (para o disparo no primeiro salvamento). */
+  whatsappGroups: WhatsappGroupOption[];
   value: ReviewPanelState;
   onChange: (value: ReviewPanelState) => void;
   onSave: () => void;
@@ -75,6 +56,7 @@ export function IdentificationReviewPanel({
   review,
   categorySuggestion,
   categories,
+  whatsappGroups,
   value,
   onChange,
   onSave,
@@ -231,6 +213,17 @@ export function IdentificationReviewPanel({
         />
       </div>
 
+      {/* Descrição curta (vitrines/listagens) */}
+      <div>
+        <label className="mb-1 block text-sm font-medium">Descrição curta</label>
+        <Input
+          value={value.shortDescription}
+          maxLength={500}
+          placeholder="Resumo de 1-2 frases para vitrines e listagens"
+          onChange={(e) => update('shortDescription', e.target.value)}
+        />
+      </div>
+
       {/* Descrição completa */}
       <div>
         <label className="mb-1 block text-sm font-medium">Descrição completa</label>
@@ -347,6 +340,94 @@ export function IdentificationReviewPanel({
           </label>
         </div>
       </div>
+
+      {/* Logística (frete) — estimado pela IA */}
+      <div>
+        <label className="mb-1 block text-sm font-medium">Logística (frete)</label>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Peso e dimensões da embalagem estimados pela IA a partir das fotos — confira antes de
+          salvar; são usados no cálculo de frete.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-4">
+          <div>
+            <Input
+              type="number"
+              step="0.001"
+              min="0"
+              value={value.weight}
+              placeholder="Peso"
+              onChange={(e) => update('weight', e.target.value)}
+            />
+            <p className="mt-0.5 text-center text-xs text-muted-foreground">Peso (kg)</p>
+          </div>
+          <div>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              value={value.dimHeight}
+              placeholder="Altura"
+              onChange={(e) => update('dimHeight', e.target.value)}
+            />
+            <p className="mt-0.5 text-center text-xs text-muted-foreground">Altura (cm)</p>
+          </div>
+          <div>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              value={value.dimWidth}
+              placeholder="Largura"
+              onChange={(e) => update('dimWidth', e.target.value)}
+            />
+            <p className="mt-0.5 text-center text-xs text-muted-foreground">Largura (cm)</p>
+          </div>
+          <div>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              value={value.dimDepth}
+              placeholder="Comprimento"
+              onChange={(e) => update('dimDepth', e.target.value)}
+            />
+            <p className="mt-0.5 text-center text-xs text-muted-foreground">Comprimento (cm)</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Condição do anúncio + GTIN (ML) */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Condição do anúncio</label>
+          <Select
+            value={value.condition}
+            onChange={(e) => update('condition', e.target.value as 'new' | 'used')}
+          >
+            <option value="new">Novo</option>
+            <option value="used">Usado</option>
+          </Select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Derivada do estado visual identificado ({review.vision.condition ?? 'não identificado'}
+            ).
+          </p>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">GTIN / EAN (código de barras)</label>
+          <Input
+            value={value.gtin}
+            maxLength={14}
+            placeholder="Ex: 7891234567895"
+            onChange={(e) => update('gtin', e.target.value)}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Lido da foto quando visível; exigido por várias categorias do Mercado Livre.
+          </p>
+        </div>
+      </div>
+
+      {/* Publicação: canais, WhatsApp e retirada */}
+      <ReviewPublishSection value={value} whatsappGroups={whatsappGroups} onChange={onChange} />
 
       {/* Tags */}
       <div>

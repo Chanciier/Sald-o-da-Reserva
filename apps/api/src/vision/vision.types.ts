@@ -34,6 +34,15 @@ export interface VisionAttributes {
    * "5 litros"). String porque é sempre leitura/estimativa da foto, não medida.
    */
   dimensions: string | null;
+  /**
+   * Estimativa estruturada da embalagem para frete (cm). `null` quando o
+   * modelo não tem base para estimar. Sempre revisável pelo operador.
+   */
+  estimatedDimensionsCm: { width: number; height: number; depth: number } | null;
+  /** Peso estimado em kg (para frete). `null` quando não estimável. */
+  estimatedWeightKg: number | null;
+  /** GTIN/EAN lido de código de barras/etiqueta visível na foto, ou `null`. */
+  gtin: string | null;
   /** Estado de conservação. */
   condition: VisionCondition | null;
   /** Características observáveis (ex.: ["display digital", "cesto removível"]). */

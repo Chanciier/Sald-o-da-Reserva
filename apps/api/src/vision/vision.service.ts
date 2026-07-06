@@ -24,6 +24,9 @@ Analise a(s) imagem(ns) do MESMO produto e retorne APENAS um objeto JSON válido
   "cor": "cor predominante, ou null",
   "material": "material predominante, ou null",
   "dimensoes": "dimensões ou capacidade visíveis/estimadas como texto (ex.: '30 x 20 x 15 cm', '5 litros'), ou null",
+  "dimensoes_estimadas_cm": { "largura": 30, "altura": 20, "profundidade": 15 },
+  "peso_estimado_kg": 1.2,
+  "gtin": "código de barras EAN/GTIN se estiver legível em alguma foto, ou null",
   "estado": "NOVO | USADO_BOM | USADO_REGULAR | DANIFICADO",
   "caracteristicas": ["lista de características observáveis"],
   "palavras_chave": ["termos de busca relevantes, incluindo marca e tipo"],
@@ -33,6 +36,8 @@ Analise a(s) imagem(ns) do MESMO produto e retorne APENAS um objeto JSON válido
 Regras:
 - Responda em português do Brasil.
 - Use null (não invente) quando um atributo não for determinável pela imagem.
+- "dimensoes_estimadas_cm" e "peso_estimado_kg": estimativa realista do produto EMBALADO para envio, baseada no tipo de produto e no que é visível (referências de escala na foto, capacidade, categoria). Se você reconhece o tipo de produto, estime — só use null se não fizer ideia do que é. Números em cm e kg.
+- "gtin": apenas dígitos, e apenas se um código de barras/etiqueta estiver realmente legível — NUNCA invente.
 - "estado": NOVO = lacrado/sem uso; USADO_BOM = sinais mínimos; USADO_REGULAR = desgaste visível; DANIFICADO = defeito/quebra visível.
 - "confianca": número entre 0.0 e 1.0 refletindo sua certeza geral na identificação.
 - "caracteristicas" e "palavras_chave" devem ser arrays de strings (podem ser vazios).`;
@@ -45,6 +50,9 @@ interface RawVision {
   cor?: unknown;
   material?: unknown;
   dimensoes?: unknown;
+  dimensoes_estimadas_cm?: unknown;
+  peso_estimado_kg?: unknown;
+  gtin?: unknown;
   estado?: unknown;
   caracteristicas?: unknown;
   palavras_chave?: unknown;
@@ -128,11 +136,39 @@ export class VisionService {
       color: toStringOrNull(raw.cor),
       material: toStringOrNull(raw.material),
       dimensions: toStringOrNull(raw.dimensoes),
+      estimatedDimensionsCm: this.toEstimatedDimensions(raw.dimensoes_estimadas_cm),
+      estimatedWeightKg: this.toPositiveNumber(raw.peso_estimado_kg),
+      gtin: this.toGtin(raw.gtin),
       condition: this.toCondition(raw.estado),
       features: toStringArray(raw.caracteristicas),
       keywords: toStringArray(raw.palavras_chave),
       confidence: toConfidence(raw.confianca),
     };
+  }
+
+  /** Aceita chaves em PT ("largura") ou EN ("width"); exige os 3 eixos > 0. */
+  private toEstimatedDimensions(
+    raw: unknown,
+  ): { width: number; height: number; depth: number } | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const rec = raw as Record<string, unknown>;
+    const width = this.toPositiveNumber(rec.largura ?? rec.width);
+    const height = this.toPositiveNumber(rec.altura ?? rec.height);
+    const depth = this.toPositiveNumber(rec.profundidade ?? rec.comprimento ?? rec.depth);
+    if (width === null || height === null || depth === null) return null;
+    return { width, height, depth };
+  }
+
+  private toPositiveNumber(v: unknown): number | null {
+    const n = typeof v === 'string' ? Number(v.replace(',', '.')) : typeof v === 'number' ? v : NaN;
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) / 1000 : null;
+  }
+
+  /** GTIN só vale se for 8–14 dígitos (EAN-8/12/13/14) — o resto é ruído/invenção. */
+  private toGtin(v: unknown): string | null {
+    if (typeof v !== 'string') return null;
+    const digits = v.replace(/\D/g, '');
+    return digits.length >= 8 && digits.length <= 14 ? digits : null;
   }
 
   private toCondition(v: unknown): VisionCondition | null {

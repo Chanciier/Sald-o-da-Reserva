@@ -1,9 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Marketplace } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { IdentificationService } from '../identification/identification.service';
 import { LearningService } from '../learning/learning.service';
 import { MarketResearchService } from '../market-research/market-research.service';
-import { MarketResearchData } from '../market-research/market-research.types';
+import {
+  ListingCondition,
+  MarketResearchData,
+  MarketResearchInput,
+} from '../market-research/market-research.types';
 import { PricingService } from '../pricing/pricing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from '../products/dto/create-product.dto';
@@ -67,8 +72,10 @@ export class VirtualEmployeeService {
     const market = await this.safeResearch({
       title: identification.seoTitle,
       brand: vision.brand,
+      model: vision.model,
       category: identification.category,
       keywords: vision.keywords,
+      condition: this.researchCondition(vision.condition),
     });
 
     const learningBias = identification.categoryId
@@ -95,6 +102,7 @@ export class VirtualEmployeeService {
       product: {
         title: identification.seoTitle,
         description: identification.description,
+        shortDescription: identification.shortDescription,
         category: identification.category,
         categoryId: identification.categoryId,
         ncm,
@@ -103,6 +111,12 @@ export class VirtualEmployeeService {
         specifications: identification.specifications,
         slug: identification.slug,
         metaDescription: identification.metaDescription,
+        weight: vision.estimatedWeightKg,
+        dimensions: vision.estimatedDimensionsCm
+          ? { ...vision.estimatedDimensionsCm, unit: 'cm' }
+          : null,
+        gtin: vision.gtin,
+        condition: this.mapCondition(vision.condition),
       },
       confidence: vision.confidence,
       pricing: { suggestedPrice: balanced.price, suggestions: pricingResult.suggestions },
@@ -140,10 +154,13 @@ export class VirtualEmployeeService {
       );
     }
 
+    const name = input.name ?? review.product.title;
     const dto: CreateProductDto = {
-      name: input.name ?? review.product.title,
+      name,
       description: input.description ?? review.product.description,
+      shortDescription: input.shortDescription ?? review.product.shortDescription ?? undefined,
       price: input.price ?? review.pricing.suggestedPrice,
+      metaTitle: name,
       metaDescription: input.metaDescription ?? review.product.metaDescription,
       slug: review.product.slug,
       brand: this.resolveNullable(input.brand, review.product.brand),
@@ -151,8 +168,18 @@ export class VirtualEmployeeService {
       ncm: this.resolveNullable(input.ncm, review.product.ncm),
       stock: input.stock ?? 1,
       isUnique: input.isUnique ?? true,
-      condition: this.mapCondition(review.vision.condition),
+      condition:
+        input.condition ?? review.product.condition ?? this.mapCondition(review.vision.condition),
+      weight: this.resolveNullable(input.weight, review.product.weight ?? null),
+      dimensions: this.resolveNullable(input.dimensions, review.product.dimensions ?? null),
+      gtin: this.resolveNullable(input.gtin, review.product.gtin ?? null),
+      pickupAvailable: input.pickupAvailable ?? false,
+      // Disparo no PRIMEIRO salvamento: o produto já nasce com WhatsApp
+      // configurado e o ProductsService publica na criação (com imagem).
+      autoPublishWhatsapp: input.autoPublishWhatsapp ?? false,
+      whatsappGroupIds: input.whatsappGroupIds ?? [],
       imageIds: input.imageIds,
+      publishTo: input.publishTo?.map((m) => Marketplace[m]),
     };
 
     const product = await this.products.create(dto, userId);
@@ -167,12 +194,7 @@ export class VirtualEmployeeService {
    * esse teto, o Hermes pode passar dos ~300s que navegador/proxy toleram e a
    * requisição inteira morre com 499 (visto em produção em 03/07/2026).
    */
-  private async safeResearch(query: {
-    title: string;
-    brand: string | null;
-    category: string | null;
-    keywords: string[];
-  }): Promise<MarketResearchData | null> {
+  private async safeResearch(query: MarketResearchInput): Promise<MarketResearchData | null> {
     try {
       return await this.withBudget(this.marketResearch.researchNow(query), RESEARCH_BUDGET_MS);
     } catch (err) {
@@ -235,11 +257,14 @@ export class VirtualEmployeeService {
     return condition === 'NOVO' ? 'new' : 'used';
   }
 
-  /** `undefined` = usa o valor sugerido; `null` explícito = limpa o campo; string = override. */
-  private resolveNullable(
-    override: string | null | undefined,
-    fallback: string | null,
-  ): string | undefined {
+  /** Condição para a pesquisa de mercado: NOVO → 'NOVO'; qualquer grau de uso → 'USADO'. */
+  private researchCondition(condition: VisionCondition | null): ListingCondition | null {
+    if (!condition) return null;
+    return condition === 'NOVO' ? 'NOVO' : 'USADO';
+  }
+
+  /** `undefined` = usa o valor sugerido; `null` explícito = limpa o campo; valor = override. */
+  private resolveNullable<T>(override: T | null | undefined, fallback: T | null): T | undefined {
     if (override === undefined) return fallback ?? undefined;
     return override ?? undefined;
   }

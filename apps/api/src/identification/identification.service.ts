@@ -12,6 +12,7 @@ import {
 
 const MAX_TITLE_LENGTH = 200; // Product.name
 const MAX_META_DESCRIPTION_LENGTH = 160; // Product.metaDescription (@db.VarChar(500), mas 160 é o limite prático de SEO)
+const MAX_SHORT_DESCRIPTION_LENGTH = 300; // Product.shortDescription (@db.Text; 300 é o corte prático de vitrine)
 const MAX_TAGS = 15;
 
 const PROMPT_HEADER = `Você é um redator especialista em e-commerce de produtos de liquidação/outlet no Brasil (loja "Saldão da Reserva").
@@ -26,6 +27,7 @@ Retorne APENAS um objeto JSON válido, sem texto adicional, com EXATAMENTE estas
 {
   "titulo_seo": "título comercial curto e otimizado para busca (até 70 caracteres), incluindo marca e tipo de produto quando conhecidos",
   "descricao": "descrição completa em português, 2 a 4 parágrafos, mencionando o estado de conservação e o que está incluso",
+  "descricao_curta": "resumo comercial de 1 a 2 frases (até 300 caracteres) para vitrines e listagens",
   "especificacoes": [{"label": "Nome do atributo", "value": "valor"}],
   "categoria": "categoria do produto em português (ex.: 'Eletroportáteis')",
   "tags": ["palavras-chave adicionais de busca, sem repetir as já fornecidas nos atributos"],
@@ -42,6 +44,7 @@ Regras:
 interface RawIdentification {
   titulo_seo?: unknown;
   descricao?: unknown;
+  descricao_curta?: unknown;
   especificacoes?: unknown;
   categoria?: unknown;
   tags?: unknown;
@@ -98,6 +101,10 @@ export class IdentificationService {
       MAX_TITLE_LENGTH,
     );
     const description = toStringOrNull(parsed.descricao) ?? '';
+    const shortDescription = this.truncate(
+      toStringOrNull(parsed.descricao_curta) ?? toStringOrNull(parsed.meta_description) ?? '',
+      MAX_SHORT_DESCRIPTION_LENGTH,
+    );
     const specifications = this.normalizeSpecifications(parsed.especificacoes, input);
     const category = toStringOrNull(parsed.categoria) ?? toStringOrNull(input.category ?? null);
     const tags = this.normalizeTags(parsed.tags, input);
@@ -110,6 +117,7 @@ export class IdentificationService {
     return {
       seoTitle,
       description,
+      shortDescription,
       specifications,
       category,
       categoryId,

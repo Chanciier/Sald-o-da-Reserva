@@ -1,17 +1,28 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+
+/** Dimensões da embalagem (cm) — mesmo shape do `DimensionsDto` de produtos. */
+class ApproveDimensionsDto {
+  @IsNumber() @Min(0) width: number;
+  @IsNumber() @Min(0) height: number;
+  @IsNumber() @Min(0) depth: number;
+  @IsIn(['cm']) unit: 'cm';
+}
 
 /** Aceita `null` explícito (limpar um campo opcional) sem falhar a validação. */
 const nullable = Transform(({ value }) => (value === null ? undefined : value));
@@ -36,6 +47,11 @@ export class VirtualEmployeeApproveDto {
   @IsString()
   @MaxLength(10000)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  shortDescription?: string;
 
   @nullable
   @IsOptional()
@@ -81,4 +97,47 @@ export class VirtualEmployeeApproveDto {
   @ArrayMaxSize(10)
   @IsString({ each: true })
   imageIds?: string[];
+
+  @nullable
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  weight?: number;
+
+  @nullable
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ApproveDimensionsDto)
+  dimensions?: ApproveDimensionsDto;
+
+  @nullable
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @IsString()
+  @MaxLength(14)
+  gtin?: string;
+
+  @IsOptional()
+  @IsIn(['new', 'used'])
+  condition?: 'new' | 'used';
+
+  @IsOptional()
+  @IsBoolean()
+  pickupAvailable?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  autoPublishWhatsapp?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  whatsappGroupIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(['MERCADO_LIVRE', 'SHOPEE'], { each: true })
+  publishTo?: ('MERCADO_LIVRE' | 'SHOPEE')[];
 }

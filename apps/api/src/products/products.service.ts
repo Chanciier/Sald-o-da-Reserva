@@ -134,7 +134,7 @@ export class ProductsService {
       ncm = cat?.ncm ?? undefined;
     }
 
-    const product = await this.prisma.product.create({
+    let product = await this.prisma.product.create({
       data: {
         name: dto.name,
         slug,
@@ -171,6 +171,12 @@ export class ProductsService {
 
     if (dto.imageIds?.length) {
       await this.connectImagesWithPosition(dto.imageIds, product.id);
+      // Recarrega com as imagens vinculadas — sem isso o disparo de WhatsApp
+      // abaixo (e o retorno da API) sai com `images` vazio no primeiro save.
+      product = await this.prisma.product.findUniqueOrThrow({
+        where: { id: product.id },
+        include: INCLUDE_FULL,
+      });
     }
 
     await this.redis.delPattern('products:*');

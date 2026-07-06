@@ -15,6 +15,9 @@ export const MARKETPLACE_SOURCES: readonly MarketplaceSource[] = ['MERCADO_LIVRE
 /** Estado de um job de pesquisa (para o fluxo assíncrono/poll). */
 export type MarketResearchStatus = 'PENDING' | 'READY' | 'FAILED';
 
+/** Condição do produto anunciado, quando identificável no anúncio. */
+export type ListingCondition = 'NOVO' | 'USADO';
+
 /** Um anúncio encontrado na pesquisa. */
 export interface MarketListing {
   marketplace: MarketplaceSource;
@@ -22,6 +25,8 @@ export interface MarketListing {
   /** Preço em BRL. `null` quando não foi possível determinar. */
   price: number | null;
   url: string;
+  /** Condição do item anunciado (novo/usado), `null` se o anúncio não deixa claro. */
+  condition: ListingCondition | null;
 }
 
 /** Estatísticas de preço agregadas para um marketplace. */
@@ -82,6 +87,12 @@ export interface MarketResearchInput {
   model?: string | null;
   category?: string | null;
   keywords?: string[];
+  /**
+   * Condição do produto sendo precificado. Quando informada, a pesquisa
+   * prioriza anúncios da mesma condição — precificar um usado olhando só
+   * anúncios de novos infla o preço (e vice-versa).
+   */
+  condition?: ListingCondition | null;
 }
 
 /** Payload do job de background enfileirado. */
