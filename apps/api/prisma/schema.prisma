@@ -351,6 +351,10 @@ model WhatsappMessageLog {
   group     WhatsappGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   success   Boolean
   error     String?
+  // ID da mensagem no WhatsApp (Baileys) — necessário para "apagar para todos"
+  // quando o produto é editado dentro do prazo de exclusão.
+  messageId String?       @map("message_id")
+  deletedAt DateTime?     @map("deleted_at")
   sentAt    DateTime      @default(now()) @map("sent_at")
 
   @@index([productId])
@@ -474,8 +478,10 @@ model Order {
   updatedAt       DateTime    @updatedAt @map("updated_at")
   cartReminderCreatedAt DateTime? @map("cart_reminder_created_at")
   cartReminderPushSentAt DateTime? @map("cart_reminder_push_sent_at")
+  cartReminderWhatsappSentAt DateTime? @map("cart_reminder_whatsapp_sent_at")
   recoveryCouponCreatedAt DateTime? @map("recovery_coupon_created_at")
   recoveryCouponPushSentAt DateTime? @map("recovery_coupon_push_sent_at")
+  recoveryCouponWhatsappSentAt DateTime? @map("recovery_coupon_whatsapp_sent_at")
 
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   coupon         Coupon?          @relation("AppliedCoupon", fields: [couponId], references: [id], onDelete: SetNull)

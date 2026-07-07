@@ -13,6 +13,9 @@ const ENGAGEMENT_WEIGHTS: Partial<Record<AnalyticsEventType, number>> = {
   [AnalyticsEventType.ADD_TO_CART]: 6,
 };
 const ENGAGEMENT_WINDOW_DAYS = 30;
+// Prazo padrão (minutos) em que o WhatsApp permite "apagar para todos" — 2 dias
+// e 12h. Usado quando WHATSAPP_DELETE_WINDOW_MINUTES não está configurado.
+const DEFAULT_DELETE_WINDOW_MINUTES = 2 * 24 * 60 + 12 * 60;
 
 interface ProductLike {
   id: string;
@@ -88,13 +91,12 @@ export class WhatsappMarketingService {
     for (const group of groups) {
       let success = false;
       let error: string | undefined;
+      let messageId: string | undefined;
 
       try {
-        if (imageUrl) {
-          await this.whatsapp.sendMedia(group.groupId, imageUrl, message);
-        } else {
-          await this.whatsapp.sendMessage(group.groupId, message);
-        }
+        messageId = imageUrl
+          ? await this.whatsapp.sendMedia(group.groupId, imageUrl, message)
+          : await this.whatsapp.sendMessage(group.groupId, message);
         success = true;
       } catch (e) {
         error = (e as Error).message;
@@ -102,9 +104,60 @@ export class WhatsappMarketingService {
       }
 
       await this.prisma.whatsappMessageLog
-        .create({ data: { productId: product.id, groupId: group.id, success, error } })
+        .create({ data: { productId: product.id, groupId: group.id, success, error, messageId } })
         .catch(() => {});
     }
+  }
+
+  private deleteWindowMinutes(): number {
+    const raw = Number(this.config.get<string>('WHATSAPP_DELETE_WINDOW_MINUTES'));
+    return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_DELETE_WINDOW_MINUTES;
+  }
+
+  // Produto já postado nos grupos e editado (qualquer campo exceto estoque)
+  // ainda dentro do prazo de exclusão do WhatsApp: apaga a mensagem desatualizada
+  // em cada grupo onde foi postada e reenvia a versão corrigida (preço, nome,
+  // foto etc. atuais). Se não houver mensagem recente dentro do prazo, não faz nada.
+  async publishProductEdit(product: ProductLike): Promise<void> {
+    if (!product.autoPublishWhatsapp || !product.whatsappGroupIds.length) return;
+
+    const since = new Date(Date.now() - this.deleteWindowMinutes() * 60_000);
+    const logs = await this.prisma.whatsappMessageLog.findMany({
+      where: {
+        productId: product.id,
+        success: true,
+        deletedAt: null,
+        messageId: { not: null },
+        sentAt: { gte: since },
+        groupId: { in: product.whatsappGroupIds },
+      },
+      include: { group: true },
+      orderBy: { sentAt: 'desc' },
+    });
+    if (!logs.length) return;
+
+    // Mantém só a mensagem mais recente por grupo (pode haver mais de um envio
+    // dentro do mesmo prazo).
+    const latestPerGroup = new Map<string, (typeof logs)[number]>();
+    for (const log of logs) {
+      if (!latestPerGroup.has(log.groupId)) latestPerGroup.set(log.groupId, log);
+    }
+
+    for (const log of latestPerGroup.values()) {
+      try {
+        await this.whatsapp.deleteMessage(log.group.groupId, log.messageId!);
+        await this.prisma.whatsappMessageLog.update({
+          where: { id: log.id },
+          data: { deletedAt: new Date() },
+        });
+      } catch (e) {
+        this.logger.error(
+          `Falha ao apagar mensagem antiga do produto ${product.id} no grupo ${log.group.name}: ${(e as Error).message}`,
+        );
+      }
+    }
+
+    await this.publishProduct(product, [...latestPerGroup.keys()]);
   }
 
   async resendProduct(productId: string): Promise<void> {
@@ -236,14 +289,12 @@ export class WhatsappMarketingService {
     let anySuccess = false;
     for (const group of groups) {
       try {
-        if (imageUrl) {
-          await this.whatsapp.sendMedia(group.groupId, imageUrl, message);
-        } else {
-          await this.whatsapp.sendMessage(group.groupId, message);
-        }
+        const messageId = imageUrl
+          ? await this.whatsapp.sendMedia(group.groupId, imageUrl, message)
+          : await this.whatsapp.sendMessage(group.groupId, message);
         anySuccess = true;
         await this.prisma.whatsappMessageLog
-          .create({ data: { productId: product.id, groupId: group.id, success: true } })
+          .create({ data: { productId: product.id, groupId: group.id, success: true, messageId } })
           .catch(() => {});
       } catch (e) {
         const error = (e as Error).message;

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Marketplace, Prisma, ProductStatus, Role, SyncAction } from '@prisma/client';
+import { Marketplace, Prisma, Product, ProductStatus, Role, SyncAction } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { StorageService } from '../storage/storage.service';
@@ -359,6 +359,16 @@ export class ProductsService {
       isActive && updated?.autoPublishWhatsapp && (justActivated || justEnabledWhatsapp);
     if (shouldPublish && updated) {
       this.whatsappMarketing.publishProduct(updated, updated.whatsappGroupIds).catch(() => {});
+    } else if (
+      updated &&
+      isActive &&
+      updated.autoPublishWhatsapp &&
+      this.hasNonQuantityChanges(existing, dto)
+    ) {
+      // Produto já postado nos grupos: se algo além da quantidade mudou, apaga a
+      // mensagem desatualizada (se ainda dentro do prazo de exclusão do WhatsApp)
+      // e reenvia com os dados corretos.
+      this.whatsappMarketing.publishProductEdit(updated).catch(() => {});
     }
 
     // OMS: sincroniza apenas o que mudou, e só para os marketplaces onde o
@@ -379,6 +389,30 @@ export class ProductsService {
     }
 
     return serializeProduct(updated!);
+  }
+
+  // Campos que não afetam o anúncio já postado no WhatsApp (quantidade ou apenas
+  // configuração de disparo) — não devem disparar apagar+reenviar a mensagem.
+  private static readonly WHATSAPP_EDIT_IGNORED_FIELDS = new Set<keyof UpdateProductDto>([
+    'stock',
+    'minimumStock',
+    'publishTo',
+    'unpublishFrom',
+    'autoPublishWhatsapp',
+    'whatsappGroupIds',
+  ]);
+
+  /** Verdadeiro se algum campo do produto mudou nesta edição, exceto quantidade. */
+  private hasNonQuantityChanges(existing: Product, dto: UpdateProductDto): boolean {
+    for (const key of Object.keys(dto) as (keyof UpdateProductDto)[]) {
+      const value = dto[key];
+      if (value === undefined || ProductsService.WHATSAPP_EDIT_IGNORED_FIELDS.has(key)) continue;
+      if (key === 'imageIds' || key === 'dimensions') return true;
+      const current = (existing as Record<string, unknown>)[key];
+      const currentValue = current instanceof Prisma.Decimal ? current.toNumber() : current;
+      if (currentValue !== value) return true;
+    }
+    return false;
   }
 
   /** Detecta campos relevantes alterados e dispara os jobs de sync adequados. */

@@ -9,6 +9,11 @@ export interface OrderNotifyTarget {
   orderId: string;
 }
 
+export interface CartNotifyTarget {
+  phone?: string | null;
+  name?: string | null;
+}
+
 const STORE_NAME = 'Saldão da Reversa';
 
 /**
@@ -54,6 +59,14 @@ export class OrderWhatsappService {
       .split(',')[0]
       .trim();
     return `${base}/pedidos/${orderId}`;
+  }
+
+  private cartUrl(): string {
+    const base = this.config
+      .get<string>('FRONTEND_URL', 'http://localhost:3000')
+      .split(',')[0]
+      .trim();
+    return `${base}/carrinho`;
   }
 
   private get pickupAddress(): string {
@@ -197,6 +210,50 @@ export class OrderWhatsappService {
       `${this.greeting(t.name)} 🙌\n\n` +
       `Pedido *#${this.shortId(t.orderId)}* retirado com sucesso. Obrigado pela compra!\n\n` +
       `Volte sempre. 💛\n` +
+      `${STORE_NAME}`;
+    return this.send(t.phone, msg);
+  }
+
+  // ── Recuperação de carrinho/pedido pendente ─────────────────────────────────
+
+  /** Lembrete de pedido criado no site que ainda aguarda pagamento (30min parado). */
+  notifyPendingOrderReminder(t: OrderNotifyTarget): Promise<boolean> {
+    const msg =
+      `${this.greeting(t.name)} 🛒\n\n` +
+      `Seu pedido *#${this.shortId(t.orderId)}* ainda está aguardando pagamento.\n\n` +
+      `Finalize antes que os itens fiquem indisponíveis: ${this.orderUrl(t.orderId)}\n` +
+      `${STORE_NAME}`;
+    return this.send(t.phone, msg);
+  }
+
+  /** Cupom de recuperação para pedido pendente (24h parado). */
+  notifyPendingOrderCoupon(t: OrderNotifyTarget, code: string): Promise<boolean> {
+    const msg =
+      `${this.greeting(t.name)} 🎁\n\n` +
+      `Preparamos um cupom exclusivo de *10% OFF* para você finalizar o pedido *#${this.shortId(t.orderId)}*.\n\n` +
+      `Cupom: *${code}* (válido por 7 dias, uso único e pessoal)\n\n` +
+      `Finalize aqui: ${this.orderUrl(t.orderId)}\n` +
+      `${STORE_NAME}`;
+    return this.send(t.phone, msg);
+  }
+
+  /** Lembrete de itens parados no carrinho, sem pedido formal ainda (30min parado). */
+  notifyCartReminder(t: CartNotifyTarget): Promise<boolean> {
+    const msg =
+      `${this.greeting(t.name)} 🛒\n\n` +
+      `Os itens no seu carrinho ainda estão te esperando!\n\n` +
+      `Finalize sua compra: ${this.cartUrl()}\n` +
+      `${STORE_NAME}`;
+    return this.send(t.phone, msg);
+  }
+
+  /** Cupom de recuperação para carrinho sem pedido formal (24h parado). */
+  notifyCartCoupon(t: CartNotifyTarget, code: string): Promise<boolean> {
+    const msg =
+      `${this.greeting(t.name)} 🎁\n\n` +
+      `Preparamos um cupom exclusivo de *10% OFF* para você finalizar a compra do seu carrinho.\n\n` +
+      `Cupom: *${code}* (válido por 7 dias, uso único e pessoal)\n\n` +
+      `Finalize aqui: ${this.cartUrl()}\n` +
       `${STORE_NAME}`;
     return this.send(t.phone, msg);
   }

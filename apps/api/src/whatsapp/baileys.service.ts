@@ -212,13 +212,29 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
       .sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
   }
 
-  async sendMessage(jid: string, text: string): Promise<void> {
+  async sendMessage(jid: string, text: string): Promise<string | undefined> {
     if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
-    await this.socket.sendMessage(jid, { text });
+    const result = await this.socket.sendMessage(jid, { text });
+    return result?.key?.id ?? undefined;
   }
 
-  async sendImage(jid: string, imageUrl: string, caption: string): Promise<void> {
+  async sendImage(jid: string, imageUrl: string, caption: string): Promise<string | undefined> {
     if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
-    await this.socket.sendMessage(jid, { image: { url: imageUrl }, caption });
+    const result = await this.socket.sendMessage(jid, { image: { url: imageUrl }, caption });
+    return result?.key?.id ?? undefined;
+  }
+
+  // "Apagar para todos" — o próprio WhatsApp só aceita dentro do prazo de exclusão;
+  // fora dele o envio é aceito mas a mensagem pode continuar visível pros participantes.
+  async deleteMessage(jid: string, messageId: string): Promise<void> {
+    if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
+    await this.socket.sendMessage(jid, {
+      delete: {
+        remoteJid: jid,
+        fromMe: true,
+        id: messageId,
+        participant: jid.endsWith('@g.us') ? this.socket.user?.id : undefined,
+      },
+    });
   }
 }

@@ -207,6 +207,13 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   ANTHROPIC_RESEARCH_MODEL: string = '';
+
+  // Janela (em minutos) em que a API tenta "apagar para todos" a mensagem do
+  // produto nos grupos antes de reenviar a versão corrigida após uma edição.
+  // Padrão = limite real do WhatsApp para exclusão (2 dias e 12h).
+  @IsString()
+  @IsOptional()
+  WHATSAPP_DELETE_WINDOW_MINUTES: string = '3600';
 }
 
 export function envValidation(config: Record<string, unknown>) {

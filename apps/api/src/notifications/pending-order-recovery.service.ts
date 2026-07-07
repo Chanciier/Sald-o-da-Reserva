@@ -6,6 +6,7 @@ import type { CartData } from '../cart/cart.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { PushNotificationsService } from './push-notifications.service';
+import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 
 const CART_DELAY_MS = 30 * 60 * 1000;
 const COUPON_DELAY_MS = 24 * 60 * 60 * 1000;
@@ -33,6 +34,7 @@ export class PendingOrderRecoveryService {
     private readonly prisma: PrismaService,
     private readonly push: PushNotificationsService,
     private readonly redis: RedisService,
+    private readonly whatsapp: OrderWhatsappService,
   ) {}
 
   @Cron('*/5 * * * *')
@@ -176,16 +178,23 @@ export class PendingOrderRecoveryService {
         channel: Marketplace.SITE,
         OR: [
           { cartReminderCreatedAt: { not: null }, cartReminderPushSentAt: null },
+          { cartReminderCreatedAt: { not: null }, cartReminderWhatsappSentAt: null },
           { recoveryCouponCreatedAt: { not: null }, recoveryCouponPushSentAt: null },
+          { recoveryCouponCreatedAt: { not: null }, recoveryCouponWhatsappSentAt: null },
         ],
       },
       select: {
         id: true,
         userId: true,
+        buyerName: true,
+        customerPhone: true,
         cartReminderCreatedAt: true,
         cartReminderPushSentAt: true,
+        cartReminderWhatsappSentAt: true,
         recoveryCouponCreatedAt: true,
         recoveryCouponPushSentAt: true,
+        recoveryCouponWhatsappSentAt: true,
+        recoveryCoupon: { select: { code: true } },
         items: {
           select: {
             quantity: true,
@@ -203,7 +212,9 @@ export class PendingOrderRecoveryService {
           where: { id: order.id },
           data: {
             cartReminderPushSentAt: order.cartReminderCreatedAt ? new Date() : undefined,
+            cartReminderWhatsappSentAt: order.cartReminderCreatedAt ? new Date() : undefined,
             recoveryCouponPushSentAt: order.recoveryCouponCreatedAt ? new Date() : undefined,
+            recoveryCouponWhatsappSentAt: order.recoveryCouponCreatedAt ? new Date() : undefined,
           },
         });
         continue;
@@ -220,6 +231,15 @@ export class PendingOrderRecoveryService {
           'cartReminderPushSentAt',
         );
       }
+      if (order.cartReminderCreatedAt && !order.cartReminderWhatsappSentAt) {
+        await this.deliverWhatsapp(order.id, 'cartReminderWhatsappSentAt', () =>
+          this.whatsapp.notifyPendingOrderReminder({
+            orderId: order.id,
+            phone: order.customerPhone,
+            name: order.buyerName,
+          }),
+        );
+      }
       if (order.recoveryCouponCreatedAt && !order.recoveryCouponPushSentAt) {
         await this.deliver(
           order.id,
@@ -232,6 +252,32 @@ export class PendingOrderRecoveryService {
           'recoveryCouponPushSentAt',
         );
       }
+      if (order.recoveryCouponCreatedAt && !order.recoveryCouponWhatsappSentAt && order.recoveryCoupon) {
+        const code = order.recoveryCoupon.code;
+        await this.deliverWhatsapp(order.id, 'recoveryCouponWhatsappSentAt', () =>
+          this.whatsapp.notifyPendingOrderCoupon(
+            { orderId: order.id, phone: order.customerPhone, name: order.buyerName },
+            code,
+          ),
+        );
+      }
+    }
+  }
+
+  private async deliverWhatsapp(
+    orderId: string,
+    sentField: 'cartReminderWhatsappSentAt' | 'recoveryCouponWhatsappSentAt',
+    send: () => Promise<boolean>,
+  ): Promise<void> {
+    try {
+      const delivered = await send();
+      if (!delivered) return;
+      await this.prisma.order.updateMany({
+        where: { id: orderId, status: OrderStatus.PENDING, [sentField]: null },
+        data: { [sentField]: new Date() },
+      });
+    } catch (error) {
+      this.logger.warn(`WhatsApp pendente para pedido=${orderId}`, error);
     }
   }
 
@@ -345,15 +391,54 @@ export class PendingOrderRecoveryService {
         if (delivered) cart.couponPushSentAt = now.toISOString();
       }
 
+      let userPhone: string | null = null;
+      if (
+        (cart.reminderCreatedAt && !cart.reminderWhatsappSentAt) ||
+        (cart.couponCreatedAt && !cart.couponWhatsappSentAt)
+      ) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { phone: true, name: true },
+        });
+        userPhone = user?.phone ?? null;
+
+        if (cart.reminderCreatedAt && !cart.reminderWhatsappSentAt) {
+          const delivered = await this.deliverCartWhatsapp(() =>
+            this.whatsapp.notifyCartReminder({ phone: user?.phone, name: user?.name }),
+          );
+          if (delivered) cart.reminderWhatsappSentAt = now.toISOString();
+        }
+
+        if (cart.couponCreatedAt && !cart.couponWhatsappSentAt) {
+          const recoveryId = cart.recoveryId ?? String(updatedAt);
+          const code = this.cartCouponCode(userId, recoveryId);
+          const delivered = await this.deliverCartWhatsapp(() =>
+            this.whatsapp.notifyCartCoupon({ phone: user?.phone, name: user?.name }, code),
+          );
+          if (delivered) cart.couponWhatsappSentAt = now.toISOString();
+        }
+      }
+
       const ttl = await this.redis.ttl(key);
       await this.redis.setJson(key, cart, ttl > 0 ? ttl : CART_TTL);
-      if (cart.couponPushSentAt) {
+      const couponFullyDelivered =
+        Boolean(cart.couponPushSentAt) && (Boolean(cart.couponWhatsappSentAt) || !userPhone);
+      if (couponFullyDelivered) {
         await this.redis.zrem(CART_RECOVERY_INDEX, userId);
       } else if (cart.couponCreatedAt) {
         await this.redis.zadd(CART_RECOVERY_INDEX, now.getTime() + 5 * 60 * 1000, userId);
       } else {
         await this.redis.zadd(CART_RECOVERY_INDEX, updatedAt + COUPON_DELAY_MS, userId);
       }
+    }
+  }
+
+  private async deliverCartWhatsapp(send: () => Promise<boolean>): Promise<boolean> {
+    try {
+      return await send();
+    } catch (error) {
+      this.logger.warn('WhatsApp de carrinho pendente', error);
+      return false;
     }
   }
 

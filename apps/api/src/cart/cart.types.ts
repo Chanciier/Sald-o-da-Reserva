@@ -18,8 +18,10 @@ export interface CartData {
   recoveryId?: string;
   reminderCreatedAt?: string;
   reminderPushSentAt?: string;
+  reminderWhatsappSentAt?: string;
   couponCreatedAt?: string;
   couponPushSentAt?: string;
+  couponWhatsappSentAt?: string;
 }
 
 export interface CouponSummary {
