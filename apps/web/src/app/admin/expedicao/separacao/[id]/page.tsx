@@ -14,6 +14,7 @@ import {
   cancelarPedido,
   salvarObservacao,
   abrirEtiquetaMl,
+  abrirEtiquetaShopee,
 } from '@/actions/expedicao';
 import type { ExpedicaoOrderDetail, OrderDetailItem, TimelineEvent } from '@/actions/expedicao';
 import { ChannelBadge } from '../../_components/channel-badge';
@@ -254,6 +255,7 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
   const allChecked = total > 0 && checkedCount === total;
   const isPickup = order.deliveryMethod === 'PICKUP';
   const isMl = order.channel === 'MERCADO_LIVRE';
+  const isShopee = order.channel === 'SHOPEE';
   const wa = waLink(order.customerPhone);
 
   async function handleMlLabel() {
@@ -262,6 +264,19 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
     setLabelError('');
     try {
       await abrirEtiquetaMl(token, order!.id);
+    } catch (err) {
+      setLabelError((err as Error).message);
+    } finally {
+      setLabelBusy(false);
+    }
+  }
+
+  async function handleShopeeLabel() {
+    if (!token) return;
+    setLabelBusy(true);
+    setLabelError('');
+    try {
+      await abrirEtiquetaShopee(token, order!.id);
     } catch (err) {
       setLabelError((err as Error).message);
     } finally {
@@ -383,6 +398,25 @@ export default function SeparacaoItemPage({ params }: { params: { id: string } }
                 >
                   <Printer className="h-3.5 w-3.5" />
                   {labelBusy ? 'Abrindo...' : 'Baixar etiqueta do Mercado Livre'}
+                </button>
+                {labelError && <p className="text-xs text-destructive">{labelError}</p>}
+              </div>
+            )}
+
+            {/* Shopee: etiqueta e fiscal são do próprio canal */}
+            {isShopee && !isPickup && (
+              <div className="rounded-lg border border-orange-300/60 bg-orange-50 dark:bg-orange-900/10 px-4 py-3 space-y-2">
+                <p className="text-xs text-orange-800 dark:text-orange-300">
+                  Pedido da <strong>Shopee</strong>. Use a etiqueta da própria Shopee para postar —
+                  a NF-e segue o fluxo fiscal do canal.
+                </p>
+                <button
+                  onClick={handleShopeeLabel}
+                  disabled={labelBusy}
+                  className="flex items-center gap-1.5 rounded-lg border border-orange-400 px-3 py-1.5 text-xs font-medium text-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  {labelBusy ? 'Abrindo...' : 'Baixar etiqueta da Shopee'}
                 </button>
                 {labelError && <p className="text-xs text-destructive">{labelError}</p>}
               </div>

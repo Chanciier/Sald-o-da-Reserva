@@ -1,11 +1,14 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { CheckCircle2, RefreshCw, RotateCcw, Store, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { CheckCircle2, Link2, RefreshCw, RotateCcw, Store, Unlink, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import {
+  disconnectShopee,
   fetchMarketplacesHealth,
+  getShopeeAuthorizeUrl,
   retryFailedPublications,
   syncAllProducts,
   type Marketplace,
@@ -25,6 +28,8 @@ function formatDate(value: string | null) {
 
 export default function MarketplacesPage() {
   const { token, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -34,6 +39,47 @@ export default function MarketplacesPage() {
     enabled: !!token && !authLoading,
     refetchInterval: 60 * 1000,
   });
+
+  useEffect(() => {
+    const shopee = searchParams.get('shopee');
+    if (!shopee) return;
+    setFeedback(
+      shopee === 'connected'
+        ? 'Shopee conectada com sucesso.'
+        : 'Falha ao conectar a Shopee. Tente novamente.',
+    );
+    router.replace('/admin/marketplaces');
+    refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  async function connectShopee() {
+    if (!token) return;
+    setBusy('SHOPEE:connect');
+    setFeedback(null);
+    try {
+      const { url } = await getShopeeAuthorizeUrl(token);
+      window.location.href = url;
+    } catch (err) {
+      setFeedback((err as Error).message);
+      setBusy(null);
+    }
+  }
+
+  async function disconnectShopeeAction() {
+    if (!token) return;
+    setBusy('SHOPEE:disconnect');
+    setFeedback(null);
+    try {
+      await disconnectShopee(token);
+      setFeedback('Shopee desconectada.');
+      await refetch();
+    } catch (err) {
+      setFeedback((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function run(marketplace: Marketplace, action: 'retry' | 'sync') {
     if (!token) return;
@@ -98,7 +144,14 @@ export default function MarketplacesPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">
           {data.map((mp) => (
-            <MarketplaceCard key={mp.marketplace} health={mp} busy={busy} onAction={run} />
+            <MarketplaceCard
+              key={mp.marketplace}
+              health={mp}
+              busy={busy}
+              onAction={run}
+              onConnectShopee={connectShopee}
+              onDisconnectShopee={disconnectShopeeAction}
+            />
           ))}
         </div>
       )}
@@ -110,13 +163,19 @@ function MarketplaceCard({
   health,
   busy,
   onAction,
+  onConnectShopee,
+  onDisconnectShopee,
 }: {
   health: MarketplaceHealth;
   busy: string | null;
   onAction: (m: Marketplace, a: 'retry' | 'sync') => void;
+  onConnectShopee: () => void;
+  onDisconnectShopee: () => void;
 }) {
   const retrying = busy === `${health.marketplace}:retry`;
   const syncing = busy === `${health.marketplace}:sync`;
+  const connectingShopee = busy === 'SHOPEE:connect';
+  const disconnectingShopee = busy === 'SHOPEE:disconnect';
 
   return (
     <div className="rounded-xl border bg-card p-5 shadow-sm">
@@ -148,7 +207,31 @@ function MarketplaceCard({
         </div>
       </dl>
 
-      <div className="mt-4 flex gap-2">
+      {health.marketplace === 'SHOPEE' && (
+        <div className="mt-4">
+          {health.connected ? (
+            <button
+              onClick={onDisconnectShopee}
+              disabled={connectingShopee || disconnectingShopee}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted disabled:opacity-50 transition-colors"
+            >
+              <Unlink className="h-3.5 w-3.5" />
+              {disconnectingShopee ? 'Desconectando...' : 'Desconectar Shopee'}
+            </button>
+          ) : (
+            <button
+              onClick={onConnectShopee}
+              disabled={connectingShopee || disconnectingShopee}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-colors"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              {connectingShopee ? 'Conectando...' : 'Conectar Shopee'}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="mt-2 flex gap-2">
         <button
           onClick={() => onAction(health.marketplace, 'retry')}
           disabled={retrying || syncing}

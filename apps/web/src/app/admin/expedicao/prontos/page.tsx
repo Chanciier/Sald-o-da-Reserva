@@ -5,7 +5,13 @@ import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, FileText, Package, Printer, Truck } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchProntos, cancelarPedido, marcarEnviado, abrirEtiquetaMl } from '@/actions/expedicao';
+import {
+  fetchProntos,
+  cancelarPedido,
+  marcarEnviado,
+  abrirEtiquetaMl,
+  abrirEtiquetaShopee,
+} from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
 import { ChannelBadge } from '../_components/channel-badge';
 
@@ -71,12 +77,13 @@ export default function ProntosPage() {
     onError: (err) => setCancelError((err as Error).message),
   });
 
-  async function handleMlLabel(orderId: string) {
+  async function handleLabel(orderId: string, channel: 'MERCADO_LIVRE' | 'SHOPEE') {
     if (!token) return;
     setLabelBusy(orderId);
     setCancelError(null);
     try {
-      await abrirEtiquetaMl(token, orderId);
+      if (channel === 'MERCADO_LIVRE') await abrirEtiquetaMl(token, orderId);
+      else await abrirEtiquetaShopee(token, orderId);
     } catch (err) {
       setCancelError((err as Error).message);
     } finally {
@@ -193,7 +200,7 @@ export default function ProntosPage() {
                           </>
                         ) : (
                           <>
-                            {o.channel === 'MERCADO_LIVRE' ? (
+                            {o.channel === 'MERCADO_LIVRE' || o.channel === 'SHOPEE' ? (
                               <>
                                 <Link
                                   href={`/admin/expedicao/conferencia/${o.id}`}
@@ -203,12 +210,22 @@ export default function ProntosPage() {
                                   Nota Fiscal
                                 </Link>
                                 <button
-                                  onClick={() => handleMlLabel(o.id)}
+                                  onClick={() =>
+                                    handleLabel(o.id, o.channel as 'MERCADO_LIVRE' | 'SHOPEE')
+                                  }
                                   disabled={labelBusy === o.id}
-                                  className="flex items-center gap-1 rounded border border-yellow-400 px-2 py-1 text-xs text-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 disabled:opacity-50 transition-colors"
+                                  className={`flex items-center gap-1 rounded border px-2 py-1 text-xs disabled:opacity-50 transition-colors ${
+                                    o.channel === 'MERCADO_LIVRE'
+                                      ? 'border-yellow-400 text-yellow-900 hover:bg-yellow-100 dark:text-yellow-200 dark:hover:bg-yellow-900/30'
+                                      : 'border-orange-400 text-orange-900 hover:bg-orange-100 dark:text-orange-200 dark:hover:bg-orange-900/30'
+                                  }`}
                                 >
                                   <Printer className="h-3.5 w-3.5" />
-                                  {labelBusy === o.id ? '...' : 'Etiqueta ML'}
+                                  {labelBusy === o.id
+                                    ? '...'
+                                    : o.channel === 'MERCADO_LIVRE'
+                                      ? 'Etiqueta ML'
+                                      : 'Etiqueta Shopee'}
                                 </button>
                                 <button
                                   onClick={() => shipMutation.mutate(o.id)}

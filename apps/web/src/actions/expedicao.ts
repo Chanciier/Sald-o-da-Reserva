@@ -258,6 +258,25 @@ export async function abrirEtiquetaMl(token: string, orderId: string): Promise<v
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/**
+ * Baixa a etiqueta da Shopee (PDF protegido por token) e abre numa nova aba.
+ * Mesmo esquema de `abrirEtiquetaMl` (fetch como blob por causa do Authorization).
+ */
+export async function abrirEtiquetaShopee(token: string, orderId: string): Promise<void> {
+  const res = await fetch(`${API}/marketplaces/shopee/orders/${orderId}/label`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: 'Falha ao obter etiqueta.' }));
+    throw new Error((err as { message?: string }).message ?? 'Falha ao obter etiqueta.');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export async function confirmarRetirada(token: string, orderId: string) {
   return apiFetch(token, `/expedicao/${orderId}/confirmar-retirada`, { method: 'PATCH' });
 }

@@ -65,3 +65,19 @@ export function syncAllProducts(token: string, marketplace: Marketplace) {
     token,
   );
 }
+
+/** Retorna a URL de autorização da Shopee — o admin é redirecionado para lá. */
+export function getShopeeAuthorizeUrl(token: string) {
+  return apiGet<{ url: string }>('/marketplaces/shopee/oauth/authorize', token);
+}
+
+export async function disconnectShopee(token: string): Promise<void> {
+  const res = await fetch(`${BASE}/api/v1/marketplaces/shopee/oauth`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message ?? `Erro ${res.status}`);
+  }
+}
