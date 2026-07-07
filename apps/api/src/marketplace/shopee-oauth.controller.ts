@@ -1,4 +1,13 @@
-import { Controller, Delete, Get, HttpCode, HttpStatus, Query, Res } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { Role } from '@prisma/client';
@@ -28,6 +37,11 @@ export class ShopeeOauthController {
   @Get('authorize')
   @Roles(Role.ADMIN)
   async authorize(): Promise<{ url: string }> {
+    if (!this.tokens.isConfigured()) {
+      throw new BadRequestException(
+        'Shopee não configurada: defina SHOPEE_PARTNER_ID e SHOPEE_PARTNER_KEY no Railway antes de conectar.',
+      );
+    }
     const url = await this.tokens.buildAuthorizeUrl();
     return { url };
   }
