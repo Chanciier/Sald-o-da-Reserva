@@ -6,6 +6,7 @@ import { OmsEventPayloads, OmsEvents } from '../events/oms-events';
 import { MarketResearchService } from '../market-research/market-research.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { REPORT_TIME_ZONE } from '../analytics/report-range';
 import {
   CategoryBias,
   LearningDashboard,
@@ -102,7 +103,7 @@ export class LearningService implements OnModuleInit {
 
   // ── Sinal 2: estoque parado (varredura diária) ──────────────────────────
 
-  @Cron(CronExpression.EVERY_DAY_AT_6AM)
+  @Cron(CronExpression.EVERY_DAY_AT_6AM, { timeZone: REPORT_TIME_ZONE })
   async scanStagnantProducts(): Promise<number> {
     const cutoff = new Date(Date.now() - STAGNANT_DAYS * MS_PER_DAY);
     const stagnant = await this.prisma.product.findMany({

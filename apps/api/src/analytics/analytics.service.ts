@@ -1,16 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-
-function startOfDay(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
-
-function startOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
+import { brazilDateKey, startOfBrazilDay, startOfBrazilMonth } from './report-range';
 
 // Statuses that represent a paid sale (counted as revenue). Covers the whole
 // post-payment pipeline — once a payment is approved the order moves through the
@@ -31,8 +22,8 @@ export class AnalyticsService {
 
   async getAdminOverview() {
     const now = new Date();
-    const today = startOfDay(now);
-    const monthStart = startOfMonth(now);
+    const today = startOfBrazilDay(now);
+    const monthStart = startOfBrazilMonth(now);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const [
@@ -97,7 +88,7 @@ export class AnalyticsService {
 
     const chartMap = new Map<string, { revenue: number; orders: number }>();
     for (const o of chartOrders) {
-      const date = o.createdAt.toISOString().split('T')[0];
+      const date = brazilDateKey(o.createdAt);
       const prev = chartMap.get(date) ?? { revenue: 0, orders: 0 };
       chartMap.set(date, { revenue: prev.revenue + o.total.toNumber(), orders: prev.orders + 1 });
     }
@@ -140,7 +131,7 @@ export class AnalyticsService {
 
   async getSellerOverview(sellerId: string, days = 30) {
     const now = new Date();
-    const today = startOfDay(now);
+    const today = startOfBrazilDay(now);
     const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     const prevSince = new Date(since.getTime() - days * 24 * 60 * 60 * 1000);
 
@@ -228,7 +219,7 @@ export class AnalyticsService {
 
     const chartMap = new Map<string, { revenue: number; orderIds: Set<string> }>();
     for (const item of chartItems) {
-      const date = item.order.createdAt.toISOString().split('T')[0];
+      const date = brazilDateKey(item.order.createdAt);
       const prev = chartMap.get(date) ?? { revenue: 0, orderIds: new Set<string>() };
       prev.revenue += (item.subtotal as unknown as { toNumber(): number }).toNumber();
       prev.orderIds.add(item.orderId);
@@ -237,7 +228,7 @@ export class AnalyticsService {
     const revenueChart: { date: string; revenue: number; orders: number }[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const date = d.toISOString().split('T')[0];
+      const date = brazilDateKey(d);
       const entry = chartMap.get(date);
       revenueChart.push({ date, revenue: entry?.revenue ?? 0, orders: entry?.orderIds.size ?? 0 });
     }
@@ -371,7 +362,7 @@ export class AnalyticsService {
     // Build chart data: revenue + orders + conversions per day
     const revenueMap = new Map<string, { revenue: number; orders: number; conversions: number }>();
     for (const o of chartOrders) {
-      const date = o.createdAt.toISOString().split('T')[0];
+      const date = brazilDateKey(o.createdAt);
       const prev = revenueMap.get(date) ?? { revenue: 0, orders: 0, conversions: 0 };
       revenueMap.set(date, {
         revenue: prev.revenue + o.total.toNumber(),
@@ -380,7 +371,7 @@ export class AnalyticsService {
       });
     }
     for (const p of conversionsByDay) {
-      const date = p.updatedAt.toISOString().split('T')[0];
+      const date = brazilDateKey(p.updatedAt);
       const prev = revenueMap.get(date) ?? { revenue: 0, orders: 0, conversions: 0 };
       revenueMap.set(date, { ...prev, conversions: prev.conversions + 1 });
     }
@@ -389,7 +380,7 @@ export class AnalyticsService {
     const chartData: { date: string; revenue: number; orders: number; conversions: number }[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const date = d.toISOString().split('T')[0];
+      const date = brazilDateKey(d);
       const entry = revenueMap.get(date) ?? { revenue: 0, orders: 0, conversions: 0 };
       chartData.push({ date, ...entry });
     }

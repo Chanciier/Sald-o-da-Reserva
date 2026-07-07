@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { QueueService } from '../queue/queue.service';
 import { QueueNames } from '../queue/queue.types';
+import { startOfBrazilDay } from '../analytics/report-range';
 
 /** Status de pedido que ainda exigem separação no estoque. */
 const AWAITING_SEPARATION: OrderStatus[] = [OrderStatus.PAID, OrderStatus.SEPARATING];
@@ -21,8 +22,7 @@ export class OmsDashboardService {
   ) {}
 
   async summary() {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = startOfBrazilDay();
 
     const [
       ordersToday,

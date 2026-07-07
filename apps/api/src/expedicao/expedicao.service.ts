@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
 import { recordOrderEvent } from '../common/order-timeline';
+import { startOfBrazilDay, endOfBrazilDay } from '../analytics/report-range';
 
 const CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.PAID,
@@ -85,10 +86,8 @@ export class ExpedicaoService {
   async getStats(userId: string | null) {
     const userFilter = userId ? { userId } : {};
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const today = startOfBrazilDay();
+    const tomorrow = endOfBrazilDay();
 
     const [grouped, separatedOrders, enviadosHoje, retiradosHoje, entreguesEnvioHoje] =
       await Promise.all([

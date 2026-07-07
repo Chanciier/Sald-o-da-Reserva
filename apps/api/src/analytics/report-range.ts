@@ -27,6 +27,22 @@ export function brazilHour(date: Date): number {
   return Number(parts(date).hour);
 }
 
+/** Início do dia atual (00:00) no horário de Brasília, como instante UTC. */
+export function startOfBrazilDay(date: Date = new Date()): Date {
+  return localMidnightToUtc(brazilDateKey(date));
+}
+
+/** Início do dia seguinte (00:00) no horário de Brasília, como instante UTC — limite exclusivo do dia. */
+export function endOfBrazilDay(date: Date = new Date()): Date {
+  return localMidnightToUtc(addUtcDays(brazilDateKey(date), 1));
+}
+
+/** Início do mês atual (dia 1, 00:00) no horário de Brasília, como instante UTC. */
+export function startOfBrazilMonth(date: Date = new Date()): Date {
+  const key = brazilDateKey(date);
+  return localMidnightToUtc(`${key.slice(0, 8)}01`);
+}
+
 function localMidnightToUtc(date: string): Date {
   const [year, month, day] = date.split('-').map(Number);
   const target = Date.UTC(year, month - 1, day);
