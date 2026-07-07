@@ -85,6 +85,35 @@ export class MailService {
     await this.send({ to: email, subject, html });
   }
 
+  async sendVerificationEmail(email: string, token: string, name?: string): Promise<void> {
+    const verifyUrl = `${this.frontendUrl}/auth/verify-email?token=${token}`;
+    const greeting = name ? `Olá, ${name.split(' ')[0]}!` : 'Olá!';
+    const subject = 'Confirme seu e-mail — Saldão da Reserva';
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+        <div style="background:#f5f5f5;padding:24px 32px;border-radius:12px 12px 0 0">
+          <h1 style="margin:0;font-size:20px;color:#1a1a1a">Saldão da Reserva</h1>
+        </div>
+        <div style="padding:32px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 16px">${greeting}</p>
+          <p style="margin:0 0 24px">Confirme seu e-mail para ativar todos os recursos da sua conta:</p>
+          <a href="${verifyUrl}" style="display:inline-block;background:#f59e0b;color:#1a1a1a;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700">
+            Confirmar meu e-mail
+          </a>
+          <p style="margin:24px 0 0;font-size:13px;color:#666">
+            Se você não criou essa conta, ignore este e-mail.<br>
+            O link expira em <strong>24 horas</strong>.
+          </p>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#999">Saldão da Reserva · Este é um e-mail automático, não responda.</p>
+        </div>
+      </div>
+    `;
+
+    await this.send({ to: email, subject, html });
+  }
+
   // ── Orders ────────────────────────────────────────────────────────────────
 
   async sendOrderConfirmedEmail(

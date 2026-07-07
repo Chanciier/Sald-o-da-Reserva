@@ -7,6 +7,7 @@ export interface AuthUserDto {
   role: string;
   phone: string | null;
   avatarUrl: string | null;
+  emailVerifiedAt: string | null;
 }
 
 export interface AuthTokens {
@@ -88,6 +89,21 @@ export async function updateMeApi(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { message?: string }).message ?? 'Erro ao salvar perfil.');
   return data as AuthUserDto;
+}
+
+export async function verifyEmailApi(token: string): Promise<{ message: string }> {
+  return post<{ message: string }>('/auth/verify-email', { token });
+}
+
+export async function resendVerificationApi(token: string): Promise<{ message: string }> {
+  const res = await fetch(`${BASE}/auth/resend-verification`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok)
+    throw new Error((data as { message?: string }).message ?? 'Erro ao reenviar e-mail.');
+  return data as { message: string };
 }
 
 export async function uploadAvatarApi(token: string, file: File): Promise<AuthUserDto> {

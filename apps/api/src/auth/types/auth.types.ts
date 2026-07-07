@@ -26,6 +26,7 @@ export interface PublicUser {
   role: Role;
   phone: string | null;
   avatarUrl: string | null;
+  emailVerifiedAt: Date | null;
 }
 
 export interface AuthResult {

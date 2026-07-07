@@ -22,6 +22,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -137,6 +138,23 @@ export class AuthController {
     await this.authService.resetPassword(dto, this.getIp(req));
     this.clearCookies(res);
     return { message: 'Senha redefinida com sucesso. Faça login com sua nova senha.' };
+  }
+
+  @Post('verify-email')
+  @Public()
+  @Throttle({ medium: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    await this.authService.verifyEmail(dto);
+    return { message: 'E-mail confirmado com sucesso.' };
+  }
+
+  @Post('resend-verification')
+  @Throttle({ medium: { limit: 3, ttl: 3_600_000 } })
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@CurrentUser() user: AuthenticatedUser) {
+    await this.authService.resendVerification(user.id);
+    return { message: 'Se seu e-mail ainda não foi confirmado, reenviamos o link.' };
   }
 
   @Get('me')

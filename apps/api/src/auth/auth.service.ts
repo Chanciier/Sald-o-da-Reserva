@@ -18,6 +18,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { AuthResult, JwtRefreshPayload, PublicUser } from './types/auth.types';
 import type { User } from '@prisma/client';
 import { UpdateMeDto } from './dto/update-me.dto';
@@ -53,6 +54,10 @@ export class AuthService {
       ipAddress: ip,
       userAgent,
     });
+
+    // Conta fica ativa e utilizável imediatamente — a verificação roda em paralelo,
+    // sem bloquear o cadastro (MailService.send() nunca lança, só loga e retorna false).
+    await this.sendVerificationEmail(user.id, user.email, user.name);
 
     return { user: this.toPublicUser(user), ...tokens };
   }
@@ -232,6 +237,61 @@ export class AuthService {
     });
   }
 
+  async verifyEmail(dto: VerifyEmailDto): Promise<void> {
+    const tokenHash = this.hashService.hashToken(dto.token);
+    const record = await this.prisma.emailVerification.findUnique({ where: { tokenHash } });
+
+    if (!record || record.isUsed || record.expiresAt < new Date()) {
+      throw new BadRequestException('Link de confirmação inválido ou expirado.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { emailVerifiedAt: new Date() },
+      }),
+      this.prisma.emailVerification.update({
+        where: { tokenHash },
+        data: { isUsed: true },
+      }),
+    ]);
+
+    await this.auditService.log(AuditAction.EMAIL_VERIFIED, { userId: record.userId });
+  }
+
+  async resendVerification(userId: string): Promise<void> {
+    await this.rateLimitService.check(`resend-verification:user:${userId}`, 3, 3600);
+
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (user.emailVerifiedAt) return;
+
+    await this.sendVerificationEmail(user.id, user.email, user.name);
+  }
+
+  private async sendVerificationEmail(
+    userId: string,
+    email: string,
+    name: string | null,
+  ): Promise<void> {
+    // Invalida links de confirmação pendentes antes de emitir um novo.
+    await this.prisma.emailVerification.updateMany({
+      where: { userId, isUsed: false },
+      data: { isUsed: true },
+    });
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashService.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + 24 * 3_600_000); // 24 horas
+
+    await this.prisma.emailVerification.create({
+      data: { userId, tokenHash, expiresAt },
+    });
+
+    await this.mailService.sendVerificationEmail(email, rawToken, name ?? undefined);
+
+    await this.auditService.log(AuditAction.EMAIL_VERIFICATION_SENT, { userId });
+  }
+
   async getMe(userId: string): Promise<PublicUser & { createdAt: Date }> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -242,6 +302,7 @@ export class AuthService {
         name: true,
         phone: true,
         avatarUrl: true,
+        emailVerifiedAt: true,
         createdAt: true,
       },
     });
@@ -268,7 +329,7 @@ export class AuthService {
   }
 
   private toPublicUser(
-    user: Pick<User, 'id' | 'email' | 'name' | 'role' | 'phone' | 'avatarUrl'>,
+    user: Pick<User, 'id' | 'email' | 'name' | 'role' | 'phone' | 'avatarUrl' | 'emailVerifiedAt'>,
   ): PublicUser {
     return {
       id: user.id,
@@ -277,6 +338,7 @@ export class AuthService {
       role: user.role,
       phone: user.phone,
       avatarUrl: user.avatarUrl,
+      emailVerifiedAt: user.emailVerifiedAt,
     };
   }
 

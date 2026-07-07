@@ -10,6 +10,7 @@ interface AuthUser {
   role: string;
   phone: string | null;
   avatarUrl: string | null;
+  emailVerifiedAt: string | null;
 }
 
 interface AuthContextType {

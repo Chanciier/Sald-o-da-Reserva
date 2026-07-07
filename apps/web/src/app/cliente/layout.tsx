@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+import { EmailVerificationBanner } from '@/components/profile/email-verification-banner';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -137,7 +138,10 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
         </div>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-5xl p-4 sm:p-6">{children}</div>
+          <div className="mx-auto max-w-5xl p-4 sm:p-6">
+            <EmailVerificationBanner />
+            {children}
+          </div>
         </main>
       </div>
     </div>
