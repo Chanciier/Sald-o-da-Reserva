@@ -10,7 +10,14 @@ const BATCH = 8;
 const MARGIN = 600;
 
 // Ordem de uma rodada: o catálogo inteiro embaralhado com seed própria.
-function epochOrder(all: Product[], epoch: number): Product[] {
+// Na primeira rodada, produtos que ainda não apareceram nas seções acima
+// vêm antes dos que o visitante já viu.
+function epochOrder(all: Product[], epoch: number, shownIds?: Set<string>): Product[] {
+  if (epoch === 1 && shownIds && shownIds.size > 0 && shownIds.size < all.length) {
+    const unseen = all.filter((p) => !shownIds.has(p.id));
+    const seen = all.filter((p) => shownIds.has(p.id));
+    return [...shuffleWithSeed(unseen, 38), ...shuffleWithSeed(seen, 45)];
+  }
   return shuffleWithSeed(all, epoch * 31 + 7);
 }
 
@@ -21,11 +28,19 @@ interface Queue {
   lastId: string | null;
 }
 
-export function DiscoveryFeed({ allProducts }: { allProducts: Product[] }) {
+export function DiscoveryFeed({
+  allProducts,
+  shownIds,
+}: {
+  allProducts: Product[];
+  shownIds?: string[];
+}) {
   // Fila por rodadas: cada rodada percorre o catálogo inteiro embaralhado,
   // então nenhum produto repete antes de todos os outros aparecerem.
   const queueRef = useRef<Queue | null>(null);
-  const [items, setItems] = useState<Product[]>(() => epochOrder(allProducts, 1).slice(0, BATCH));
+  const [items, setItems] = useState<Product[]>(() =>
+    epochOrder(allProducts, 1, new Set(shownIds)).slice(0, BATCH),
+  );
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const loadMore = useCallback(() => {
@@ -33,7 +48,7 @@ export function DiscoveryFeed({ allProducts }: { allProducts: Product[] }) {
 
     let q = queueRef.current;
     if (!q) {
-      const order = epochOrder(allProducts, 1);
+      const order = epochOrder(allProducts, 1, new Set(shownIds));
       const index = Math.min(BATCH, order.length);
       q = queueRef.current = { epoch: 1, index, order, lastId: order[index - 1]?.id ?? null };
     }
@@ -55,7 +70,7 @@ export function DiscoveryFeed({ allProducts }: { allProducts: Product[] }) {
       batch.push(product);
     }
     setItems((prev) => [...prev, ...batch]);
-  }, [allProducts]);
+  }, [allProducts, shownIds]);
 
   // Gatilho por rolagem: quando o sentinel entra na zona de MARGIN, carrega.
   useEffect(() => {

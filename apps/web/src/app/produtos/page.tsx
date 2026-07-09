@@ -11,7 +11,7 @@ import { RandomButton } from '@/components/products/discovery/random-button';
 import { DiscoveryProductCard } from '@/components/products/discovery/discovery-product-card';
 import { Pagination } from '@/components/ui/pagination';
 import { SearchTracker } from '@/components/products/search-tracker';
-import type { ProductQuery } from '@/types/product';
+import type { Product, ProductQuery } from '@/types/product';
 
 interface PageProps {
   searchParams: Record<string, string | string[] | undefined>;
@@ -43,8 +43,22 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
     getCategories().catch(() => ({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 })),
   ]);
 
-  const products = productsResult.data;
+  let products: Product[] = productsResult.data;
   const categories = categoriesResult.data;
+
+  // A API pagina em no máximo 100; no modo discovery busca as páginas
+  // restantes para o catálogo inteiro circular no feed (teto de 500).
+  if (!isFiltered && productsResult.totalPages > 1) {
+    const extras = await Promise.all(
+      Array.from({ length: Math.min(productsResult.totalPages, 5) - 1 }, (_, i) =>
+        getProducts({ page: i + 2, limit: 100, status: 'ACTIVE' }).catch(() => null),
+      ),
+    );
+    for (const extra of extras) {
+      if (extra) products = products.concat(extra.data);
+    }
+  }
+
   const slugs = products.map((p) => p.slug);
 
   /* ── FILTERED MODE ─────────────────────────────────────────────────── */
@@ -84,31 +98,43 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
   }
 
   /* ── DISCOVERY MODE ─────────────────────────────────────────────────── */
-  const novos = products
-    .slice()
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 8);
+  // Seções sem sobreposição: cada uma consome só do que ainda não apareceu,
+  // para o mesmo produto não se repetir ao longo da página.
+  const used = new Set<string>();
+  const take = (list: Product[], n: number): Product[] => {
+    const picked = list.filter((p) => !used.has(p.id)).slice(0, n);
+    for (const p of picked) used.add(p.id);
+    return picked;
+  };
 
-  const ofertas = products
-    .filter(hasDiscount)
-    .sort((a, b) => discountPercent(b) - discountPercent(a))
-    .slice(0, 8);
+  const novos = take(
+    products
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    8,
+  );
+
+  const ofertas = take(
+    products.filter(hasDiscount).sort((a, b) => discountPercent(b) - discountPercent(a)),
+    8,
+  );
 
   const ofertasFallback =
     ofertas.length > 0
       ? ofertas
-      : products
-          .slice()
-          .sort((a, b) => a.price - b.price)
-          .slice(0, 8);
+      : take(
+          products.slice().sort((a, b) => a.price - b.price),
+          8,
+        );
 
-  const aleatorios = shuffleWithSeed(products, 99).slice(0, 8);
+  const aleatorios = take(shuffleWithSeed(products, 99), 8);
 
-  const visualizados = shuffleWithSeed(products, 7).slice(0, 8);
+  const visualizados = take(shuffleWithSeed(products, 7), 8);
 
-  const ultimas = products
-    .filter((p) => p.stock > 0 && p.stock <= 4)
-    .sort((a, b) => a.stock - b.stock);
+  const ultimas = take(
+    products.filter((p) => p.stock > 0 && p.stock <= 4).sort((a, b) => a.stock - b.stock),
+    products.length,
+  );
 
   return (
     <main className="flex-1">
@@ -178,7 +204,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
 
       <div id="descobrir" className="scroll-mt-24" />
 
-      <DiscoveryFeed allProducts={products} />
+      <DiscoveryFeed allProducts={products} shownIds={Array.from(used)} />
 
       <RandomButton slugs={slugs} />
     </main>
