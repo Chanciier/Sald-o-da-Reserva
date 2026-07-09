@@ -38,7 +38,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
             sortOrder: param(searchParams.sortOrder) as ProductQuery['sortOrder'],
             status: 'ACTIVE',
           } satisfies ProductQuery)
-        : { limit: 60, status: 'ACTIVE' },
+        : { limit: 100, status: 'ACTIVE' },
     ).catch(() => ({ data: [], total: 0, page: 1, limit: 24, totalPages: 0 })),
     getCategories().catch(() => ({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 })),
   ]);

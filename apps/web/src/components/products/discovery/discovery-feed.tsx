@@ -9,19 +9,51 @@ import { DiscoveryProductCard } from '@/components/products/discovery/discovery-
 const BATCH = 8;
 const MARGIN = 600;
 
-function nextBatch(all: Product[], cycle: number): Product[] {
-  return shuffleWithSeed(all, cycle * 31 + 7).slice(0, BATCH);
+// Ordem de uma rodada: o catálogo inteiro embaralhado com seed própria.
+function epochOrder(all: Product[], epoch: number): Product[] {
+  return shuffleWithSeed(all, epoch * 31 + 7);
+}
+
+interface Queue {
+  epoch: number;
+  index: number;
+  order: Product[];
+  lastId: string | null;
 }
 
 export function DiscoveryFeed({ allProducts }: { allProducts: Product[] }) {
-  const cycleRef = useRef(1);
-  const [items, setItems] = useState<Product[]>(() => allProducts.slice(0, BATCH));
+  // Fila por rodadas: cada rodada percorre o catálogo inteiro embaralhado,
+  // então nenhum produto repete antes de todos os outros aparecerem.
+  const queueRef = useRef<Queue | null>(null);
+  const [items, setItems] = useState<Product[]>(() => epochOrder(allProducts, 1).slice(0, BATCH));
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const loadMore = useCallback(() => {
     if (allProducts.length === 0) return;
-    const batch = nextBatch(allProducts, cycleRef.current);
-    cycleRef.current += 1;
+
+    let q = queueRef.current;
+    if (!q) {
+      const order = epochOrder(allProducts, 1);
+      const index = Math.min(BATCH, order.length);
+      q = queueRef.current = { epoch: 1, index, order, lastId: order[index - 1]?.id ?? null };
+    }
+
+    const batch: Product[] = [];
+    while (batch.length < BATCH) {
+      if (q.index >= q.order.length) {
+        q.epoch += 1;
+        q.index = 0;
+        q.order = epochOrder(allProducts, q.epoch);
+        // Evita o mesmo produto duas vezes seguidas na virada da rodada.
+        if (q.order.length > 1 && q.order[0].id === q.lastId) {
+          [q.order[0], q.order[1]] = [q.order[1], q.order[0]];
+        }
+      }
+      const product = q.order[q.index];
+      q.index += 1;
+      q.lastId = product.id;
+      batch.push(product);
+    }
     setItems((prev) => [...prev, ...batch]);
   }, [allProducts]);
 
