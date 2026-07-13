@@ -114,6 +114,19 @@ export class WhatsappMarketingService {
     return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_DELETE_WINDOW_MINUTES;
   }
 
+  // Mensagem de texto simples (sem produto) para todos os grupos ativos — usado
+  // pelos avisos de "bom dia"/"boa noite" da rotina de disparo espaçado.
+  async broadcastGreeting(message: string): Promise<void> {
+    const groups = await this.prisma.whatsappGroup.findMany({ where: { active: true } });
+    for (const group of groups) {
+      try {
+        await this.whatsapp.sendMessage(group.groupId, message);
+      } catch (e) {
+        this.logger.error(`Saudação → grupo ${group.name}: ${(e as Error).message}`);
+      }
+    }
+  }
+
   // Produto já postado nos grupos e editado (qualquer campo exceto estoque)
   // ainda dentro do prazo de exclusão do WhatsApp: apaga a mensagem desatualizada
   // em cada grupo onde foi postada e reenvia a versão corrigida (preço, nome,

@@ -41,10 +41,26 @@ export interface BroadcastState {
 export class WhatsappBroadcastService {
   private readonly logger = new Logger(WhatsappBroadcastService.name);
 
+  private static readonly GREETINGS = [
+    'Bom dia! ☀️ Começando o dia com ofertas novas por aqui, fica de olho que os disparos já vão começar!',
+    'Bom dia, pessoal! 🌞 Mais um dia de saldão começando, as ofertas já vão sair aqui no grupo!',
+    'Bom dia! ☀️🛍️ Hoje tem oferta o dia todo por aqui, se liga nos próximos disparos!',
+  ];
+
+  private static readonly FAREWELLS = [
+    'Boa noite! 🌙 Por hoje os disparos encerram por aqui, amanhã tem mais ofertas. Até lá!',
+    'Boa noite, pessoal! 🌙✨ Fechando o dia por aqui, amanhã a gente volta com mais ofertas!',
+    'Boa noite! 🌙 Foi tudo por hoje, obrigado por acompanhar! Amanhã tem mais saldão.',
+  ];
+
   constructor(
     private readonly redis: RedisService,
     private readonly marketing: WhatsappMarketingService,
   ) {}
+
+  private pick(list: string[]): string {
+    return list[Math.floor(Math.random() * list.length)];
+  }
 
   async getState(): Promise<BroadcastState | null> {
     const state = await this.redis.getJson<BroadcastState>(STATE_KEY);
@@ -176,12 +192,23 @@ export class WhatsappBroadcastService {
     const firstBatchSize = activeDay ? this.computeBatchSize(queue.length, now, schedule) : 0;
     const firstBatch = queue.splice(0, firstBatchSize);
 
+    if (firstBatch.length) {
+      await this.marketing.broadcastGreeting(this.pick(WhatsappBroadcastService.GREETINGS));
+    }
+
     const progress = { sent: 0, failed: 0, lastProductName: null as string | null };
     await this.sendBatch(firstBatch, progress);
 
     const intervalMin = activeDay?.intervalMin ?? enabledDays[0].intervalMin;
     const nextFrom = new Date(now.getTime() + (firstBatch.length ? intervalMin : 0) * 60_000);
     const nextAt = this.nextAllowed(nextFrom, schedule);
+
+    // Se o próximo disparo cai num dia diferente (fuso da loja), esse já foi o
+    // último envio de hoje — despede antes de persistir o estado.
+    if (firstBatch.length && this.dateKey(nextAt) !== this.dateKey(now)) {
+      await this.marketing.broadcastGreeting(this.pick(WhatsappBroadcastService.FAREWELLS));
+    }
+
     const state: BroadcastState = {
       running: true,
       startedAt: now.toISOString(),
@@ -265,6 +292,14 @@ export class WhatsappBroadcastService {
       return;
     }
 
+    // Primeiro disparo do dia (comparando com a data do último envio, no fuso da
+    // loja) leva um "bom dia" antes do lote de produtos.
+    const isFirstDispatchToday =
+      !state.lastSentAt || this.dateKey(new Date(state.lastSentAt)) !== this.dateKey(now);
+    if (isFirstDispatchToday) {
+      await this.marketing.broadcastGreeting(this.pick(WhatsappBroadcastService.GREETINGS));
+    }
+
     // Lote adaptativo: se a fila não coubesse 1 produto por disparo dentro da
     // janela do dia, manda 2, 3 ou mais de uma vez para escoar tudo a tempo.
     const batchSize = this.computeBatchSize(state.queue.length, now, state.schedule);
@@ -279,6 +314,13 @@ export class WhatsappBroadcastService {
       state.schedule,
     ).toISOString();
     state.remaining = state.queue.length;
+
+    // Se o próximo disparo só acontece num dia diferente, este foi o último de
+    // hoje — despede depois de enviar o lote.
+    if (this.dateKey(new Date(state.nextAt)) !== this.dateKey(now)) {
+      await this.marketing.broadcastGreeting(this.pick(WhatsappBroadcastService.FAREWELLS));
+    }
+
     await this.redis.setJson(STATE_KEY, state, STATE_TTL);
   }
 }
