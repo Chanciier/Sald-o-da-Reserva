@@ -12,7 +12,19 @@ const CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.SEPARATING,
   OrderStatus.SEPARATED,
   OrderStatus.READY_TO_SHIP,
+  OrderStatus.DELIVERED,
   OrderStatus.REFUNDED,
+];
+
+// Orders in these statuses never left the store, so cancelling them frees the
+// stock back up. A DELIVERED order's item is already with the customer — do
+// not restock it automatically, or it comes back to the catalog as if it were
+// still on the shelf (see project-estoque-cancelamento-expedicao memory).
+const STOCK_RESTORE_STATUSES: OrderStatus[] = [
+  OrderStatus.PAID,
+  OrderStatus.SEPARATING,
+  OrderStatus.SEPARATED,
+  OrderStatus.READY_TO_SHIP,
 ];
 
 function serializeOrder(order: Record<string, unknown>) {
@@ -705,17 +717,19 @@ export class ExpedicaoService {
           data: { status: PaymentStatus.REFUNDED },
         });
       }
-      for (const item of order.items) {
-        const updated = await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-          select: { stock: true, status: true },
-        });
-        if (updated.stock > 0 && updated.status === 'INACTIVE') {
-          await tx.product.update({
+      if (STOCK_RESTORE_STATUSES.includes(order.status)) {
+        for (const item of order.items) {
+          const updated = await tx.product.update({
             where: { id: item.productId },
-            data: { status: 'ACTIVE' },
+            data: { stock: { increment: item.quantity } },
+            select: { stock: true, status: true },
           });
+          if (updated.stock > 0 && updated.status === 'INACTIVE') {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { status: 'ACTIVE' },
+            });
+          }
         }
       }
     });

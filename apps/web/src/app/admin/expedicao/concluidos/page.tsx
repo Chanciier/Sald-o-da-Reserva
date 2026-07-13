@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchConcluidos } from '@/actions/expedicao';
+import { fetchConcluidos, cancelarPedido } from '@/actions/expedicao';
 import type { OrderSummary } from '@/actions/expedicao';
 import { DeliveryTabs, useDeliveryTab } from '../_components/delivery-tabs';
 
@@ -18,15 +18,32 @@ function fmt(n: number) {
 
 export default function ConcluidosPage() {
   const { token } = useAuth();
+  const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useDeliveryTab();
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [refundWarning, setRefundWarning] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['expedicao-concluidos', page, search, deliveryMethod],
     queryFn: () => fetchConcluidos(token!, { page, search, deliveryMethod }),
     enabled: !!token,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (orderId: string) => cancelarPedido(token!, orderId),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setCancelError(result.error);
+        return;
+      }
+      setConfirmCancel(null);
+      if (result.refundError) setRefundWarning(result.refundError);
+      qc.invalidateQueries({ queryKey: ['expedicao-concluidos'] });
+    },
   });
 
   function handleSearch(e: React.FormEvent) {
@@ -49,6 +66,33 @@ export default function ConcluidosPage() {
           setPage(1);
         }}
       />
+
+      {cancelError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3">
+          <span>{cancelError}</span>
+          <button
+            onClick={() => setCancelError(null)}
+            className="shrink-0 text-destructive/70 hover:text-destructive"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {refundWarning && (
+        <div className="rounded-lg border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300 flex items-center justify-between gap-3">
+          <span>
+            Pedido cancelado, mas o estorno automático falhou: {refundWarning}. Realize o estorno
+            manualmente no Mercado Pago.
+          </span>
+          <button
+            onClick={() => setRefundWarning(null)}
+            className="shrink-0 opacity-70 hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="relative">
@@ -101,6 +145,7 @@ export default function ConcluidosPage() {
                   <th className="px-4 py-3 font-medium">Data Pedido</th>
                   <th className="px-4 py-3 font-medium">Data Conclusão</th>
                   <th className="px-4 py-3 font-medium text-right">Valor</th>
+                  <th className="px-4 py-3 font-medium">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -120,6 +165,37 @@ export default function ConcluidosPage() {
                       {new Date(o.updatedAt).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">{fmt(o.total)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {confirmCancel === o.id ? (
+                          <>
+                            <span className="text-xs text-muted-foreground">Cancelar?</span>
+                            <button
+                              onClick={() => cancelMutation.mutate(o.id)}
+                              disabled={cancelMutation.isPending}
+                              className="rounded-lg bg-destructive px-2.5 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                            >
+                              {cancelMutation.isPending && cancelMutation.variables === o.id
+                                ? '...'
+                                : 'Sim'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmCancel(null)}
+                              className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted"
+                            >
+                              Não
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmCancel(o.id)}
+                            className="rounded-lg border border-destructive/50 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
