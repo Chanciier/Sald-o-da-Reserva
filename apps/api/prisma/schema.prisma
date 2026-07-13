@@ -489,6 +489,7 @@ model Order {
   separatedItems  Json?    @map("separated_items")
   separationNotes String?  @map("separation_notes")
   pickupRemindedAt DateTime? @map("pickup_reminded_at")
+  clientConfirmedPickupAt DateTime? @map("client_confirmed_pickup_at")
   stockApplied    Boolean  @default(false) @map("stock_applied")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")

@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { getOrder } from '@/lib/cart-api';
+import { getOrder, confirmarRetiradaCliente } from '@/lib/cart-api';
 import { purchaseLabel } from '@/lib/shipping';
 import { fetchInvoices, type Invoice } from '@/actions/invoices';
 import { TrackingDisplay } from '@/components/shipping/tracking-display';
@@ -57,6 +57,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 export default function OrderDetailPage() {
   const { user, token } = useAuth();
   const params = useParams();
+  const searchParams = useSearchParams();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -67,6 +68,9 @@ export default function OrderDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showConfirmPickupModal, setShowConfirmPickupModal] = useState(false);
+  const [confirmingPickup, setConfirmingPickup] = useState(false);
+  const [confirmPickupError, setConfirmPickupError] = useState('');
 
   const isAdmin = user?.role === 'ADMIN';
   const isStaff = user?.role === 'ADMIN' || user?.role === 'VENDEDOR';
@@ -92,6 +96,34 @@ export default function OrderDetailPage() {
       .then((res) => setInvoice(res.data[0] ?? null))
       .catch(() => null);
   }, [token, isStaff, params.id]);
+
+  // Abre o modal de confirmação automaticamente quando o cliente chega pelo
+  // link do lembrete de WhatsApp (/pedidos/{id}?confirmar-retirada=true).
+  useEffect(() => {
+    if (!order) return;
+    const wantsConfirm = searchParams.get('confirmar-retirada') === 'true';
+    const eligible =
+      (order.deliveryMethod === 'PICKUP' || !!order.pickupCode) &&
+      order.status === 'READY_TO_SHIP' &&
+      !order.clientConfirmedPickupAt;
+    if (wantsConfirm && eligible) setShowConfirmPickupModal(true);
+  }, [order, searchParams]);
+
+  async function handleConfirmarRetirada() {
+    if (!token || !order) return;
+    setConfirmingPickup(true);
+    setConfirmPickupError('');
+    try {
+      await confirmarRetiradaCliente(token, order.id);
+      const updated = await getOrder(token, order.id);
+      setOrder(updated);
+      setShowConfirmPickupModal(false);
+    } catch (e) {
+      setConfirmPickupError((e as Error).message);
+    } finally {
+      setConfirmingPickup(false);
+    }
+  }
 
   async function handleCancelOrder() {
     if (!token || !order) return;
@@ -555,6 +587,24 @@ export default function OrderDetailPage() {
               </div>
             )}
 
+            {order.status === 'READY_TO_SHIP' &&
+              (order.clientConfirmedPickupAt ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  Você informou que já retirou este pedido. Assim que a loja confirmar, ele
+                  aparecerá como entregue.
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+                  <p className="text-sm font-medium">Você já retirou este pedido?</p>
+                  <button
+                    onClick={() => setShowConfirmPickupModal(true)}
+                    className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    Confirmar que já retirei
+                  </button>
+                </div>
+              ))}
+
             <div className="rounded-lg border border-border px-4 py-3 space-y-0.5">
               <p className="text-xs font-semibold">{STORE.mall}</p>
               <p className="text-xs text-muted-foreground">
@@ -645,6 +695,39 @@ export default function OrderDetailPage() {
               .catch(() => {});
           }}
         />
+      )}
+
+      {showConfirmPickupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl border bg-background p-6 shadow-xl">
+            <h2 className="text-base font-semibold mb-2">Confirmar retirada</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Confirma que este pedido já foi retirado na loja?
+            </p>
+            {confirmPickupError && (
+              <p className="mb-3 text-xs text-destructive">{confirmPickupError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowConfirmPickupModal(false);
+                  setConfirmPickupError('');
+                }}
+                disabled={confirmingPickup}
+                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleConfirmarRetirada}
+                disabled={confirmingPickup}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {confirmingPickup ? 'Confirmando...' : 'Confirmar retirada'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

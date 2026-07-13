@@ -9,7 +9,9 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { AdminSection, Role } from '@prisma/client';
 import { CheckoutService } from './checkout.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -21,6 +23,19 @@ import { RequireSection } from '../seller-permissions/decorators/require-section
 @Controller()
 export class CheckoutController {
   constructor(private readonly checkout: CheckoutService) {}
+
+  private getIp(req: Request): string {
+    return (
+      (req.headers['cf-connecting-ip'] as string) ||
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.ip ||
+      'unknown'
+    );
+  }
+
+  private getUserAgent(req: Request): string {
+    return (req.headers['user-agent'] as string) || '';
+  }
 
   @Get('checkout/shipping')
   getShipping(@Query('subtotal') subtotal: string, @Query('cep') cep?: string) {
@@ -75,6 +90,19 @@ export class CheckoutController {
   @HttpCode(HttpStatus.OK)
   cancelOrder(@CurrentUser('id') userId: string, @Param('id') orderId: string) {
     return this.checkout.cancelUserOrder(userId, orderId);
+  }
+
+  @Patch('orders/:id/confirmar-retirada')
+  @HttpCode(HttpStatus.OK)
+  confirmarRetiradaCliente(
+    @CurrentUser('id') userId: string,
+    @Param('id') orderId: string,
+    @Req() req: Request,
+  ) {
+    return this.checkout.confirmarRetiradaCliente(userId, orderId, {
+      ipAddress: this.getIp(req),
+      userAgent: this.getUserAgent(req),
+    });
   }
 
   @Get('orders/:id')

@@ -350,6 +350,72 @@ export class CheckoutService {
     return cancelled;
   }
 
+  // Cliente informa que já retirou o pedido na loja, antes da equipe dar a
+  // baixa definitiva (confirmarRetirada em ExpedicaoService). Não altera o
+  // status do pedido — apenas sinaliza pro time, que continua responsável
+  // pela confirmação final.
+  async confirmarRetiradaCliente(
+    userId: string,
+    orderId: string,
+    meta: { ipAddress?: string; userAgent?: string },
+  ) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      select: {
+        id: true,
+        status: true,
+        deliveryMethod: true,
+        clientConfirmedPickupAt: true,
+      },
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    if (order.deliveryMethod !== DeliveryMethod.PICKUP) {
+      throw new BadRequestException(
+        'Confirmação de retirada só é válida para pedidos de retirada na loja.',
+      );
+    }
+
+    if (order.status === OrderStatus.DELIVERED) {
+      throw new BadRequestException('Este pedido já foi retirado.');
+    }
+
+    if (order.clientConfirmedPickupAt) {
+      throw new BadRequestException('Você já confirmou a retirada deste pedido.');
+    }
+
+    if (order.status !== OrderStatus.READY_TO_SHIP) {
+      throw new BadRequestException(
+        'Este pedido ainda não está disponível para confirmação de retirada.',
+      );
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { clientConfirmedPickupAt: new Date() },
+      select: { id: true, status: true, clientConfirmedPickupAt: true },
+    });
+
+    await recordOrderEvent(this.prisma, {
+      orderId,
+      status: order.status,
+      title: 'Cliente informou que já retirou o pedido',
+      actor: 'cliente',
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        action: 'order.pickup_confirmed_by_client',
+        userId,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        metadata: { orderId } as Prisma.InputJsonValue,
+      },
+    });
+
+    return updated;
+  }
+
   async updateOrderStatus(orderId: string, status: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

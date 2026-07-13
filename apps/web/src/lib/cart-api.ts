@@ -60,3 +60,10 @@ export const createOrder = (token: string, body: unknown) =>
 export const getOrders = (token: string) => apiFetch<Order[]>('/orders', token);
 
 export const getOrder = (token: string, id: string) => apiFetch<Order>(`/orders/${id}`, token);
+
+export const confirmarRetiradaCliente = (token: string, id: string) =>
+  apiFetch<{ id: string; status: string; clientConfirmedPickupAt: string }>(
+    `/orders/${id}/confirmar-retirada`,
+    token,
+    { method: 'PATCH' },
+  );

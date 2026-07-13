@@ -313,6 +313,11 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
         >
           {STATUS_LABEL[status] ?? status}
         </span>
+        {order.clientConfirmedPickupAt && (
+          <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+            Cliente informou que já retirou
+          </span>
+        )}
       </div>
 
       {/* Contato do cliente */}

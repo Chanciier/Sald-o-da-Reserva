@@ -227,11 +227,18 @@ export default function RetiradaPage() {
                       {new Date(o.createdAt).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[o.status] ?? 'bg-muted text-foreground'}`}
-                      >
-                        {STATUS_LABEL[o.status] ?? o.status}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[o.status] ?? 'bg-muted text-foreground'}`}
+                        >
+                          {STATUS_LABEL[o.status] ?? o.status}
+                        </span>
+                        {o.clientConfirmedPickupAt && (
+                          <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+                            Cliente informou que já retirou
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">

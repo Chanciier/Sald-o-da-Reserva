@@ -199,6 +199,9 @@ export class OrderWhatsappService {
       `🕒 ${this.pickupHours}`,
       '',
       'Te esperamos! 💛',
+      '',
+      'Se você já retirou seu pedido e o status ainda não foi atualizado, confirme a retirada pelo link abaixo:',
+      `Confirmar retirada: ${this.orderUrl(t.orderId)}?confirmar-retirada=true`,
       STORE_NAME,
     );
     return this.send(t.phone, lines.join('\n'));

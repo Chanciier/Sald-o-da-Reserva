@@ -89,6 +89,7 @@ export interface OrderSummary {
   buyerName: string | null;
   deliveryMethod: 'SHIPPING' | 'PICKUP';
   pickupCode: string | null;
+  clientConfirmedPickupAt: string | null;
   separatedItems: string[] | null;
   total: number;
   subtotal: number;
