@@ -208,7 +208,7 @@ function PendentesTab({ token }: { token: string }) {
                   <tr key={o.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
                       <Link
-                        href={`/pedidos/${o.id}`}
+                        href={`/admin/expedicao/conferencia/${o.id}`}
                         className="font-mono text-xs text-primary hover:underline"
                       >
                         #{o.id.slice(-8).toUpperCase()}
@@ -250,7 +250,7 @@ function PendentesTab({ token }: { token: string }) {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/pedidos/${o.id}`}
+                          href={`/admin/expedicao/conferencia/${o.id}`}
                           className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
                         >
                           Ver
@@ -421,7 +421,7 @@ function TodosTab({ token }: { token: string }) {
                   <tr key={o.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
                       <Link
-                        href={`/pedidos/${o.id}`}
+                        href={`/admin/expedicao/conferencia/${o.id}`}
                         className="font-mono text-xs text-primary hover:underline"
                       >
                         #{o.id.slice(-8).toUpperCase()}
@@ -506,7 +506,7 @@ function TodosTab({ token }: { token: string }) {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/pedidos/${o.id}`}
+                          href={`/admin/expedicao/conferencia/${o.id}`}
                           className="rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
                         >
                           Ver

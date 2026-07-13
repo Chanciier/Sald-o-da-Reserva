@@ -700,7 +700,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
             </div>
           )}
 
-          {status !== 'DELIVERED' && status !== 'SHIPPED' && status !== 'CANCELLED' && (
+          {status !== 'SHIPPED' && status !== 'CANCELLED' && (
             <>
               {cancelError && <p className="text-xs text-destructive">{cancelError}</p>}
               {confirmCancel ? (
