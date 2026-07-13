@@ -347,6 +347,8 @@ export class CheckoutService {
     // Only restores if stock had actually been applied (i.e. order was paid).
     // A pending/unpaid order never decremented stock, so this is a no-op.
     await this.stock.restoreForOrder(orderId);
+    // Orchestrator: libera produtos únicos reservados na criação do pedido.
+    this.events.emit(OmsEvents.OrderCancelled, { orderId, reason: 'cliente.cancelou' });
     return cancelled;
   }
 

@@ -4,6 +4,9 @@ import { DeliveryMethod, OrderStatus, PaymentStatus, ShipmentStatus } from '@pri
 import { PrismaService } from '../prisma/prisma.service';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import { OrderWhatsappService } from '../whatsapp/order-whatsapp.service';
+import { StockService } from '../stock/stock.service';
+import { EventBusService } from '../events/event-bus.service';
+import { OmsEvents } from '../events/oms-events';
 import { recordOrderEvent } from '../common/order-timeline';
 import { startOfBrazilDay, endOfBrazilDay } from '../analytics/report-range';
 
@@ -93,6 +96,8 @@ export class ExpedicaoService {
     private readonly prisma: PrismaService,
     private readonly mp: MercadoPagoService,
     private readonly orderWa: OrderWhatsappService,
+    private readonly stock: StockService,
+    private readonly events: EventBusService,
   ) {}
 
   async getStats(userId: string | null) {
@@ -649,7 +654,6 @@ export class ExpedicaoService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        items: { select: { productId: true, quantity: true } },
         payment: { select: { id: true, status: true, gatewayPaymentId: true, method: true } },
       },
     });
@@ -717,22 +721,18 @@ export class ExpedicaoService {
           data: { status: PaymentStatus.REFUNDED },
         });
       }
-      if (STOCK_RESTORE_STATUSES.includes(order.status)) {
-        for (const item of order.items) {
-          const updated = await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: item.quantity } },
-            select: { stock: true, status: true },
-          });
-          if (updated.stock > 0 && updated.status === 'INACTIVE') {
-            await tx.product.update({
-              where: { id: item.productId },
-              data: { status: 'ACTIVE' },
-            });
-          }
-        }
-      }
     });
+
+    // Devolução via StockService: o claim atômico de stockApplied garante que a
+    // devolução acontece UMA vez, mesmo se o webhook de reembolso do MP chegar
+    // em paralelo e também chamar restoreForOrder (incidente 09/07: o incremento
+    // direto aqui duplicava o estoque nessa corrida).
+    if (STOCK_RESTORE_STATUSES.includes(order.status)) {
+      await this.stock.restoreForOrder(orderId);
+      // Orchestrator: libera produtos únicos (o item nunca saiu da loja) e
+      // propaga o estoque devolvido aos canais externos.
+      this.events.emit(OmsEvents.OrderCancelled, { orderId, reason: 'expedicao.cancelamento' });
+    }
 
     await recordOrderEvent(this.prisma, {
       orderId,

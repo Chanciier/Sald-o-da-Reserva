@@ -39,6 +39,7 @@ export class OrderOrchestratorService implements OnModuleInit {
     this.events.on(OmsEvents.OrderCancelled, (p) => this.onOrderCancelled(p));
     this.events.on(OmsEvents.MarketplacePublishFailed, (p) => this.onPublishFailed(p));
     this.events.on(OmsEvents.StockDecremented, (p) => this.onStockDecremented(p));
+    this.events.on(OmsEvents.StockRestored, (p) => this.onStockRestored(p));
   }
 
   private async onOrderCreated({ orderId }: OmsEventPayloads['order.created']): Promise<void> {
@@ -94,23 +95,46 @@ export class OrderOrchestratorService implements OnModuleInit {
     }
   }
 
-  /** Pedido cancelado: libera produtos únicos reservados (mas não os já vendidos). */
+  /**
+   * Pedido cancelado ANTES de sair da loja: libera produtos únicos, tanto os
+   * reservados quanto os já marcados como SOLD — o item voltou à prateleira.
+   * Quem emite o evento é responsável por só emiti-lo quando o item de fato
+   * nunca saiu (ver expedição: pedidos DELIVERED não emitem).
+   */
   private async onOrderCancelled({ orderId }: OmsEventPayloads['order.cancelled']): Promise<void> {
     const items = await this.prisma.orderItem.findMany({
       where: { orderId },
-      select: { product: { select: { id: true, isUnique: true } } },
+      select: { product: { select: { id: true, name: true, isUnique: true } } },
     });
 
     for (const { product } of items) {
       if (!product?.isUnique) continue;
       const freed = await this.prisma.product.updateMany({
-        where: { id: product.id, status: ProductStatus.RESERVED },
+        where: { id: product.id, status: { in: [ProductStatus.RESERVED, ProductStatus.SOLD] } },
         data: { status: ProductStatus.ACTIVE },
       });
       if (freed.count > 0) {
         await this.audit('oms.product.released', { productId: product.id, orderId });
+        // Anúncios REMOVED em outros canais não reabrem sozinhos (ML fecha o
+        // anúncio em definitivo) — o admin precisa republicar pelo painel.
+        await this.notifications.notify({
+          role: Role.ADMIN,
+          type: 'PRODUCT_RELEASED',
+          title: 'Produto único de volta ao catálogo',
+          message: `${product.name} voltou a ficar disponível após cancelamento. Verifique os anúncios nos marketplaces — anúncios removidos precisam ser republicados.`,
+          orderId,
+          productId: product.id,
+        });
       }
     }
+  }
+
+  /** Estoque devolvido (cancelamento/estorno): propaga o novo nível aos canais. */
+  private async onStockRestored({
+    productId,
+    newStock,
+  }: OmsEventPayloads['stock.restored']): Promise<void> {
+    await this.hub.enqueueSync(productId, SyncAction.UPDATE_STOCK, newStock);
   }
 
   /** Estoque baixado por venda: propaga o novo nível a todos os canais ativos. */

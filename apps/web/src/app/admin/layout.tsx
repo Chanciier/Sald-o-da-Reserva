@@ -31,6 +31,8 @@ import {
   MessageCircle,
   Boxes,
   Lock,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -187,7 +189,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const { data: mySections } = useMySections();
+
+  useEffect(() => {
+    setCollapsed(localStorage.getItem('admin-sidebar-collapsed') === '1');
+  }, []);
 
   useEffect(() => {
     if (!loading && (!user || (user.role !== 'ADMIN' && user.role !== 'VENDEDOR'))) {
@@ -245,6 +252,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setOpen((prev) => ({ ...prev, [label]: !prev[label] }));
   }
 
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('admin-sidebar-collapsed', next ? '1' : '0');
+      return next;
+    });
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Mobile backdrop */}
@@ -257,21 +272,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar */}
       <aside
-        className={`no-print fixed inset-y-0 left-0 z-50 flex w-72 shrink-0 flex-col border-r bg-card transition-transform duration-200 md:static md:w-60 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`no-print fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r bg-card transition-all duration-200 ${collapsed ? 'md:w-16' : 'md:w-60'} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
         {/* Brand */}
         <div className="flex h-14 items-center justify-between border-b px-5">
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 ${collapsed ? 'md:hidden' : ''}`}>
             <span className="text-xs font-bold text-primary uppercase tracking-widest">Admin</span>
             <span className="text-xs text-muted-foreground">· Saldão</span>
           </div>
-          <button
-            className="rounded-md p-1 hover:bg-muted md:hidden"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Fechar menu"
-          >
-            <X className="size-4" />
-          </button>
+          {collapsed && <span className="hidden text-sm font-bold text-primary md:block">S</span>}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleCollapsed}
+              className="hidden rounded-md p-1.5 hover:bg-muted transition-colors md:inline-flex"
+              aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+              title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="size-4" />
+              ) : (
+                <PanelLeftClose className="size-4" />
+              )}
+            </button>
+            <button
+              className="rounded-md p-1 hover:bg-muted md:hidden"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Fechar menu"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
 
         {/* Nav */}
@@ -285,15 +315,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Link
                   key={item.href}
                   href={item.href!}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  title={collapsed ? item.label : undefined}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${collapsed ? 'md:justify-center md:px-2' : ''} ${
                     active
                       ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {locked && <Lock className="h-3 w-3 shrink-0 opacity-60" />}
+                  <span className={`flex-1 ${collapsed ? 'md:hidden' : ''}`}>{item.label}</span>
+                  {locked && (
+                    <Lock
+                      className={`h-3 w-3 shrink-0 opacity-60 ${collapsed ? 'md:hidden' : ''}`}
+                    />
+                  )}
                 </Link>
               );
             }
@@ -302,26 +337,60 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const isOpen = open[item.label] ?? false;
 
             return (
-              <div key={item.label}>
+              <div key={item.label} className="relative group">
                 <button
                   onClick={() => toggle(item.label)}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  title={collapsed ? item.label : undefined}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${collapsed ? 'md:justify-center md:px-2' : ''} ${
                     anyActive
                       ? 'text-foreground font-medium'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1 text-left">{item.label}</span>
+                  <span className={`flex-1 text-left ${collapsed ? 'md:hidden' : ''}`}>
+                    {item.label}
+                  </span>
                   {isOpen ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
+                    <ChevronDown className={`h-3.5 w-3.5 ${collapsed ? 'md:hidden' : ''}`} />
                   ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
+                    <ChevronRight className={`h-3.5 w-3.5 ${collapsed ? 'md:hidden' : ''}`} />
                   )}
                 </button>
 
                 {isOpen && (
-                  <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-3">
+                  <div
+                    className={`ml-4 mt-0.5 space-y-0.5 border-l border-border pl-3 ${collapsed ? 'md:hidden' : ''}`}
+                  >
+                    {item.children.map((child) => {
+                      const childActive = isActive(pathname, child.href);
+                      const locked =
+                        user.role === 'VENDEDOR' &&
+                        getNavVisibility(child.href, sections) === 'locked';
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                            childActive
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          }`}
+                        >
+                          <span className="flex-1">{child.label}</span>
+                          {locked && <Lock className="h-3 w-3 shrink-0 opacity-60" />}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Flyout submenu shown on hover when the sidebar is collapsed */}
+                {collapsed && (
+                  <div className="hidden md:group-hover:flex md:absolute md:left-full md:top-0 md:z-50 md:ml-2 md:w-56 md:flex-col md:gap-0.5 md:rounded-lg md:border md:bg-card md:p-2 md:shadow-lg">
+                    <span className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+                      {item.label}
+                    </span>
                     {item.children.map((child) => {
                       const childActive = isActive(pathname, child.href);
                       const locked =
@@ -351,38 +420,43 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* User footer */}
         <div className="border-t p-3 space-y-1">
-          <div className="rounded-lg bg-muted px-3 py-2">
+          <div className={`rounded-lg bg-muted px-3 py-2 ${collapsed ? 'md:hidden' : ''}`}>
             <p className="text-xs font-medium truncate">{user.name ?? user.email}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           </div>
           <Link
             href="/"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title={collapsed ? 'Ver Loja' : undefined}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors ${collapsed ? 'md:justify-center md:px-2' : ''}`}
           >
-            <Store className="h-4 w-4" />
-            Ver Loja
+            <Store className="h-4 w-4 shrink-0" />
+            <span className={collapsed ? 'md:hidden' : ''}>Ver Loja</span>
           </Link>
           <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title={collapsed ? 'Abrir Loja em Nova Aba' : undefined}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors ${collapsed ? 'md:justify-center md:px-2' : ''}`}
           >
-            <ExternalLink className="h-4 w-4" />
-            Abrir Loja em Nova Aba
+            <ExternalLink className="h-4 w-4 shrink-0" />
+            <span className={collapsed ? 'md:hidden' : ''}>Abrir Loja em Nova Aba</span>
           </a>
           <button
             onClick={logout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            title={collapsed ? 'Sair' : undefined}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors ${collapsed ? 'md:justify-center md:px-2' : ''}`}
           >
-            <LogOut className="h-4 w-4" />
-            Sair
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span className={collapsed ? 'md:hidden' : ''}>Sair</span>
           </button>
         </div>
       </aside>
 
       {/* Main */}
-      <div className="flex flex-1 flex-col min-w-0">
+      <div
+        className={`flex flex-1 flex-col min-w-0 transition-all duration-200 ${collapsed ? 'md:ml-16' : 'md:ml-60'}`}
+      >
         {/* Mobile top bar */}
         <div className="flex items-center justify-between border-b bg-card px-4 py-2.5">
           <div className="flex items-center gap-3 md:invisible">

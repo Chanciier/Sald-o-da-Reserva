@@ -51,11 +51,22 @@ interface MlAddress {
 
 interface MlShipment {
   id?: number | string;
+  order_id?: number | string;
   status?: string;
   substatus?: string | null;
   tracking_number?: string | null;
   logistic_type?: string | null;
   receiver_address?: MlAddress;
+}
+
+/** Snapshot local mínimo para aplicar uma atualização de envio. */
+interface LocalShipmentRef {
+  id: string;
+  status: ShipmentStatus;
+  trackingCode: string | null;
+  shippedAt: Date | null;
+  deliveredAt: Date | null;
+  order: { id: string; status: OrderStatus } | null;
 }
 
 export interface ImportResult {
@@ -85,6 +96,13 @@ export class MlOrderImportService {
   /** E-mail do usuário-sistema dono dos pedidos importados do Mercado Livre. */
   private static readonly CHANNEL_USER_EMAIL = 'mercadolivre@marketplace.local';
 
+  /** Estados finais que a sincronização de envio nunca sobrescreve. */
+  private static readonly FINAL_ORDER_STATUSES: OrderStatus[] = [
+    OrderStatus.DELIVERED,
+    OrderStatus.CANCELLED,
+    OrderStatus.REFUNDED,
+  ];
+
   constructor(
     private readonly config: ConfigService,
     private readonly tokenService: MlTokenService,
@@ -112,6 +130,14 @@ export class MlOrderImportService {
       select: { id: true },
     });
     if (existing) {
+      // O webhook de orders também chega quando o pedido muda de estado no ML
+      // (enviado/entregue). Reconcilia o envio para o site acompanhar — é a
+      // única chance de atualizar quando o tópico de shipments não chega.
+      await this.reconcileOrderShipment(existing.id).catch((err) => {
+        this.logger.warn(
+          `ML: reconciliação de envio do pedido ${existing.id} falhou: ${(err as Error).message}`,
+        );
+      });
       return { imported: false, orderId: existing.id, reason: 'já importado' };
     }
 
@@ -227,34 +253,127 @@ export class MlOrderImportService {
 
   /** Atualiza rastreio/estado a partir de um shipment do ML. */
   async syncShipmentById(mlShipmentId: string): Promise<void> {
+    const externalId = String(mlShipmentId);
+    const shipment = await this.fetchShipment(externalId);
+    if (!shipment) {
+      // Erro transitório (API fora / token vencido): propaga para a fila
+      // reprocessar. Antes o retorno silencioso descartava o "enviado/entregue"
+      // para sempre — era isso que deixava pedidos parados no site.
+      throw new Error(`ML: não foi possível buscar o envio ${externalId}`);
+    }
+
+    let local: LocalShipmentRef | null = await this.prisma.shipment.findFirst({
+      where: { externalId },
+      include: { order: { select: { id: true, status: true } } },
+    });
+
+    // Importações que falharam ao buscar o shipment na época ficaram com
+    // externalId nulo: recupera o vínculo pelo pedido do ML e preenche.
+    if (!local && shipment.order_id) {
+      const order = await this.prisma.order.findUnique({
+        where: {
+          channel_externalId: {
+            channel: Marketplace.MERCADO_LIVRE,
+            externalId: String(shipment.order_id),
+          },
+        },
+        select: { id: true },
+      });
+      if (order) {
+        local = await this.prisma.shipment
+          .update({
+            where: { orderId: order.id },
+            data: { externalId },
+            include: { order: { select: { id: true, status: true } } },
+          })
+          .catch(() => null);
+      }
+    }
+    if (!local) return; // pedido ainda não importado — o tópico de orders cuida
+
+    await this.applyShipmentUpdate(local, shipment);
+  }
+
+  /**
+   * Reconcilia o envio de um pedido ML já importado: busca o shipment na API e
+   * espelha enviado/entregue no pedido interno. Chamado quando o webhook de
+   * orders chega para pedido existente e pela rede de segurança periódica.
+   * Falhas transitórias são toleradas (a próxima rodada tenta de novo).
+   */
+  async reconcileOrderShipment(internalOrderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: internalOrderId },
+      select: {
+        id: true,
+        status: true,
+        channel: true,
+        externalId: true,
+        externalReference: true,
+        shipment: true,
+      },
+    });
+    if (!order || order.channel !== Marketplace.MERCADO_LIVRE || !order.shipment) return;
+    if (MlOrderImportService.FINAL_ORDER_STATUSES.includes(order.status)) return;
+
+    let mlShipmentId = order.shipment.externalId ?? order.externalReference;
+    if (!mlShipmentId && order.externalId) {
+      // Importação antiga sem vínculo: redescobre o envio pelo pedido do ML.
+      const mlOrder = await this.fetchOrder(order.externalId);
+      mlShipmentId = mlOrder?.shipping?.id ? String(mlOrder.shipping.id) : null;
+    }
+    if (!mlShipmentId) return;
+
     const shipment = await this.fetchShipment(mlShipmentId);
     if (!shipment) return;
 
-    const local = await this.prisma.shipment.findFirst({
-      where: { externalId: String(mlShipmentId) },
-      include: { order: { select: { id: true, status: true } } },
-    });
-    if (!local) return;
+    if (!order.shipment.externalId) {
+      await this.prisma.shipment.update({
+        where: { id: order.shipment.id },
+        data: { externalId: String(mlShipmentId) },
+      });
+    }
+    await this.applyShipmentUpdate(
+      { ...order.shipment, order: { id: order.id, status: order.status } },
+      shipment,
+    );
+  }
 
+  /** Aplica rastreio/estado de um shipment do ML na remessa e no pedido locais. */
+  private async applyShipmentUpdate(local: LocalShipmentRef, shipment: MlShipment): Promise<void> {
     const mapped = mapShipmentStatus(shipment.status);
+
+    // Não rebaixa uma remessa já entregue (webhooks podem chegar fora de ordem).
+    const nextShipmentStatus =
+      mapped && !(local.status === ShipmentStatus.DELIVERED && mapped !== ShipmentStatus.DELIVERED)
+        ? mapped
+        : local.status;
+
     await this.prisma.shipment.update({
       where: { id: local.id },
       data: {
         trackingCode: shipment.tracking_number ?? local.trackingCode,
-        status: mapped ?? local.status,
+        status: nextShipmentStatus,
         ...(mapped === ShipmentStatus.SHIPPED && !local.shippedAt ? { shippedAt: new Date() } : {}),
-        ...(mapped === ShipmentStatus.DELIVERED ? { deliveredAt: new Date() } : {}),
+        ...(mapped === ShipmentStatus.DELIVERED && !local.deliveredAt
+          ? { deliveredAt: new Date() }
+          : {}),
       },
     });
 
-    // Avança o pedido junto do envio (entregue/enviado), sem retroceder estados.
+    // Avança o pedido junto do envio (enviado/entregue), sem retroceder estados
+    // finais nem reabrir pedidos cancelados.
     const orderStatus =
       mapped === ShipmentStatus.DELIVERED
         ? OrderStatus.DELIVERED
         : mapped === ShipmentStatus.SHIPPED
           ? OrderStatus.SHIPPED
           : null;
-    if (orderStatus && local.order && local.order.status !== orderStatus) {
+    if (
+      orderStatus &&
+      local.order &&
+      local.order.status !== orderStatus &&
+      !MlOrderImportService.FINAL_ORDER_STATUSES.includes(local.order.status)
+    ) {
       await this.prisma.order.update({
         where: { id: local.order.id },
         data: { status: orderStatus },
@@ -264,6 +383,7 @@ export class MlOrderImportService {
         status: orderStatus,
         dedupe: true,
       });
+      this.logger.log(`ML: pedido ${local.order.id} avançou para ${orderStatus} (envio)`);
     }
   }
 
@@ -299,21 +419,59 @@ export class MlOrderImportService {
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async reconcileRecent(): Promise<void> {
-    if (!this.tokenService.isConfigured() || !this.sellerId) return;
-    try {
-      const orders = await this.fetchRecentPaidOrders();
-      let imported = 0;
-      for (const o of orders) {
-        try {
-          const result = await this.importByOrderId(String(o.id));
-          if (result.imported) imported++;
-        } catch (err) {
-          this.logger.warn(`Reconcile: pedido ${o.id} falhou: ${(err as Error).message}`);
+    if (!this.tokenService.isConfigured()) return;
+
+    if (this.sellerId) {
+      try {
+        const orders = await this.fetchRecentPaidOrders();
+        let imported = 0;
+        for (const o of orders) {
+          try {
+            const result = await this.importByOrderId(String(o.id));
+            if (result.imported) imported++;
+          } catch (err) {
+            this.logger.warn(`Reconcile: pedido ${o.id} falhou: ${(err as Error).message}`);
+          }
         }
+        if (imported) this.logger.log(`ML reconcile: ${imported} pedido(s) novo(s) importado(s)`);
+      } catch (err) {
+        this.logger.warn('ML reconcile: busca de pedidos recentes falhou', err as Error);
       }
-      if (imported) this.logger.log(`ML reconcile: ${imported} pedido(s) novo(s) importado(s)`);
-    } catch (err) {
-      this.logger.warn('ML reconcile: busca de pedidos recentes falhou', err as Error);
+    }
+
+    await this.reconcileOpenShipments();
+  }
+
+  /**
+   * Rede de segurança dos ENVIOS: espelha enviado/entregue dos pedidos ML em
+   * aberto mesmo quando o webhook de shipments se perde (ou o app do ML não
+   * está inscrito no tópico). Limitado aos 40 mais recentes por rodada.
+   */
+  private async reconcileOpenShipments(): Promise<void> {
+    const open = await this.prisma.order.findMany({
+      where: {
+        channel: Marketplace.MERCADO_LIVRE,
+        status: {
+          in: [
+            OrderStatus.PAID,
+            OrderStatus.SEPARATING,
+            OrderStatus.SEPARATED,
+            OrderStatus.READY_TO_SHIP,
+            OrderStatus.SHIPPED,
+          ],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 40,
+      select: { id: true },
+    });
+
+    for (const { id } of open) {
+      try {
+        await this.reconcileOrderShipment(id);
+      } catch (err) {
+        this.logger.warn(`Reconcile envio do pedido ${id}: ${(err as Error).message}`);
+      }
     }
   }
 

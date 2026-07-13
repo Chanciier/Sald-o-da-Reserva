@@ -207,7 +207,13 @@ export class WebhooksService {
     if (becomingApproved) {
       stockChanged = await this.stock.applyForOrder(payment.orderId);
     } else if (becomingRestored) {
-      stockChanged = await this.stock.restoreForOrder(payment.orderId);
+      // Pedido que já saiu da loja (enviado/entregue) não volta ao estoque
+      // automaticamente — o item está com o cliente. Mesma regra da expedição
+      // (ver STOCK_RESTORE_STATUSES em expedicao.service.ts).
+      const itemLeftStore =
+        payment.order.status === OrderStatus.SHIPPED ||
+        payment.order.status === OrderStatus.DELIVERED;
+      stockChanged = itemLeftStore ? false : await this.stock.restoreForOrder(payment.orderId);
     }
     if (stockChanged) {
       await this.redis.delPattern('products:*'); // refresh storefront availability

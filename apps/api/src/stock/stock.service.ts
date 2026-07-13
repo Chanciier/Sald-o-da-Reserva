@@ -118,6 +118,8 @@ export class StockService {
 
   /** Restore stock for an order's items exactly once (only if previously applied). */
   async restoreForOrder(orderId: string): Promise<boolean> {
+    const stockUpdates: Array<{ productId: string; newStock: number }> = [];
+
     const restored = await this.prisma.$transaction(async (tx) => {
       // Claim atomically: only the first caller flips true → false.
       const claim = await tx.order.updateMany({
@@ -143,11 +145,18 @@ export class StockService {
             data: { status: ProductStatus.ACTIVE },
           });
         }
+        stockUpdates.push({ productId: item.productId, newStock: Math.max(0, updated.stock) });
       }
       return true;
     });
 
-    if (restored) this.logger.log(`Stock restored for order=${orderId}`);
+    if (restored) {
+      this.logger.log(`Stock restored for order=${orderId}`);
+      // Orchestrator propaga o nível devolvido aos canais externos (ML/Shopee).
+      for (const update of stockUpdates) {
+        this.events.emit(OmsEvents.StockRestored, update);
+      }
+    }
     return restored;
   }
 }
