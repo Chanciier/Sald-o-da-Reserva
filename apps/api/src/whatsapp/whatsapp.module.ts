@@ -20,6 +20,6 @@ import { WhatsappController } from './whatsapp.controller';
     AIContentService,
     OrderWhatsappService,
   ],
-  exports: [WhatsappMarketingService, AIContentService, OrderWhatsappService],
+  exports: [BaileysService, WhatsappMarketingService, AIContentService, OrderWhatsappService],
 })
 export class WhatsappModule {}

@@ -13,6 +13,19 @@ import { RedisService } from '../redis/redis.service';
 const CREDS_KEY = 'wa:creds';
 const KEY_PREFIX = 'wa:k:';
 
+export interface WaGroupMetadataLite {
+  id: string;
+  subject: string;
+  size: number;
+  description?: string;
+}
+
+export type GroupParticipantsUpdateHandler = (update: {
+  jid: string;
+  action: 'add' | 'remove' | 'promote' | 'demote' | 'modify';
+  participants: string[];
+}) => void;
+
 function serialize(v: unknown): string {
   return JSON.stringify(v, (_k, val) => {
     // Uint8Array puro (não tem toJSON) chega como instância
@@ -59,6 +72,9 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
   private connected = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private connectTimeoutTimer: NodeJS.Timeout | null = null;
+  // Handlers externos de eventos de participantes — re-registrados a cada
+  // reconexão, já que o socket é recriado do zero em connect().
+  private readonly groupParticipantsHandlers: GroupParticipantsUpdateHandler[] = [];
 
   constructor(private readonly redis: RedisService) {}
 
@@ -138,6 +154,23 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
       if (this.socket) saveCreds(this.socket.authState.creds);
     });
 
+    this.socket.ev.on('group-participants.update', (update) => {
+      const payload = {
+        jid: update.id,
+        action: update.action,
+        participants: (update.participants ?? []).map((p) =>
+          typeof p === 'string' ? p : (p.id ?? ''),
+        ),
+      };
+      for (const handler of this.groupParticipantsHandlers) {
+        try {
+          handler(payload);
+        } catch (err) {
+          this.logger.error('Handler de group-participants.update falhou', err as Error);
+        }
+      }
+    });
+
     this.socket.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
@@ -210,6 +243,42 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     return Object.values(groups)
       .map((g) => ({ id: g.id, subject: g.subject || '(sem nome)' }))
       .sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
+  }
+
+  /**
+   * Metadados de todos os grupos em que a conta conectada participa, com o
+   * total de participantes — base da sincronização do CommunityModule.
+   */
+  async fetchAllGroupsMetadata(): Promise<WaGroupMetadataLite[]> {
+    if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
+    const groups = await this.socket.groupFetchAllParticipating();
+    return Object.values(groups)
+      .map((g) => ({
+        id: g.id,
+        subject: g.subject || '(sem nome)',
+        size: g.size ?? g.participants?.length ?? 0,
+        description: g.desc ?? undefined,
+      }))
+      .sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
+  }
+
+  /**
+   * Link de convite do grupo. Exige que a conta conectada seja ADMIN do
+   * grupo — sem admin o WhatsApp não expõe o código e retornamos null.
+   */
+  async fetchGroupInviteLink(jid: string): Promise<string | null> {
+    if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
+    try {
+      const code = await this.socket.groupInviteCode(jid);
+      return code ? `https://chat.whatsapp.com/${code}` : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Registra um handler para entradas/saídas de participantes (tempo real). */
+  onGroupParticipantsUpdate(handler: GroupParticipantsUpdateHandler): void {
+    this.groupParticipantsHandlers.push(handler);
   }
 
   async sendMessage(jid: string, text: string): Promise<string | undefined> {

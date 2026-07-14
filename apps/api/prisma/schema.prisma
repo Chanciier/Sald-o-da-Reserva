@@ -194,32 +194,32 @@ enum DeviceType {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  cpf          String?  @map("cpf")
-  phone        String?  @map("phone")
-  avatarUrl    String?  @map("avatar_url")
-  passwordHash String   @map("password_hash")
-  role         Role     @default(CLIENTE)
-  isActive     Boolean  @default(true) @map("is_active")
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  cpf             String?   @map("cpf")
+  phone           String?   @map("phone")
+  avatarUrl       String?   @map("avatar_url")
+  passwordHash    String    @map("password_hash")
+  role            Role      @default(CLIENTE)
+  isActive        Boolean   @default(true) @map("is_active")
   emailVerifiedAt DateTime? @map("email_verified_at")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  refreshTokens   RefreshToken[]
-  passwordResets  PasswordReset[]
-  emailVerifications EmailVerification[]
-  auditLogs       AuditLog[]
-  images          Image[]
-  orders          Order[]
-  products        Product[]
-  returnRequests  ReturnRequest[]
-  consents        UserConsent[]
-  reviews         Review[]
-  notifications   Notification[]
-  pushSubscriptions PushSubscription[]
-  recoveryCoupons Coupon[] @relation("RecoveryCouponOwner")
+  refreshTokens            RefreshToken[]
+  passwordResets           PasswordReset[]
+  emailVerifications       EmailVerification[]
+  auditLogs                AuditLog[]
+  images                   Image[]
+  orders                   Order[]
+  products                 Product[]
+  returnRequests           ReturnRequest[]
+  consents                 UserConsent[]
+  reviews                  Review[]
+  notifications            Notification[]
+  pushSubscriptions        PushSubscription[]
+  recoveryCoupons          Coupon[]                  @relation("RecoveryCouponOwner")
   sellerSectionPermissions SellerSectionPermission[] @relation("SellerSectionPermissions")
   sellerAccessRequests     SellerAccessRequest[]     @relation("SellerAccessRequests")
   resolvedAccessRequests   SellerAccessRequest[]     @relation("SellerAccessRequestsResolved")
@@ -326,11 +326,11 @@ model Product {
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
-  category     Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdBy    User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  images       Image[]
-  orderItems   OrderItem[]
-  reviews      Review[]
+  category        Category?                @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy       User?                    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  images          Image[]
+  orderItems      OrderItem[]
+  reviews         Review[]
   whatsappLogs    WhatsappMessageLog[]
   whatsappContent WhatsappContentHistory[]
   metaCatalogSync MetaCatalogSync?
@@ -465,44 +465,44 @@ model Coupon {
 }
 
 model Order {
-  id              String      @id @default(cuid())
-  userId          String      @map("user_id")
-  couponId        String?     @map("coupon_id")
-  status          OrderStatus    @default(PENDING)
-  deliveryMethod  DeliveryMethod @default(SHIPPING) @map("delivery_method")
+  id                           String         @id @default(cuid())
+  userId                       String         @map("user_id")
+  couponId                     String?        @map("coupon_id")
+  status                       OrderStatus    @default(PENDING)
+  deliveryMethod               DeliveryMethod @default(SHIPPING) @map("delivery_method")
   // OMS: canal de origem do pedido. SITE = loja própria; demais = marketplaces.
   // `externalId` é o id do pedido no marketplace (idempotência de importação);
   // `externalReference` guarda o pack/shipment usado para agrupar/rastrear.
-  channel           Marketplace @default(SITE)
-  externalId        String?     @map("external_id")
-  externalReference String?     @map("external_reference")
-  subtotal        Decimal        @db.Decimal(10, 2)
-  discount        Decimal        @default(0) @db.Decimal(10, 2)
-  shipping        Decimal        @default(0) @db.Decimal(10, 2)
-  total           Decimal        @db.Decimal(10, 2)
-  shippingAddress Json?          @map("shipping_address")
-  shippingMethod  String         @map("shipping_method")
-  notes           String?
-  buyerName       String?  @map("buyer_name")
-  customerPhone   String?  @map("customer_phone")
-  pickupCode      String?  @unique @map("pickup_code")
-  separatedItems  Json?    @map("separated_items")
-  separationNotes String?  @map("separation_notes")
-  pickupRemindedAt DateTime? @map("pickup_reminded_at")
-  clientConfirmedPickupAt DateTime? @map("client_confirmed_pickup_at")
-  stockApplied    Boolean  @default(false) @map("stock_applied")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
-  cartReminderCreatedAt DateTime? @map("cart_reminder_created_at")
-  cartReminderPushSentAt DateTime? @map("cart_reminder_push_sent_at")
-  cartReminderWhatsappSentAt DateTime? @map("cart_reminder_whatsapp_sent_at")
-  recoveryCouponCreatedAt DateTime? @map("recovery_coupon_created_at")
-  recoveryCouponPushSentAt DateTime? @map("recovery_coupon_push_sent_at")
-  recoveryCouponWhatsappSentAt DateTime? @map("recovery_coupon_whatsapp_sent_at")
+  channel                      Marketplace    @default(SITE)
+  externalId                   String?        @map("external_id")
+  externalReference            String?        @map("external_reference")
+  subtotal                     Decimal        @db.Decimal(10, 2)
+  discount                     Decimal        @default(0) @db.Decimal(10, 2)
+  shipping                     Decimal        @default(0) @db.Decimal(10, 2)
+  total                        Decimal        @db.Decimal(10, 2)
+  shippingAddress              Json?          @map("shipping_address")
+  shippingMethod               String         @map("shipping_method")
+  notes                        String?
+  buyerName                    String?        @map("buyer_name")
+  customerPhone                String?        @map("customer_phone")
+  pickupCode                   String?        @unique @map("pickup_code")
+  separatedItems               Json?          @map("separated_items")
+  separationNotes              String?        @map("separation_notes")
+  pickupRemindedAt             DateTime?      @map("pickup_reminded_at")
+  clientConfirmedPickupAt      DateTime?      @map("client_confirmed_pickup_at")
+  stockApplied                 Boolean        @default(false) @map("stock_applied")
+  createdAt                    DateTime       @default(now()) @map("created_at")
+  updatedAt                    DateTime       @updatedAt @map("updated_at")
+  cartReminderCreatedAt        DateTime?      @map("cart_reminder_created_at")
+  cartReminderPushSentAt       DateTime?      @map("cart_reminder_push_sent_at")
+  cartReminderWhatsappSentAt   DateTime?      @map("cart_reminder_whatsapp_sent_at")
+  recoveryCouponCreatedAt      DateTime?      @map("recovery_coupon_created_at")
+  recoveryCouponPushSentAt     DateTime?      @map("recovery_coupon_push_sent_at")
+  recoveryCouponWhatsappSentAt DateTime?      @map("recovery_coupon_whatsapp_sent_at")
 
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coupon         Coupon?          @relation("AppliedCoupon", fields: [couponId], references: [id], onDelete: SetNull)
-  recoveryCoupon Coupon?          @relation("RecoveryCouponSource")
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon         Coupon?            @relation("AppliedCoupon", fields: [couponId], references: [id], onDelete: SetNull)
+  recoveryCoupon Coupon?            @relation("RecoveryCouponSource")
   items          OrderItem[]
   payment        Payment?
   shipment       Shipment?
@@ -961,4 +961,77 @@ model SellerAccessRequest {
   @@index([userId, section])
   @@index([status])
   @@map("seller_access_requests")
+}
+
+// ── Hub de Distribuição de Grupos WhatsApp (CommunityModule) ─────────────────
+
+enum CommunityGroupStatus {
+  ACTIVE // recebendo novos membros
+  FULL // lotado (flipado automaticamente pela sync)
+  PAUSED // pausado manualmente pelo admin
+  ARCHIVED // fora de uso, mantido para histórico
+}
+
+enum CommunityRedirectOutcome {
+  REDIRECTED // visitante recebeu um grupo
+  ALL_FULL // todos os grupos lotados no momento do acesso
+}
+
+model CommunityGroup {
+  id           String               @id @default(cuid())
+  name         String
+  // JID do grupo no WhatsApp (xxx@g.us). Opcional: sem ele o grupo não é
+  // sincronizado via Baileys e o contador de participantes é manual.
+  groupJid     String?              @unique @map("group_jid")
+  // Link de convite divulgado ao público (chat.whatsapp.com/...).
+  inviteLink   String               @map("invite_link")
+  status       CommunityGroupStatus @default(ACTIVE)
+  capacity     Int                  @default(1024)
+  participants Int                  @default(0)
+  // Desempate na distribuição: entre grupos com ocupação equivalente, o de
+  // maior prioridade recebe primeiro.
+  priority     Int                  @default(0)
+  active       Boolean              @default(true)
+  lastSyncAt   DateTime?            @map("last_sync_at")
+  syncError    String?              @map("sync_error")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  redirects CommunityRedirect[]
+  snapshots CommunityGroupSnapshot[]
+
+  @@index([active, status])
+  @@map("community_groups")
+}
+
+// Um registro por acesso ao link único /grupos — alimenta os analytics de
+// acessos, redirecionamentos por grupo e conversão por origem (UTM).
+model CommunityRedirect {
+  id          String                   @id @default(cuid())
+  groupId     String?                  @map("group_id")
+  group       CommunityGroup?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  outcome     CommunityRedirectOutcome
+  visitorId   String?                  @map("visitor_id")
+  utmSource   String?                  @map("utm_source")
+  utmMedium   String?                  @map("utm_medium")
+  utmCampaign String?                  @map("utm_campaign")
+  referrer    String?
+  createdAt   DateTime                 @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([groupId, createdAt])
+  @@map("community_redirects")
+}
+
+// Snapshot do total de participantes capturado pela sincronização — alimenta
+// o histórico de crescimento. Só é gravado quando o número muda.
+model CommunityGroupSnapshot {
+  id           String         @id @default(cuid())
+  groupId      String         @map("group_id")
+  group        CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  participants Int
+  capturedAt   DateTime       @default(now()) @map("captured_at")
+
+  @@index([groupId, capturedAt])
+  @@map("community_group_snapshots")
 }

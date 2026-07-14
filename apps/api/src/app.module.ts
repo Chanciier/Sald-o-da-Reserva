@@ -26,6 +26,7 @@ import { MailModule } from './mail/mail.module';
 import { ContentModule } from './content/content.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { CommunityModule } from './community/community.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { EventBusModule } from './events/event-bus.module';
 import { QueueModule } from './queue/queue.module';
@@ -79,6 +80,7 @@ import { envValidation } from './config/env.validation';
     ContentModule,
     ReviewsModule,
     WhatsappModule,
+    CommunityModule,
     NotificationsModule,
     EventBusModule,
     QueueModule,
