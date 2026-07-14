@@ -69,6 +69,7 @@ export default function AdminComunidadePage() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [linkStatus, setLinkStatus] = useState<'idle' | 'loading' | 'manual'>('idle');
 
   const headers = () => ({
     'Content-Type': 'application/json',
@@ -176,7 +177,41 @@ export default function AdminComunidadePage() {
     });
     setEditingId(g.id);
     setError('');
+    setLinkStatus('idle');
     setShowForm(true);
+  }
+
+  // Ao selecionar um grupo do WhatsApp: preenche nome/participantes (se
+  // vazios) e tenta buscar o link de convite automaticamente. Só funciona
+  // se o número do site for admin do grupo — senão cai para preenchimento
+  // manual (o link já digitado, se houver, não é apagado).
+  async function handleSelectWaGroup(jid: string) {
+    const wa = waGroups?.find((w) => w.id === jid);
+    setForm((prev) => ({
+      ...prev,
+      groupJid: jid,
+      name: jid && wa && !prev.name.trim() ? wa.subject : prev.name,
+      participants: wa ? wa.size : prev.participants,
+    }));
+    setLinkStatus('idle');
+    if (!jid) return;
+
+    setLinkStatus('loading');
+    try {
+      const res = await fetch(
+        `${BASE}/api/v1/community/admin/wa-groups/${encodeURIComponent(jid)}/invite-link`,
+        { headers: headers() },
+      );
+      const body = (await res.json().catch(() => ({}))) as { inviteLink?: string | null };
+      if (res.ok && body.inviteLink) {
+        setForm((prev) => ({ ...prev, inviteLink: body.inviteLink as string }));
+        setLinkStatus('idle');
+      } else {
+        setLinkStatus('manual');
+      }
+    } catch {
+      setLinkStatus('manual');
+    }
   }
 
   async function copyPublicLink() {
@@ -229,6 +264,7 @@ export default function AdminComunidadePage() {
               setForm(emptyForm);
               setEditingId(null);
               setError('');
+              setLinkStatus('idle');
               setShowForm(true);
             }}
             className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
@@ -418,23 +454,12 @@ export default function AdminComunidadePage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Link de convite
-                </label>
-                <input
-                  value={form.inviteLink}
-                  onChange={(e) => setForm({ ...form, inviteLink: e.target.value })}
-                  placeholder="https://chat.whatsapp.com/..."
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
                   Grupo do WhatsApp (sincronização automática)
                 </label>
                 {waGroups && waGroups.length > 0 ? (
                   <select
                     value={form.groupJid}
-                    onChange={(e) => setForm({ ...form, groupJid: e.target.value })}
+                    onChange={(e) => void handleSelectWaGroup(e.target.value)}
                     className={inputCls}
                   >
                     <option value="">— sem vínculo (contagem manual) —</option>
@@ -451,6 +476,29 @@ export default function AdminComunidadePage() {
                     placeholder="123456789@g.us (opcional)"
                     className={inputCls}
                   />
+                )}
+              </div>
+              <div>
+                <label className="mb-1 flex items-center justify-between text-xs font-medium text-gray-600">
+                  <span>Link de convite</span>
+                  {linkStatus === 'loading' && (
+                    <span className="inline-flex items-center gap-1 text-gray-400">
+                      <Loader2 className="h-3 w-3 animate-spin" /> buscando automaticamente...
+                    </span>
+                  )}
+                </label>
+                <input
+                  value={form.inviteLink}
+                  onChange={(e) => setForm({ ...form, inviteLink: e.target.value })}
+                  placeholder="https://chat.whatsapp.com/..."
+                  className={inputCls}
+                />
+                {linkStatus === 'manual' && (
+                  <p className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                    Não consegui obter o link automaticamente — o número do site precisa ser admin
+                    do grupo para isso. Copie o link de convite no próprio WhatsApp e cole aqui.
+                  </p>
                 )}
               </div>
               <div className="grid grid-cols-3 gap-3">

@@ -71,6 +71,16 @@ export class CommunityAdminController {
     return this.baileys.fetchAllGroupsMetadata();
   }
 
+  // Busca o link de convite sob demanda (só quando o admin seleciona o
+  // grupo no formulário) — evita N chamadas ao abrir a lista inteira.
+  // Só funciona se o número do site for admin do grupo; senão inviteLink
+  // vem null e o front pede para colar manualmente.
+  @Get('wa-groups/:jid/invite-link')
+  async getWaGroupInviteLink(@Param('jid') jid: string) {
+    const inviteLink = await this.baileys.fetchGroupInviteLink(jid);
+    return { inviteLink };
+  }
+
   @Get('analytics')
   getAnalytics(@Query('days') days?: string) {
     return this.analytics.overview(days);
