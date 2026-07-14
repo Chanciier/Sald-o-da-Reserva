@@ -203,7 +203,11 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
         identificationNumber: cleanCpf,
       });
     } catch (err) {
-      onError((err as Error).message ?? 'Erro ao processar cartão.');
+      onError(
+        err instanceof Error
+          ? err.message
+          : 'Erro ao processar cartão. Verifique os dados e tente novamente.',
+      );
     } finally {
       setSubmitting(false);
     }
