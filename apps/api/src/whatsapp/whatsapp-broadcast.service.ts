@@ -42,15 +42,15 @@ export class WhatsappBroadcastService {
   private readonly logger = new Logger(WhatsappBroadcastService.name);
 
   private static readonly GREETINGS = [
-    'Bom dia! ☀️ Começando o dia com ofertas novas por aqui, fica de olho que os disparos já vão começar!',
-    'Bom dia, pessoal! 🌞 Mais um dia de saldão começando, as ofertas já vão sair aqui no grupo!',
-    'Bom dia! ☀️🛍️ Hoje tem oferta o dia todo por aqui, se liga nos próximos disparos!',
+    'Bom dia! ☀️ Espero que hoje seja um dia de boas oportunidades pra vocês, aqui sempre aparece alguma coisa que vale a pena.',
+    'Bom dia, pessoal! 🌞 Que o dia comece bem pra todo mundo. Sempre tem uma oportunidade boa passando por aqui, vale dar uma olhada.',
+    'Bom dia! ☕ Começando mais um dia com o pé direito, e por aqui sempre tem alguma oportunidade interessante aparecendo.',
   ];
 
   private static readonly FAREWELLS = [
-    'Boa noite! 🌙 Por hoje os disparos encerram por aqui, amanhã tem mais ofertas. Até lá!',
-    'Boa noite, pessoal! 🌙✨ Fechando o dia por aqui, amanhã a gente volta com mais ofertas!',
-    'Boa noite! 🌙 Foi tudo por hoje, obrigado por acompanhar! Amanhã tem mais saldão.',
+    'Boa noite! 🌙 Descansem bem, vocês merecem. Amanhã tem mais oportunidades boas por aqui.',
+    'Boa noite, pessoal! ✨ Obrigado por estarem por aqui hoje, amanhã a gente continua de olho em novas oportunidades pra vocês.',
+    'Boa noite! 🌙 Foi um bom dia, espero que amanhã seja ainda melhor. Nos vemos com mais oportunidades por aqui.',
   ];
 
   constructor(
