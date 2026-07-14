@@ -47,10 +47,33 @@ export interface WaGroup {
 
 export interface AnalyticsResponse {
   period: { days: number; since: string; timeZone: string };
-  totals: { accesses: number; redirected: number; allFull: number };
-  byDay: { date: string; accesses: number; redirected: number; allFull: number }[];
+  totals: {
+    accesses: number;
+    redirected: number;
+    allFull: number;
+    joins: number;
+    leaves: number;
+    netMembers: number;
+  };
+  byDay: {
+    date: string;
+    accesses: number;
+    redirected: number;
+    allFull: number;
+    joins: number;
+    leaves: number;
+    netMembers: number;
+  }[];
   byGroup: { groupId: string; name: string; redirects: number }[];
   bySource: { source: string; accesses: number; redirected: number }[];
+  membersByGroup: {
+    groupId: string;
+    name: string;
+    joins: number;
+    leaves: number;
+    netMembers: number;
+  }[];
+  memberSources: { source: string; joins: number; leaves: number; netMembers: number }[];
   growth: { groupId: string; name: string; participants: number; capturedAt: string }[];
 }
 

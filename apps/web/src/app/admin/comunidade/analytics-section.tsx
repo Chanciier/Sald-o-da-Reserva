@@ -7,6 +7,10 @@ import type { AnalyticsResponse } from './types';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const PERIODS = [7, 30, 90] as const;
+const SOURCE_LABEL: Record<string, string> = {
+  REALTIME: 'Tempo real',
+  SYNC_INFERRED: 'Sync inferida',
+};
 
 function Bar({ value, max, className }: { value: number; max: number; className: string }) {
   const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
@@ -33,6 +37,7 @@ export function AnalyticsSection({ token }: { token: string }) {
 
   const maxDay = Math.max(1, ...(data?.byDay.map((d) => d.accesses) ?? []));
   const maxGroup = Math.max(1, ...(data?.byGroup.map((g) => g.redirects) ?? []));
+  const maxMemberDay = Math.max(1, ...(data?.byDay.map((d) => Math.max(d.joins, d.leaves)) ?? []));
 
   // Último snapshot de cada grupo dentro do período (crescimento).
   const growthByGroup = new Map<string, { name: string; first: number; last: number }>();
@@ -87,6 +92,28 @@ export function AnalyticsSection({ token }: { token: string }) {
             </div>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-2xl font-bold text-emerald-600">{data.totals.joins}</p>
+              <p className="text-xs text-gray-500">Entradas reais</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-2xl font-bold text-rose-600">{data.totals.leaves}</p>
+              <p className="text-xs text-gray-500">Saidas</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p
+                className={`text-2xl font-bold ${
+                  data.totals.netMembers >= 0 ? 'text-green-600' : 'text-red-500'
+                }`}
+              >
+                {data.totals.netMembers >= 0 ? '+' : ''}
+                {data.totals.netMembers}
+              </p>
+              <p className="text-xs text-gray-500">Saldo no periodo</p>
+            </div>
+          </div>
+
           {data.byDay.length > 0 && (
             <div>
               <h3 className="mb-2 text-sm font-medium text-gray-700">Acessos por dia</h3>
@@ -98,6 +125,36 @@ export function AnalyticsSection({ token }: { token: string }) {
                     </span>
                     <Bar value={d.accesses} max={maxDay} className="bg-emerald-500" />
                     <span className="w-8 shrink-0 text-right font-medium">{d.accesses}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.byDay.some((d) => d.joins > 0 || d.leaves > 0) && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-gray-700">Entradas e saidas por dia</h3>
+              <div className="space-y-2">
+                {data.byDay.slice(-14).map((d) => (
+                  <div
+                    key={`members-${d.date}`}
+                    className="grid grid-cols-[5rem_1fr_2.5rem] gap-3 text-xs"
+                  >
+                    <span className="text-gray-500">
+                      {d.date.slice(8, 10)}/{d.date.slice(5, 7)}
+                    </span>
+                    <div className="space-y-1">
+                      <Bar value={d.joins} max={maxMemberDay} className="bg-emerald-500" />
+                      <Bar value={d.leaves} max={maxMemberDay} className="bg-rose-500" />
+                    </div>
+                    <span
+                      className={`text-right font-medium ${
+                        d.netMembers >= 0 ? 'text-green-600' : 'text-red-500'
+                      }`}
+                    >
+                      {d.netMembers >= 0 ? '+' : ''}
+                      {d.netMembers}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -118,6 +175,76 @@ export function AnalyticsSection({ token }: { token: string }) {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {data.membersByGroup.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-gray-700">
+                Entradas e saidas por grupo
+              </h3>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="py-1.5 font-medium">Grupo</th>
+                    <th className="py-1.5 text-right font-medium">Entradas</th>
+                    <th className="py-1.5 text-right font-medium">Saidas</th>
+                    <th className="py-1.5 text-right font-medium">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.membersByGroup.map((g) => (
+                    <tr key={g.groupId} className="border-b last:border-0">
+                      <td className="max-w-0 truncate py-1.5 pr-3">{g.name}</td>
+                      <td className="py-1.5 text-right text-emerald-600">{g.joins}</td>
+                      <td className="py-1.5 text-right text-rose-600">{g.leaves}</td>
+                      <td
+                        className={`py-1.5 text-right font-medium ${
+                          g.netMembers >= 0 ? 'text-green-600' : 'text-red-500'
+                        }`}
+                      >
+                        {g.netMembers >= 0 ? '+' : ''}
+                        {g.netMembers}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {data.memberSources.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-gray-700">
+                Origem das entradas e saidas
+              </h3>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="py-1.5 font-medium">Fonte</th>
+                    <th className="py-1.5 text-right font-medium">Entradas</th>
+                    <th className="py-1.5 text-right font-medium">Saidas</th>
+                    <th className="py-1.5 text-right font-medium">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.memberSources.map((s) => (
+                    <tr key={s.source} className="border-b last:border-0">
+                      <td className="py-1.5">{SOURCE_LABEL[s.source] ?? s.source}</td>
+                      <td className="py-1.5 text-right text-emerald-600">{s.joins}</td>
+                      <td className="py-1.5 text-right text-rose-600">{s.leaves}</td>
+                      <td
+                        className={`py-1.5 text-right font-medium ${
+                          s.netMembers >= 0 ? 'text-green-600' : 'text-red-500'
+                        }`}
+                      >
+                        {s.netMembers >= 0 ? '+' : ''}
+                        {s.netMembers}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 

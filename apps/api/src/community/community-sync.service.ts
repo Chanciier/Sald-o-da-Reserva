@@ -1,6 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { CommunityGroupStatus } from '@prisma/client';
+import {
+  CommunityGroupStatus,
+  CommunityMemberEventSource,
+  CommunityMemberEventType,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BaileysService } from '../whatsapp/baileys.service';
 import { CommunityService } from './community.service';
@@ -12,6 +16,14 @@ export interface SyncSummary {
   unlinked: number;
   errors: number;
   finishedAt: string;
+}
+
+interface LockedCommunityGroup {
+  id: string;
+  name: string;
+  participants: number;
+  capacity: number;
+  status: CommunityGroupStatus;
 }
 
 /**
@@ -39,8 +51,9 @@ export class CommunitySyncService implements OnModuleInit {
   onModuleInit() {
     this.baileys.onGroupParticipantsUpdate((update) => {
       if (update.action !== 'add' && update.action !== 'remove') return;
-      const delta = (update.action === 'add' ? 1 : -1) * update.participants.length;
-      void this.applyRealtimeDelta(update.jid, delta);
+      const type =
+        update.action === 'add' ? CommunityMemberEventType.JOIN : CommunityMemberEventType.LEAVE;
+      void this.applyRealtimeEvent(update.jid, type, update.participants.length);
     });
   }
 
@@ -111,18 +124,7 @@ export class CommunitySyncService implements OnModuleInit {
           continue;
         }
 
-        const status = this.nextStatus(group.status, meta.size, group.capacity);
-        await this.prisma.communityGroup.update({
-          where: { id: group.id },
-          data: { participants: meta.size, status, lastSyncAt: now, syncError: null },
-        });
-
-        // Snapshot só quando o total muda — histórico de crescimento enxuto.
-        if (meta.size !== group.participants) {
-          await this.prisma.communityGroupSnapshot.create({
-            data: { groupId: group.id, participants: meta.size },
-          });
-        }
+        await this.syncGroupWithLock(group.id, meta.size, now);
         synced += 1;
       } catch (err) {
         errors += 1;
@@ -142,24 +144,87 @@ export class CommunitySyncService implements OnModuleInit {
     return this.lastSummary;
   }
 
-  private async applyRealtimeDelta(groupJid: string, delta: number): Promise<void> {
+  private async applyRealtimeEvent(
+    groupJid: string,
+    type: CommunityMemberEventType,
+    count: number,
+  ): Promise<void> {
     try {
-      const group = await this.prisma.communityGroup.findUnique({ where: { groupJid } });
-      if (!group) return;
+      if (count <= 0) return;
+      const delta = type === CommunityMemberEventType.JOIN ? count : -count;
 
-      const participants = Math.max(0, group.participants + delta);
-      const status = this.nextStatus(group.status, participants, group.capacity);
-      await this.prisma.communityGroup.update({
-        where: { id: group.id },
-        data: { participants, status },
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const rows = await tx.$queryRaw<LockedCommunityGroup[]>`
+          UPDATE community_groups
+          SET participants = GREATEST(0, participants + ${delta}), updated_at = NOW()
+          WHERE group_jid = ${groupJid}
+          RETURNING id, name, participants, capacity, status
+        `;
+        const group = rows[0];
+        if (!group) return null;
+
+        const status = this.nextStatus(group.status, group.participants, group.capacity);
+        if (status !== group.status) {
+          await tx.communityGroup.update({
+            where: { id: group.id },
+            data: { status },
+          });
+        }
+
+        await tx.communityMemberEvent.create({
+          data: {
+            groupId: group.id,
+            type,
+            count,
+            source: CommunityMemberEventSource.REALTIME,
+          },
+        });
+
+        return { name: group.name, participants: group.participants };
       });
+      if (!updated) return;
+
       await this.community.invalidateCache();
       this.logger.debug(
-        `Ajuste em tempo real: ${group.name} ${delta > 0 ? '+' : ''}${delta} → ${participants}`,
+        `Ajuste em tempo real: ${updated.name} ${delta > 0 ? '+' : ''}${delta} → ${updated.participants}`,
       );
     } catch (err) {
       this.logger.error('Falha ao aplicar ajuste em tempo real de participantes', err as Error);
     }
+  }
+
+  private async syncGroupWithLock(groupId: string, participants: number, now: Date): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<LockedCommunityGroup[]>`
+        SELECT id, name, participants, capacity, status
+        FROM community_groups
+        WHERE id = ${groupId}
+        FOR UPDATE
+      `;
+      const group = rows[0];
+      if (!group) return;
+
+      const status = this.nextStatus(group.status, participants, group.capacity);
+      await tx.communityGroup.update({
+        where: { id: group.id },
+        data: { participants, status, lastSyncAt: now, syncError: null },
+      });
+
+      const delta = participants - group.participants;
+      if (delta === 0) return;
+
+      await tx.communityGroupSnapshot.create({
+        data: { groupId: group.id, participants },
+      });
+      await tx.communityMemberEvent.create({
+        data: {
+          groupId: group.id,
+          type: delta > 0 ? CommunityMemberEventType.JOIN : CommunityMemberEventType.LEAVE,
+          count: Math.abs(delta),
+          source: CommunityMemberEventSource.SYNC_INFERRED,
+        },
+      });
+    });
   }
 
   /** Flipa ACTIVE↔FULL pela ocupação; PAUSED/ARCHIVED são manuais. */

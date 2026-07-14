@@ -977,6 +977,16 @@ enum CommunityRedirectOutcome {
   ALL_FULL // todos os grupos lotados no momento do acesso
 }
 
+enum CommunityMemberEventType {
+  JOIN
+  LEAVE
+}
+
+enum CommunityMemberEventSource {
+  REALTIME
+  SYNC_INFERRED
+}
+
 model CommunityGroup {
   id           String               @id @default(cuid())
   name         String
@@ -997,8 +1007,9 @@ model CommunityGroup {
   createdAt    DateTime             @default(now()) @map("created_at")
   updatedAt    DateTime             @updatedAt @map("updated_at")
 
-  redirects CommunityRedirect[]
-  snapshots CommunityGroupSnapshot[]
+  redirects    CommunityRedirect[]
+  snapshots    CommunityGroupSnapshot[]
+  memberEvents CommunityMemberEvent[]
 
   @@index([active, status])
   @@map("community_groups")
@@ -1034,4 +1045,21 @@ model CommunityGroupSnapshot {
 
   @@index([groupId, capturedAt])
   @@map("community_group_snapshots")
+}
+
+// Eventos de entrada/saida observados pelo WhatsApp. Guarda apenas contagens
+// agregadas por evento para evitar persistir identificadores pessoais.
+model CommunityMemberEvent {
+  id        String                     @id @default(cuid())
+  groupId   String                     @map("group_id")
+  group     CommunityGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  type      CommunityMemberEventType
+  source    CommunityMemberEventSource
+  count     Int                        @default(1)
+  createdAt DateTime                   @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([groupId, createdAt])
+  @@index([type, createdAt])
+  @@map("community_member_events")
 }
