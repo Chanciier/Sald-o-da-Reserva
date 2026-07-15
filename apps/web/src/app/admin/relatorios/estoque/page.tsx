@@ -7,6 +7,7 @@ import {
   Gauge,
   Package,
   PackageCheck,
+  PackagePlus,
   PackageX,
   Percent,
   Sparkles,
@@ -59,6 +60,7 @@ function RelatorioEstoque() {
     aging,
     topValue,
     stagnant,
+    newItems,
     lowStock,
     outOfStock,
     timeline,
@@ -78,6 +80,23 @@ function RelatorioEstoque() {
         fetching={report.isFetching}
         refresh={() => report.refetch()}
       />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Kpi
+          label="Mercadoria cadastrada no período"
+          value={money(summary.newItemsValue)}
+          icon={<PackagePlus className="h-5 w-5" />}
+          detail={`${summary.newItemsCount.toLocaleString('pt-BR')} novos produtos · ${summary.newItemsUnits.toLocaleString('pt-BR')} unidades`}
+        />
+        <Kpi
+          label="Valor médio por produto novo"
+          value={
+            summary.newItemsCount ? money(summary.newItemsValue / summary.newItemsCount) : money(0)
+          }
+          icon={<Sparkles className="h-5 w-5" />}
+          detail="Baseado no preço praticado e estoque atual"
+        />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
@@ -157,6 +176,46 @@ function RelatorioEstoque() {
           detail="No ritmo de vendas do período selecionado"
         />
       </div>
+
+      <Panel
+        title="Produtos cadastrados no período"
+        subtitle="Novos produtos criados no catálogo dentro do período selecionado, com o estoque e valor atuais. Não inclui reposição de estoque de produtos já existentes — o sistema não guarda histórico de entradas de estoque, só a data de cadastro do produto."
+      >
+        {!newItems.length ? (
+          <Empty />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="pb-3 font-medium">Produto</th>
+                  <th className="pb-3 font-medium">SKU</th>
+                  <th className="pb-3 font-medium">Categoria</th>
+                  <th className="pb-3 text-right font-medium">Estoque</th>
+                  <th className="pb-3 text-right font-medium">Valor</th>
+                  <th className="pb-3 text-right font-medium">Cadastrado em</th>
+                </tr>
+              </thead>
+              <tbody>
+                {newItems.map((item) => (
+                  <tr key={item.id} className="border-b last:border-0">
+                    <td className="py-3 font-medium">{item.name}</td>
+                    <td className="py-3 text-muted-foreground">{item.sku}</td>
+                    <td className="py-3 text-muted-foreground">{item.category}</td>
+                    <td className="py-3 text-right">{item.stock}</td>
+                    <td className="py-3 text-right font-semibold">{money(item.value)}</td>
+                    <td className="py-3 text-right text-muted-foreground">
+                      {new Date(item.createdAt).toLocaleDateString('pt-BR', {
+                        timeZone: 'America/Sao_Paulo',
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Panel title="Valor em estoque por categoria" subtitle="Preço praticado × unidades atuais">

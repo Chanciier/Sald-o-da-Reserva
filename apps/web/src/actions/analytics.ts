@@ -243,6 +243,9 @@ export interface StockOverview {
     healthyStockCount: number;
     uniqueItemsCount: number;
     uniqueItemsValue: number;
+    newItemsCount: number;
+    newItemsUnits: number;
+    newItemsValue: number;
   };
   turnover: {
     unitsSoldInPeriod: number;
@@ -277,6 +280,15 @@ export interface StockOverview {
     stock: number;
     value: number;
     daysListed: number;
+  }[];
+  newItems: {
+    id: string;
+    name: string;
+    sku: string;
+    stock: number;
+    value: number;
+    category: string;
+    createdAt: string;
   }[];
   lowStock: {
     id: string;

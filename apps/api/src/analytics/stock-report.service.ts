@@ -111,12 +111,16 @@ export class StockReportService {
     let healthyStockCount = 0;
     let uniqueItemsCount = 0;
     let uniqueItemsValue = 0;
+    let newItemsCount = 0;
+    let newItemsUnits = 0;
+    let newItemsValue = 0;
 
     const withValue = products.map((p) => {
       const unitPrice = number(p.salePrice ?? p.price);
       const value = unitPrice * p.stock;
       const sold = soldByProduct.get(p.id);
       const daysListed = Math.floor((now - p.createdAt.getTime()) / DAY_MS);
+      const registeredInPeriod = p.createdAt >= range.start && p.createdAt < range.endExclusive;
 
       totalUnits += p.stock;
       valueAtPrice += number(p.price) * p.stock;
@@ -130,6 +134,11 @@ export class StockReportService {
       if (p.isUnique) {
         uniqueItemsCount += 1;
         uniqueItemsValue += value;
+      }
+      if (registeredInPeriod) {
+        newItemsCount += 1;
+        newItemsUnits += p.stock;
+        newItemsValue += value;
       }
 
       const categoryName = p.category?.name ?? 'Sem categoria';
@@ -164,7 +173,7 @@ export class StockReportService {
         bucket.value += value;
       }
 
-      return { ...p, unitPrice, value, sold, daysListed };
+      return { ...p, unitPrice, value, sold, daysListed, registeredInPeriod };
     });
 
     const topValue = [...withValue]
@@ -218,6 +227,20 @@ export class StockReportService {
         status: p.status,
       }));
 
+    const newItems = withValue
+      .filter((p) => p.registeredInPeriod)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 30)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        stock: p.stock,
+        value: p.value,
+        category: p.category?.name ?? 'Sem categoria',
+        createdAt: p.createdAt,
+      }));
+
     const dailyPace = unitsSoldInPeriod / range.days;
     const daysOfInventory = dailyPace > 0 ? totalUnits / dailyPace : null;
     const sellThroughRate =
@@ -239,6 +262,9 @@ export class StockReportService {
         healthyStockCount,
         uniqueItemsCount,
         uniqueItemsValue,
+        newItemsCount,
+        newItemsUnits,
+        newItemsValue,
       },
       turnover: {
         unitsSoldInPeriod,
@@ -253,6 +279,7 @@ export class StockReportService {
       aging: agingBuckets,
       topValue,
       stagnant,
+      newItems,
       lowStock,
       outOfStock,
       timeline: [...timeline]
