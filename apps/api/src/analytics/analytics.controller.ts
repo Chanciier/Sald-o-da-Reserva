@@ -8,6 +8,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ReportsService } from './reports.service';
 import { TrackingService } from './tracking.service';
 import { BehaviorService } from './behavior.service';
+import { StockReportService } from './stock-report.service';
 import { TrackSessionDto } from './dto/track-event.dto';
 import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
 
@@ -18,6 +19,7 @@ export class AnalyticsController {
     private readonly reportsService: ReportsService,
     private readonly trackingService: TrackingService,
     private readonly behaviorService: BehaviorService,
+    private readonly stockReportService: StockReportService,
   ) {}
 
   // Ingestão de eventos de comportamento (cliques, page views, funil...).
@@ -44,6 +46,13 @@ export class AnalyticsController {
   @RequireSection(AdminSection.VENDAS, AdminSection.RELATORIOS)
   getReports(@Query('from') from?: string, @Query('to') to?: string) {
     return this.reportsService.overview(from, to);
+  }
+
+  @Get('estoque')
+  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @RequireSection(AdminSection.PRODUTOS, AdminSection.RELATORIOS)
+  getStockReport(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.stockReportService.overview(from, to);
   }
 
   @Get('admin')

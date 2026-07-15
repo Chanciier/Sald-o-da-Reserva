@@ -36,6 +36,11 @@ export async function fetchBehaviorReport(token: string, from: string, to: strin
   return apiFetch<BehaviorOverview>(`/analytics/behavior?${query}`, token);
 }
 
+export async function fetchStockReport(token: string, from: string, to: string) {
+  const query = new URLSearchParams({ from, to });
+  return apiFetch<StockOverview>(`/analytics/estoque?${query}`, token);
+}
+
 export interface AdminOverview {
   inventoryValue: number;
   revenueToday: number;
@@ -222,6 +227,67 @@ export interface BehaviorProduct {
   name: string;
   slug: string | null;
   count: number;
+}
+
+export interface StockOverview {
+  period: { from: string; to: string; days: number; timeZone: string };
+  summary: {
+    totalSkus: number;
+    totalUnits: number;
+    valueAtPrice: number;
+    valueAtSalePrice: number;
+    markdownValue: number;
+    avgUnitValue: number;
+    outOfStockCount: number;
+    lowStockCount: number;
+    healthyStockCount: number;
+    uniqueItemsCount: number;
+    uniqueItemsValue: number;
+  };
+  turnover: {
+    unitsSoldInPeriod: number;
+    revenueInPeriod: number;
+    sellThroughRate: number;
+    daysOfInventory: number | null;
+  };
+  byCategory: {
+    id: string;
+    name: string;
+    count: number;
+    units: number;
+    value: number;
+    soldUnits: number;
+    soldRevenue: number;
+  }[];
+  byStatus: { status: string; count: number; units: number; value: number }[];
+  aging: { bucket: string; count: number; units: number; value: number }[];
+  topValue: {
+    id: string;
+    name: string;
+    sku: string;
+    stock: number;
+    unitPrice: number;
+    value: number;
+    category: string;
+  }[];
+  stagnant: {
+    id: string;
+    name: string;
+    sku: string;
+    stock: number;
+    value: number;
+    daysListed: number;
+  }[];
+  lowStock: {
+    id: string;
+    name: string;
+    sku: string;
+    stock: number;
+    minimumStock: number;
+    value: number;
+  }[];
+  outOfStock: { id: string; name: string; sku: string; minimumStock: number; status: string }[];
+  timeline: { date: string; units: number; revenue: number }[];
 }
 
 export interface MarketingOverview {

@@ -114,6 +114,7 @@ export function ReportHeader(props: HeaderProps) {
         {[
           ['Vendas', '/admin/relatorios/vendas'],
           ['Produtos', '/admin/relatorios/produtos'],
+          ['Estoque', '/admin/relatorios/estoque'],
           ['Clientes', '/admin/relatorios/clientes'],
           ['Comportamento', '/admin/relatorios/comportamento'],
         ].map(([label, href]) => (

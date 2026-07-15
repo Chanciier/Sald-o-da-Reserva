@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { fetchReports } from '@/actions/analytics';
+import { fetchReports, fetchStockReport } from '@/actions/analytics';
 import { useAuth } from '@/contexts/auth-context';
 
 function brazilToday() {
@@ -15,7 +15,10 @@ function brazilToday() {
   }).format(new Date());
 }
 
-export function useReports() {
+function useDateRangeReport<T>(
+  queryKey: string,
+  fetchFn: (token: string, from: string, to: string) => Promise<T>,
+) {
   const { token, loading } = useAuth();
   const params = useSearchParams();
   const router = useRouter();
@@ -25,8 +28,8 @@ export function useReports() {
   const to = params.get('to') ?? today;
   const [draft, setDraft] = useState({ from, to });
   const query = useQuery({
-    queryKey: ['reports', from, to],
-    queryFn: () => fetchReports(token!, from, to),
+    queryKey: [queryKey, from, to],
+    queryFn: () => fetchFn(token!, from, to),
     enabled: !!token && !loading,
     refetchInterval: 5 * 60 * 1000,
   });
@@ -54,4 +57,12 @@ export function useReports() {
   }
 
   return { ...query, from, to, draft, setDraft, apply, preset };
+}
+
+export function useReports() {
+  return useDateRangeReport('reports', fetchReports);
+}
+
+export function useStockReport() {
+  return useDateRangeReport('stock-report', fetchStockReport);
 }
