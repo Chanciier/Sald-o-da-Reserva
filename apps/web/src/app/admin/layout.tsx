@@ -33,6 +33,7 @@ import {
   Lock,
   PanelLeftClose,
   PanelLeftOpen,
+  Printer,
 } from 'lucide-react';
 
 type NavChild = { href: string; label: string };
@@ -81,6 +82,16 @@ const NAV: NavItem[] = [
       { href: '/admin/expedicao/enviados', label: 'Enviados' },
       { href: '/admin/expedicao/retirada', label: 'Retirada na Loja' },
       { href: '/admin/expedicao/concluidos', label: 'Concluídos' },
+    ],
+  },
+  {
+    label: 'Print Center',
+    icon: Printer,
+    children: [
+      { href: '/admin/print-center/fila', label: 'Fila' },
+      { href: '/admin/print-center/historico', label: 'Histórico' },
+      { href: '/admin/print-center/falhas', label: 'Falhas' },
+      { href: '/admin/print-center/devices', label: 'Dispositivos' },
     ],
   },
   {
@@ -227,13 +238,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   // Vendedores enxergam apenas o que o admin liberou em "Permissões de
-  // Vendedores" (GET /seller-permissions/me), mais Expedição, que continua
-  // sempre disponível e fora do novo sistema de permissões por seção.
+  // Vendedores" (GET /seller-permissions/me), mais Expedição e Print Center,
+  // que continuam sempre disponíveis e fora do novo sistema de permissões por
+  // seção (a aba "Dispositivos" do Print Center já é escondida por role
+  // dentro do próprio layout do módulo).
   const sections = mySections ?? [];
   const visibleNav =
     user.role === 'VENDEDOR'
       ? NAV.reduce<NavItem[]>((acc, item) => {
-          if (item.label === 'Expedição') {
+          if (item.label === 'Expedição' || item.label === 'Print Center') {
             acc.push(item);
             return acc;
           }

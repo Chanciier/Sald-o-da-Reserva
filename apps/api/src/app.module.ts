@@ -46,6 +46,9 @@ import { ResourceOwnerGuard } from './rbac/guards/resource-owner.guard';
 import { SellerPermissionsModule } from './seller-permissions/seller-permissions.module';
 import { SectionAccessGuard } from './seller-permissions/guards/section-access.guard';
 import { envValidation } from './config/env.validation';
+import { RecipientProfilesModule } from './recipient-profiles/recipient-profiles.module';
+import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
+import { PrintCenterModule } from './print-center/print-center.module';
 
 @Module({
   imports: [
@@ -93,6 +96,9 @@ import { envValidation } from './config/env.validation';
     LearningModule,
     VirtualEmployeeModule,
     SellerPermissionsModule,
+    FeatureFlagsModule,
+    RecipientProfilesModule,
+    PrintCenterModule,
   ],
   controllers: [AppController],
   providers: [

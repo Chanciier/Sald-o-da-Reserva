@@ -111,6 +111,12 @@ enum DeliveryMethod {
   PICKUP
 }
 
+// ── Perfis de recebimento e endereços salvos (checkout) ───────────────────────
+enum DocumentType {
+  CPF
+  CNPJ
+}
+
 enum OrderStatus {
   PENDING
   CONFIRMED
@@ -204,6 +210,8 @@ model User {
   role            Role      @default(CLIENTE)
   isActive        Boolean   @default(true) @map("is_active")
   emailVerifiedAt DateTime? @map("email_verified_at")
+  // Estágio "usuários de teste" do rollout gradual de CHECKOUT_SAVED_PROFILES_ENABLED.
+  isBetaTester    Boolean   @default(false) @map("is_beta_tester")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
@@ -223,6 +231,7 @@ model User {
   sellerSectionPermissions SellerSectionPermission[] @relation("SellerSectionPermissions")
   sellerAccessRequests     SellerAccessRequest[]     @relation("SellerAccessRequests")
   resolvedAccessRequests   SellerAccessRequest[]     @relation("SellerAccessRequestsResolved")
+  recipientProfiles        RecipientProfile[]
 
   @@map("users")
 }
@@ -491,6 +500,17 @@ model Order {
   pickupRemindedAt             DateTime?      @map("pickup_reminded_at")
   clientConfirmedPickupAt      DateTime?      @map("client_confirmed_pickup_at")
   stockApplied                 Boolean        @default(false) @map("stock_applied")
+  // Rastreabilidade opcional de qual perfil/endereço salvo originou este pedido.
+  // NUNCA lido por integrações externas (MP/Focus NF-e/Melhor Envio) — só UX/auditoria.
+  recipientProfileId           String?        @map("recipient_profile_id")
+  savedAddressId               String?        @map("saved_address_id")
+  // Snapshot imutável do documento/e-mail usados NESTE pedido, gravado na criação.
+  // Integrações preferem estes campos quando presentes, com fallback para o
+  // comportamento legado (order.user.cpf / order.user.email) quando nulos
+  // (todo pedido criado antes desta feature tem esses campos null).
+  recipientDocument            String?        @map("recipient_document")
+  recipientDocumentType        DocumentType?  @map("recipient_document_type")
+  recipientEmail               String?        @map("recipient_email")
   createdAt                    DateTime       @default(now()) @map("created_at")
   updatedAt                    DateTime       @updatedAt @map("updated_at")
   cartReminderCreatedAt        DateTime?      @map("cart_reminder_created_at")
@@ -500,21 +520,26 @@ model Order {
   recoveryCouponPushSentAt     DateTime?      @map("recovery_coupon_push_sent_at")
   recoveryCouponWhatsappSentAt DateTime?      @map("recovery_coupon_whatsapp_sent_at")
 
-  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coupon         Coupon?            @relation("AppliedCoupon", fields: [couponId], references: [id], onDelete: SetNull)
-  recoveryCoupon Coupon?            @relation("RecoveryCouponSource")
-  items          OrderItem[]
-  payment        Payment?
-  shipment       Shipment?
-  invoices       Invoice[]
-  returnRequests ReturnRequest[]
-  statusEvents   OrderStatusEvent[]
-  notifications  Notification[]
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon           Coupon?            @relation("AppliedCoupon", fields: [couponId], references: [id], onDelete: SetNull)
+  recoveryCoupon   Coupon?            @relation("RecoveryCouponSource")
+  items            OrderItem[]
+  payment          Payment?
+  shipment         Shipment?
+  invoices         Invoice[]
+  returnRequests   ReturnRequest[]
+  statusEvents     OrderStatusEvent[]
+  notifications    Notification[]
+  recipientProfile RecipientProfile?  @relation(fields: [recipientProfileId], references: [id], onDelete: SetNull)
+  savedAddress     SavedAddress?      @relation(fields: [savedAddressId], references: [id], onDelete: SetNull)
+  printJobs        PrintJob[]
 
   @@unique([channel, externalId], map: "orders_channel_external_id_key")
   @@index([userId])
   @@index([channel])
   @@index([status, channel, createdAt])
+  @@index([recipientProfileId])
+  @@index([savedAddressId])
   @@map("orders")
 }
 
@@ -534,6 +559,55 @@ model OrderStatusEvent {
 
   @@index([orderId])
   @@map("order_status_events")
+}
+
+// Perfil de destinatário reutilizável (pessoa/empresa) — pode receber entrega,
+// retirar na loja, ser o destinatário da NF-e e/ou ser usado no pagamento.
+// NUNCA lido diretamente por integrações externas: o checkout normaliza e copia
+// os dados para colunas próprias do Order (ver Order.recipientDocument/
+// recipientDocumentType/recipientEmail e o Json Order.shippingAddress), que são
+// a única fonte lida por Mercado Pago, Focus NF-e e Melhor Envio.
+model RecipientProfile {
+  id           String       @id @default(cuid())
+  userId       String       @map("user_id")
+  label        String
+  name         String
+  documentType DocumentType @default(CPF) @map("document_type")
+  document     String
+  phone        String?
+  email        String?
+  isDefault    Boolean      @default(false) @map("is_default")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addresses SavedAddress[]
+  orders    Order[]
+
+  @@index([userId])
+  @@map("recipient_profiles")
+}
+
+model SavedAddress {
+  id                 String   @id @default(cuid())
+  recipientProfileId String   @map("recipient_profile_id")
+  label              String
+  postalCode         String   @map("postal_code")
+  street             String
+  number             String
+  complement         String?
+  neighborhood       String
+  city               String
+  state              String   @db.Char(2)
+  isDefault          Boolean  @default(false) @map("is_default")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  recipientProfile RecipientProfile @relation(fields: [recipientProfileId], references: [id], onDelete: Cascade)
+  orders           Order[]
+
+  @@index([recipientProfileId])
+  @@map("saved_addresses")
 }
 
 model OrderItem {
@@ -1062,4 +1136,71 @@ model CommunityMemberEvent {
   @@index([groupId, createdAt])
   @@index([type, createdAt])
   @@map("community_member_events")
+}
+
+// ── Print Center ────────────────────────────────────────────────────────────
+// Consumidor de eventos (order.paid / order.cancelled) que prepara documentos
+// de impressão (etiqueta interna de retirada / etiqueta oficial do Melhor
+// Envio) e os enfileira para um Print Agent autenticado por Device Token.
+// Nunca é escrito por checkout/pagamentos/frete/NF-e — só lê os pedidos.
+enum PrintJobType {
+  PICKUP
+  SHIPPING
+}
+
+enum PrintJobStatus {
+  PENDING
+  READY
+  SENT
+  PRINTING
+  PRINTED
+  FAILED
+}
+
+model PrintJob {
+  id             String         @id @default(cuid())
+  orderId        String         @map("order_id")
+  type           PrintJobType
+  status         PrintJobStatus @default(PENDING)
+  copies         Int            @default(1)
+  attempts       Int            @default(0)
+  printerProfile String?        @map("printer_profile")
+  documentUrl    String?        @map("document_url")
+  lastError      String?        @map("last_error")
+  deviceId       String?        @map("device_id")
+  sentAt         DateTime?      @map("sent_at")
+  printedAt      DateTime?      @map("printed_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  order  Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  device PrintDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  // Garante que a criação automática (order.paid) seja idempotente: pagamento
+  // duplicado, webhook duplicado ou reprocessamento nunca geram uma segunda
+  // etiqueta para o mesmo pedido/tipo (P2002 é tratado como no-op).
+  @@unique([orderId, type])
+  @@index([status, type])
+  @@index([deviceId])
+  @@map("print_jobs")
+}
+
+// Computador da loja autorizado a puxar/confirmar jobs de impressão. Nunca
+// usa login administrativo nem JWT de usuário — só o token próprio (hash
+// armazenado, valor em texto puro é mostrado uma única vez na criação).
+model PrintDevice {
+  id              String    @id @default(cuid())
+  name            String
+  tokenHash       String    @unique @map("token_hash")
+  online          Boolean   @default(false)
+  lastSeen        DateTime? @map("last_seen")
+  pickupPrinter   String?   @map("pickup_printer")
+  shippingPrinter String?   @map("shipping_printer")
+  revokedAt       DateTime? @map("revoked_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  jobs PrintJob[]
+
+  @@map("print_devices")
 }
