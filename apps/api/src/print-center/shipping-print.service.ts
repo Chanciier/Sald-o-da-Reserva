@@ -118,22 +118,22 @@ export class ShippingPrintService implements OnModuleInit {
   }
 
   /**
-   * Busca o PDF de verdade da etiqueta e devolve a URL de uma versão
-   * reencaixada no tamanho físico real (4x6"), pronta pra imprimir 1:1.
-   * Null se qualquer etapa falhar — tratado como "ainda não pronta".
+   * Busca o PDF de verdade da etiqueta — e, se existir, o da DACE (Declaração
+   * Auxiliar de Conteúdo Eletrônica; nem todo envio tem uma) — e devolve a
+   * URL de um PDF único, reencaixado no tamanho físico real (4x6"), com a
+   * etiqueta na primeira página e a DACE na segunda quando aplicável.
+   * Null se a etiqueta em si falhar — tratado como "ainda não pronta". Se só
+   * a DACE falhar, segue sem ela (nem todo envio precisa).
    */
   private async buildPrintableLabel(meOrderId: string): Promise<string | null> {
-    const fileUrl = await this.fetchPrintableFileUrl(meOrderId);
-    if (!fileUrl) return null;
+    const labelBytes = await this.fetchPdfBytes(`/me/imprimir/pdf/${meOrderId}`, 'etiqueta');
+    if (!labelBytes) return null;
+
+    const daceBytes = await this.fetchPdfBytes(`/me/imprimir/dace/pdf/${meOrderId}`, 'DACE');
 
     try {
-      const res = await fetch(fileUrl);
-      if (!res.ok) {
-        this.logger.warn(`Falha ao baixar PDF da etiqueta (${fileUrl}): HTTP ${res.status}`);
-        return null;
-      }
-      const bytes = await res.arrayBuffer();
-      const fitted = await this.fitToLabelSize(Buffer.from(bytes));
+      const sources = daceBytes ? [labelBytes, daceBytes] : [labelBytes];
+      const fitted = await this.fitToLabelSize(sources);
       return this.storage.uploadPdf(fitted, 'print-jobs');
     } catch (err) {
       this.logger.warn(`Erro ao processar PDF da etiqueta: ${(err as Error).message}`);
@@ -146,13 +146,15 @@ export class ShippingPrintService implements OnModuleInit {
    * interativa do Melhor Envio (`/imprimir/{code}`, `POST /me/shipment/print`)
    * — feita pra um humano abrir no navegador, não um PDF baixável por
    * servidor/script (o Print Agent recebia HTML e rejeitava por não começar
-   * com a assinatura "%PDF"). O endpoint certo pra automação é este aqui:
-   * `GET /me/imprimir/pdf/{meOrderId}`, que devolve um link S3 público
-   * apontando direto pro arquivo PDF, sem precisar de sessão de navegador.
+   * com a assinatura "%PDF"). Os endpoints certos pra automação são
+   * `GET /me/imprimir/pdf/{meOrderId}` (etiqueta) e
+   * `GET /me/imprimir/dace/pdf/{meOrderId}` (DACE, quando existe) — cada um
+   * devolve um link S3 público apontando direto pro arquivo, sem precisar
+   * de sessão de navegador. Esta função busca o link e já baixa os bytes.
    */
-  private async fetchPrintableFileUrl(meOrderId: string): Promise<string | null> {
+  private async fetchPdfBytes(path: string, label: string): Promise<Buffer | null> {
     try {
-      const res = await fetch(`${this.baseUrl}/me/imprimir/pdf/${meOrderId}`, {
+      const res = await fetch(`${this.baseUrl}${path}`, {
         headers: {
           Authorization: `Bearer ${this.token}`,
           Accept: 'application/json',
@@ -161,58 +163,70 @@ export class ShippingPrintService implements OnModuleInit {
         },
       });
       if (!res.ok) {
-        this.logger.warn(
-          `Falha ao obter PDF direto da etiqueta (meOrderId=${meOrderId}): HTTP ${res.status}`,
-        );
+        this.logger.warn(`Falha ao obter link da ${label}: HTTP ${res.status}`);
         return null;
       }
 
       const text = (await res.text()).trim();
-      // A API já devolveu isso como string JSON pura, `{ "url": "..." }` e
-      // `["https://..."]` em observações diferentes — aceita os três.
+      // A API já devolveu isso como string JSON pura, `{ "url"/"pdf": "..." }`
+      // e `["https://..."]` em observações diferentes — aceita todos.
+      let fileUrl: string | null = null;
       try {
         const parsed: unknown = JSON.parse(text);
-        if (typeof parsed === 'string') return parsed;
-        if (Array.isArray(parsed) && typeof parsed[0] === 'string') return parsed[0];
-        if (parsed && typeof parsed === 'object' && 'url' in parsed) {
-          const url = (parsed as { url?: unknown }).url;
-          if (typeof url === 'string') return url;
+        if (typeof parsed === 'string') fileUrl = parsed;
+        else if (Array.isArray(parsed) && typeof parsed[0] === 'string') fileUrl = parsed[0];
+        else if (parsed && typeof parsed === 'object') {
+          const value = Object.values(parsed as Record<string, unknown>)[0];
+          if (typeof value === 'string') fileUrl = value;
         }
       } catch {
-        // não era JSON — o corpo pode já ser a URL crua
+        fileUrl = text.startsWith('http') ? text : null;
       }
-      return text.startsWith('http') ? text : null;
+      if (!fileUrl) return null;
+
+      const fileRes = await fetch(fileUrl);
+      if (!fileRes.ok) {
+        this.logger.warn(
+          `Falha ao baixar arquivo da ${label} (${fileUrl}): HTTP ${fileRes.status}`,
+        );
+        return null;
+      }
+      return Buffer.from(await fileRes.arrayBuffer());
     } catch (err) {
-      this.logger.warn(`Erro ao chamar /me/imprimir/pdf: ${(err as Error).message}`);
+      this.logger.warn(`Erro ao buscar ${label}: ${(err as Error).message}`);
       return null;
     }
   }
 
   /**
-   * O PDF que o Melhor Envio devolve nesse endpoint não vem no tamanho
-   * físico da etiqueta (num pedido de teste veio numa página de
+   * Os PDFs que o Melhor Envio devolve nesses endpoints não vêm no tamanho
+   * físico da etiqueta (num pedido de teste vieram numa página de
    * ~204x287mm, bem maior que o rolo de 4x6") — encaixar por recorte é
    * arriscado (já cortou parte do conteúdo real numa tentativa). Em vez
-   * disso, cada página é reencaixada (mesma lógica de `object-fit: contain`
-   * já usada na etiqueta de retirada) numa página nova de 4x6" exata,
-   * preservando a proporção — nada é cortado, só reduzido.
+   * disso, cada página de cada PDF de origem é reencaixada (mesma lógica de
+   * `object-fit: contain` já usada na etiqueta de retirada) numa página nova
+   * de 4x6" exata, preservando a proporção — nada é cortado, só reduzido.
+   * Todas as páginas de todos os PDFs de origem viram páginas sequenciais
+   * de um único PDF de saída (etiqueta primeiro, depois DACE se houver).
    */
-  private async fitToLabelSize(sourceBytes: Buffer): Promise<Buffer> {
-    const srcDoc = await PDFDocument.load(sourceBytes);
+  private async fitToLabelSize(sourcesBytes: Buffer[]): Promise<Buffer> {
     const outDoc = await PDFDocument.create();
 
-    const pageIndices = srcDoc.getPages().map((_, i) => i);
-    const embeddedPages = await outDoc.embedPdf(srcDoc, pageIndices);
+    for (const sourceBytes of sourcesBytes) {
+      const srcDoc = await PDFDocument.load(sourceBytes);
+      const pageIndices = srcDoc.getPages().map((_, i) => i);
+      const embeddedPages = await outDoc.embedPdf(srcDoc, pageIndices);
 
-    for (const embedded of embeddedPages) {
-      const scale = Math.min(LABEL_WIDTH_PT / embedded.width, LABEL_HEIGHT_PT / embedded.height);
-      const width = embedded.width * scale;
-      const height = embedded.height * scale;
-      const x = (LABEL_WIDTH_PT - width) / 2;
-      const y = (LABEL_HEIGHT_PT - height) / 2;
+      for (const embedded of embeddedPages) {
+        const scale = Math.min(LABEL_WIDTH_PT / embedded.width, LABEL_HEIGHT_PT / embedded.height);
+        const width = embedded.width * scale;
+        const height = embedded.height * scale;
+        const x = (LABEL_WIDTH_PT - width) / 2;
+        const y = (LABEL_HEIGHT_PT - height) / 2;
 
-      const page = outDoc.addPage([LABEL_WIDTH_PT, LABEL_HEIGHT_PT]);
-      page.drawPage(embedded, { x, y, width, height });
+        const page = outDoc.addPage([LABEL_WIDTH_PT, LABEL_HEIGHT_PT]);
+        page.drawPage(embedded, { x, y, width, height });
+      }
     }
 
     return Buffer.from(await outDoc.save());

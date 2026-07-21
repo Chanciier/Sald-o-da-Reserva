@@ -118,16 +118,20 @@ describe('ShippingPrintService', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('etiqueta aparece: busca o PDF direto, reencaixa no tamanho 4x6" e marca READY', async () => {
+  it('etiqueta + DACE: busca os dois PDFs, reencaixa em 4x6" (etiqueta na pág. 1, DACE na pág. 2) e marca READY', async () => {
     prisma.printJob.findUnique.mockResolvedValue({ id: JOB_ID, status: 'PENDING', attempts: 5 });
     prisma.shipment.findUnique.mockResolvedValue({
       labelUrl: 'https://melhorenvio.com.br/imprimir/abc123',
       meOrderId: ME_ORDER_ID,
     });
-    const pdfBytes = await samplePdfBytes();
+    const labelBytes = await samplePdfBytes();
+    const daceBytes = await samplePdfBytes();
+    const DACE_FILE_URL = 'https://me-bucket.s3.amazonaws.com/dace.pdf?X-Amz-Signature=xyz';
     fetchMock
       .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([FILE_URL]) })
-      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => pdfBytes.buffer });
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => labelBytes.buffer })
+      .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ pdf: DACE_FILE_URL }) })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => daceBytes.buffer });
     prisma.printJob.update.mockResolvedValue({
       id: JOB_ID,
       orderId: ORDER_ID,
@@ -146,14 +150,23 @@ describe('ShippingPrintService', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(2, FILE_URL);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining(`/me/imprimir/dace/pdf/${ME_ORDER_ID}`),
+      expect.anything(),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(4, DACE_FILE_URL);
 
-    // O buffer enviado pro storage já deve estar reencaixado em 4x6"
-    // (288x432pt), não no tamanho original (577.5x813pt) do PDF de origem.
+    // 2 páginas (etiqueta + DACE), cada uma já reencaixada em 4x6"
+    // (288x432pt), não no tamanho original (577.5x813pt) dos PDFs de origem.
     const uploadedBuffer = storage.uploadPdf.mock.calls[0][0] as Buffer;
     const fittedDoc = await PDFDocument.load(uploadedBuffer);
-    const size = fittedDoc.getPage(0).getSize();
-    expect(size.width).toBeCloseTo(288, 0);
-    expect(size.height).toBeCloseTo(432, 0);
+    expect(fittedDoc.getPageCount()).toBe(2);
+    for (const page of fittedDoc.getPages()) {
+      const size = page.getSize();
+      expect(size.width).toBeCloseTo(288, 0);
+      expect(size.height).toBeCloseTo(432, 0);
+    }
 
     expect(prisma.printJob.update).toHaveBeenCalledWith({
       where: { id: JOB_ID },
@@ -165,6 +178,36 @@ describe('ShippingPrintService', () => {
     expect(printAgentWs.pushJobReady).toHaveBeenCalledWith(
       expect.objectContaining({ id: JOB_ID, status: 'READY' }),
     );
+  });
+
+  it('sem DACE (nem todo envio tem uma): segue só com a etiqueta, sem falhar o job', async () => {
+    prisma.printJob.findUnique.mockResolvedValue({ id: JOB_ID, status: 'PENDING', attempts: 5 });
+    prisma.shipment.findUnique.mockResolvedValue({
+      labelUrl: 'https://melhorenvio.com.br/imprimir/abc123',
+      meOrderId: ME_ORDER_ID,
+    });
+    const labelBytes = await samplePdfBytes();
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([FILE_URL]) })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => labelBytes.buffer })
+      .mockResolvedValueOnce({ ok: false, status: 404, text: async () => '' });
+    prisma.printJob.update.mockResolvedValue({
+      id: JOB_ID,
+      orderId: ORDER_ID,
+      type: 'SHIPPING',
+      status: 'READY',
+      documentUrl: 'https://cdn.example.com/print-jobs/fitted.pdf',
+    });
+
+    await queue.handler!({ orderId: ORDER_ID, printJobId: JOB_ID });
+
+    const uploadedBuffer = storage.uploadPdf.mock.calls[0][0] as Buffer;
+    const fittedDoc = await PDFDocument.load(uploadedBuffer);
+    expect(fittedDoc.getPageCount()).toBe(1);
+    expect(prisma.printJob.update).toHaveBeenCalledWith({
+      where: { id: JOB_ID },
+      data: { status: 'READY', documentUrl: 'https://cdn.example.com/print-jobs/fitted.pdf' },
+    });
   });
 
   it('labelUrl existe mas o endpoint do PDF ainda falha: trata como não pronto e tenta de novo', async () => {
