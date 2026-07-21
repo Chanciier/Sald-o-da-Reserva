@@ -24,7 +24,7 @@ tauri-plugin-store = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = "0.24"
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 keyring = { version = "3", features = ["windows-native"] }
@@ -36,6 +36,7 @@ url = "2"
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
 image = { version = "0.25", default-features = false, features = ["png"] }
+printpdf = "0.7"
 
 [dev-dependencies]
 wiremock = "0.6"

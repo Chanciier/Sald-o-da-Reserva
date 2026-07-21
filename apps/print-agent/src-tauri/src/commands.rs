@@ -131,10 +131,11 @@ pub async fn test_print(
     let printer =
         printer.ok_or_else(|| "Nenhuma impressora configurada para este tipo.".to_string())?;
     let cache_dir = runtime.paths.cache_dir.clone();
+    let sumatra_path = runtime.paths.sumatra_path.clone();
 
     tokio::task::spawn_blocking(move || -> Result<(), String> {
         let path = generate_test_label(&cache_dir).map_err(|e| e.to_string())?;
-        print_image(&path, &printer, copies.max(1)).map_err(|e| e.to_string())
+        print_image(&sumatra_path, &path, &printer, copies.max(1)).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())??;

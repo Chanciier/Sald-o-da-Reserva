@@ -185,9 +185,10 @@ async fn finish_processing(
 
     match claimed.job_type {
         JobType::Pickup => {
+            let sumatra = paths.sumatra_path.clone();
             let path = path.clone();
             let printer = printer.clone();
-            tokio::task::spawn_blocking(move || print_image(&path, &printer, copies))
+            tokio::task::spawn_blocking(move || print_image(&sumatra, &path, &printer, copies))
                 .await
                 .expect("thread de impressão travou")?;
         }

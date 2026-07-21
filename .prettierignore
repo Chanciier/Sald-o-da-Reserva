@@ -5,6 +5,7 @@ build
 out
 coverage
 target
+gen
 *.min.js
 *.min.css
 pnpm-lock.yaml
