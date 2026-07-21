@@ -35,6 +35,7 @@ describe('PickupLabelService', () => {
       id: 'order-abcdef123456',
       buyerName: 'Cliente Teste',
       customerPhone: '11999999999',
+      pickupCode: 'A-0001',
       createdAt: new Date('2026-07-17T12:00:00Z'),
       items: [{ name: 'Produto A', sku: 'SKU-1', quantity: 2 }],
     });
@@ -56,6 +57,7 @@ describe('PickupLabelService', () => {
         id: 'order-abcdef123456',
         buyerName: 'Cliente & <Teste> "Especial"',
         customerPhone: null,
+        pickupCode: 'A-0002',
         createdAt: new Date('2026-07-17T12:00:00Z'),
         items: [
           { name: 'Produto <A> & "B"', sku: "SKU-'1", quantity: 1 },
@@ -71,9 +73,22 @@ describe('PickupLabelService', () => {
         id: 'order-abcdef123456',
         buyerName: null,
         customerPhone: null,
+        pickupCode: null,
         createdAt: new Date('2026-07-17T12:00:00Z'),
         items: [],
       }),
     ).resolves.toBe('https://cdn.example.com/print-jobs/x.png');
+  });
+
+  it('sem pickupCode (pedido legado): usa os últimos 8 caracteres do id como código', async () => {
+    const url = await service.generate({
+      id: 'order-abcdef123456',
+      buyerName: 'Cliente Teste',
+      customerPhone: null,
+      pickupCode: null,
+      createdAt: new Date('2026-07-17T12:00:00Z'),
+      items: [],
+    });
+    expect(url).toBe('https://cdn.example.com/print-jobs/x.png');
   });
 });

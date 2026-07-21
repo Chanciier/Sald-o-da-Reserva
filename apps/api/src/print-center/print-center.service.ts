@@ -21,6 +21,7 @@ interface LoadedOrder {
   deliveryMethod: DeliveryMethod;
   buyerName: string | null;
   customerPhone: string | null;
+  pickupCode: string | null;
   createdAt: Date;
   items: Array<{ name: string; sku: string | null; quantity: number }>;
 }
@@ -148,6 +149,7 @@ export class PrintCenterService implements OnModuleInit {
         deliveryMethod: true,
         buyerName: true,
         customerPhone: true,
+        pickupCode: true,
         createdAt: true,
         items: { select: { name: true, sku: true, quantity: true } },
       },
