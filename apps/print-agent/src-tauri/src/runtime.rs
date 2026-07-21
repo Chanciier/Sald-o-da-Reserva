@@ -46,7 +46,14 @@ impl AgentRuntime {
         let paths = self.paths.clone();
 
         tokio::spawn(ws_client::run(status_tx, ws_url, token, job_tx, stop_rx));
-        tokio::spawn(bridge_status(app.clone(), state.clone(), status_rx));
+        tokio::spawn(bridge_status(
+            app.clone(),
+            state.clone(),
+            status_rx,
+            api.clone(),
+            token_provider.clone(),
+            paths.clone(),
+        ));
         tokio::spawn(processor::run(app, state, api, token_provider, paths, job_rx));
     }
 
@@ -59,8 +66,22 @@ impl AgentRuntime {
 }
 
 /// Ponte entre o status do `ws_client` (desacoplado do Tauri, testável sozinho)
-/// e `AppState`/eventos do front — só isso, nenhuma lógica de reconexão aqui.
-async fn bridge_status(app: AppHandle, state: AppState, mut status_rx: watch::Receiver<ConnectionStatus>) {
+/// e `AppState`/eventos do front. Também é quem cobre o "buraco" do push:
+/// se o WS cair (ex.: instabilidade de rede) bem no momento em que um job é
+/// criado no servidor, o push daquele job se perde — `pushJobReady` só manda
+/// pra sockets conectados *naquele instante*, sem fila de retry. Sem isso
+/// aqui, o job só seria pego na próxima vez que alguém clicasse em
+/// "Reprocessar" manualmente. Por isso, toda vez que o status vira
+/// `Connected` (primeira conexão OU reconexão depois de queda), dispara o
+/// mesmo `reprocess_pending` do botão, em background.
+async fn bridge_status(
+    app: AppHandle,
+    state: AppState,
+    mut status_rx: watch::Receiver<ConnectionStatus>,
+    api: ApiClient,
+    token_provider: TokenProvider,
+    paths: ProcessorPaths,
+) {
     loop {
         let status = *status_rx.borrow();
         let snapshot = {
@@ -69,6 +90,17 @@ async fn bridge_status(app: AppHandle, state: AppState, mut status_rx: watch::Re
             guard.snapshot()
         };
         let _ = app.emit("state-changed", snapshot);
+
+        if status == ConnectionStatus::Connected {
+            let app = app.clone();
+            let state = state.clone();
+            let api = api.clone();
+            let token_provider = token_provider.clone();
+            let paths = paths.clone();
+            tokio::spawn(async move {
+                processor::reprocess_pending(&app, &state, &api, &token_provider, &paths).await;
+            });
+        }
 
         if status_rx.changed().await.is_err() {
             return; // ws_client encerrou, o sender foi dropado
