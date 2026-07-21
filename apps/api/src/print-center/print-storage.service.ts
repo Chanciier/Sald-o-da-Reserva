@@ -33,7 +33,20 @@ export class PrintStorageService {
   }
 
   async uploadPng(buffer: Buffer, folder: 'print-jobs'): Promise<string> {
-    const key = `${folder}/${Date.now()}-${randomBytes(8).toString('hex')}.png`;
+    return this.upload(buffer, folder, 'png', 'image/png');
+  }
+
+  async uploadPdf(buffer: Buffer, folder: 'print-jobs'): Promise<string> {
+    return this.upload(buffer, folder, 'pdf', 'application/pdf');
+  }
+
+  private async upload(
+    buffer: Buffer,
+    folder: 'print-jobs',
+    extension: string,
+    contentType: string,
+  ): Promise<string> {
+    const key = `${folder}/${Date.now()}-${randomBytes(8).toString('hex')}.${extension}`;
 
     await new Upload({
       client: this.s3,
@@ -41,7 +54,7 @@ export class PrintStorageService {
         Bucket: this.bucket,
         Key: key,
         Body: buffer,
-        ContentType: 'image/png',
+        ContentType: contentType,
         CacheControl: 'no-cache',
       },
     }).done();
