@@ -54,6 +54,29 @@ export default function PrintCenterDevicesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['print-center-devices'] }),
   });
 
+  // Edição das impressoras de um device já existente — o app desktop não
+  // reporta pro backend o que o usuário configura nas Configurações locais
+  // dele (são duas fontes de verdade separadas), e é esse campo aqui que o
+  // gateway WS usa pra decidir pra quem empurrar cada job. Sem editar isso,
+  // um device pareado depois da criação nunca recebe nada.
+  const [editingPrinters, setEditingPrinters] = useState<{
+    id: string;
+    pickupPrinter: string;
+    shippingPrinter: string;
+  } | null>(null);
+
+  const updatePrintersMutation = useMutation({
+    mutationFn: () =>
+      updatePrintDevice(token!, editingPrinters!.id, {
+        pickupPrinter: editingPrinters!.pickupPrinter || undefined,
+        shippingPrinter: editingPrinters!.shippingPrinter || undefined,
+      }),
+    onSuccess: () => {
+      setEditingPrinters(null);
+      qc.invalidateQueries({ queryKey: ['print-center-devices'] });
+    },
+  });
+
   const regenerateMutation = useMutation({
     mutationFn: (id: string) => regeneratePrintDeviceToken(token!, id),
     onSuccess: (result, id) => {
@@ -188,37 +211,96 @@ export default function PrintCenterDevicesPage() {
                       {device.lastSeen ? new Date(device.lastSeen).toLocaleString('pt-BR') : '—'}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {device.pickupPrinter ?? '—'} / {device.shippingPrinter ?? '—'}
+                      {editingPrinters?.id === device.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            value={editingPrinters.pickupPrinter}
+                            onChange={(e) =>
+                              setEditingPrinters({
+                                ...editingPrinters,
+                                pickupPrinter: e.target.value,
+                              })
+                            }
+                            placeholder="Impressora de retirada"
+                            className="w-32 rounded border bg-background px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-primary/40"
+                          />
+                          <input
+                            value={editingPrinters.shippingPrinter}
+                            onChange={(e) =>
+                              setEditingPrinters({
+                                ...editingPrinters,
+                                shippingPrinter: e.target.value,
+                              })
+                            }
+                            placeholder="Impressora de envio"
+                            className="w-32 rounded border bg-background px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-primary/40"
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            setEditingPrinters({
+                              id: device.id,
+                              pickupPrinter: device.pickupPrinter ?? '',
+                              shippingPrinter: device.shippingPrinter ?? '',
+                            })
+                          }
+                          className="hover:underline"
+                          title="Clique para editar"
+                        >
+                          {device.pickupPrinter ?? '—'} / {device.shippingPrinter ?? '—'}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => pairingCodeMutation.mutate(device.id)}
-                          disabled={pairingCodeMutation.isPending || !!device.revokedAt}
-                          className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
-                        >
-                          Gerar código de pareamento
-                        </button>
-                        <button
-                          onClick={() => regenerateMutation.mutate(device.id)}
-                          disabled={regenerateMutation.isPending}
-                          className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
-                        >
-                          Novo token
-                        </button>
-                        <button
-                          onClick={() =>
-                            revokeMutation.mutate({ id: device.id, revoked: !device.revokedAt })
-                          }
-                          disabled={revokeMutation.isPending}
-                          className={`rounded-lg border px-2.5 py-1.5 text-xs disabled:opacity-50 ${
-                            device.revokedAt
-                              ? 'hover:bg-muted'
-                              : 'border-destructive/50 text-destructive hover:bg-destructive/10'
-                          }`}
-                        >
-                          {device.revokedAt ? 'Reativar' : 'Revogar'}
-                        </button>
+                        {editingPrinters?.id === device.id ? (
+                          <>
+                            <button
+                              onClick={() => updatePrintersMutation.mutate()}
+                              disabled={updatePrintersMutation.isPending}
+                              className="rounded-lg bg-primary px-2.5 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                            >
+                              {updatePrintersMutation.isPending ? 'Salvando...' : 'Salvar'}
+                            </button>
+                            <button
+                              onClick={() => setEditingPrinters(null)}
+                              className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => pairingCodeMutation.mutate(device.id)}
+                              disabled={pairingCodeMutation.isPending || !!device.revokedAt}
+                              className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+                            >
+                              Gerar código de pareamento
+                            </button>
+                            <button
+                              onClick={() => regenerateMutation.mutate(device.id)}
+                              disabled={regenerateMutation.isPending}
+                              className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+                            >
+                              Novo token
+                            </button>
+                            <button
+                              onClick={() =>
+                                revokeMutation.mutate({ id: device.id, revoked: !device.revokedAt })
+                              }
+                              disabled={revokeMutation.isPending}
+                              className={`rounded-lg border px-2.5 py-1.5 text-xs disabled:opacity-50 ${
+                                device.revokedAt
+                                  ? 'hover:bg-muted'
+                                  : 'border-destructive/50 text-destructive hover:bg-destructive/10'
+                              }`}
+                            >
+                              {device.revokedAt ? 'Reativar' : 'Revogar'}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
