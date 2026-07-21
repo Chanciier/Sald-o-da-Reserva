@@ -3,8 +3,8 @@
 // <base>/<form> hijacks are blocked. 'unsafe-inline'/'unsafe-eval' are required
 // by Next.js hydration + the Mercado Pago SDK; a nonce-based policy would need a
 // middleware refactor. Origins:
-//   scripts  → MP SDK, Cloudflare Turnstile
-//   connect  → API, MP API, BrasilAPI/ViaCEP (lookup de CEP), Turnstile
+//   scripts  → MP SDK, Cloudflare Turnstile, Meta Pixel
+//   connect  → API, MP API, BrasilAPI/ViaCEP (lookup de CEP), Turnstile, Meta Pixel (beacon de eventos)
 //   frames   → Turnstile widget, MP secure fields
 //   images   → S3/CloudFront/QR server/any https + data/blob (next/image)
 // O SDK do Mercado Pago carrega, internamente, um script/iframe de fingerprint
@@ -19,11 +19,11 @@ const wsOrigin = apiOrigin.replace(/^http/, 'ws');
 
 const csp = [
   `default-src 'self'`,
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://challenges.cloudflare.com`,
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://challenges.cloudflare.com https://connect.facebook.net`,
   `style-src 'self' 'unsafe-inline'`,
   `img-src 'self' data: blob: https:`,
   `font-src 'self' data:`,
-  `connect-src 'self' ${apiOrigin} ${wsOrigin} https://api.mercadopago.com https://*.mercadopago.com https://*.mercadolibre.com https://brasilapi.com.br https://viacep.com.br https://challenges.cloudflare.com`,
+  `connect-src 'self' ${apiOrigin} ${wsOrigin} https://api.mercadopago.com https://*.mercadopago.com https://*.mercadolibre.com https://brasilapi.com.br https://viacep.com.br https://challenges.cloudflare.com https://www.facebook.com`,
   `frame-src 'self' https://challenges.cloudflare.com https://*.mercadopago.com https://*.mercadolibre.com`,
   `worker-src 'self' blob:`,
   `object-src 'none'`,
