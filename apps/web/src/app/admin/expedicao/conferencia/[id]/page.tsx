@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
 import { fetchInvoices, emitInvoice, reemitInvoice } from '@/actions/invoices';
 import { purchaseLabel } from '@/lib/shipping';
+import { createManualPrintJob } from '@/lib/print-center-api';
 import { marcarPronto, confirmarRetirada, cancelarPedido } from '@/actions/expedicao';
 import type { Order } from '@/types/order';
 import type { Invoice } from '@/actions/invoices';
@@ -82,6 +83,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const router = useRouter();
   const qc = useQueryClient();
   const [labelError, setLabelError] = useState('');
+  const [pickupPrintError, setPickupPrintError] = useState('');
   const [invoiceError, setInvoiceError] = useState('');
   const [buyerCpf, setBuyerCpf] = useState('');
   const [buyerNameOverride, setBuyerNameOverride] = useState('');
@@ -192,6 +194,16 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     mutationFn: () => purchaseLabel(params.id, token!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['order', params.id] }),
     onError: (e: Error) => setLabelError(e.message),
+  });
+
+  // Dispara o mesmo caminho real de produção (PickupLabelService + push pro
+  // Print Agent via WS) usado quando order.paid dispara sozinho — só que na
+  // hora, ignorando as feature flags (ação manual explícita do admin). Serve
+  // tanto pra reimprimir quanto pra testar o Print Agent na prática.
+  const printPickupLabelMutation = useMutation({
+    mutationFn: () => createManualPrintJob(token!, params.id),
+    onSuccess: () => setPickupPrintError(''),
+    onError: (e: Error) => setPickupPrintError(e.message),
   });
 
   async function openCarrierModal() {
@@ -603,19 +615,38 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
             <Tag className="h-4 w-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm">Etiqueta de Retirada</h2>
           </div>
-          <div className="p-4 flex items-center gap-4">
-            {pickupCode && (
-              <span className="font-mono text-lg font-bold tracking-widest border rounded-lg px-3 py-1.5 bg-muted">
-                {pickupCode}
-              </span>
+          <div className="p-4 space-y-2">
+            <div className="flex items-center gap-4">
+              {pickupCode && (
+                <span className="font-mono text-lg font-bold tracking-widest border rounded-lg px-3 py-1.5 bg-muted">
+                  {pickupCode}
+                </span>
+              )}
+              <button
+                onClick={() => printPickupLabelMutation.mutate()}
+                disabled={printPickupLabelMutation.isPending}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {printPickupLabelMutation.isPending
+                  ? 'Enviando para o Print Agent...'
+                  : 'Enviar Etiqueta para o Print Agent'}
+              </button>
+              <Link
+                href={`/admin/expedicao/retirada/${params.id}/etiqueta`}
+                target="_blank"
+                className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+              >
+                Imprimir pelo navegador
+              </Link>
+            </div>
+            {printPickupLabelMutation.isSuccess && (
+              <p className="text-xs text-green-600 dark:text-green-400">
+                Job criado (status: {printPickupLabelMutation.data.status}) — se o Print Agent
+                estiver conectado com uma impressora de retirada configurada, a etiqueta real (com
+                QR code e itens) deve chegar até ele em segundos.
+              </p>
             )}
-            <Link
-              href={`/admin/expedicao/retirada/${params.id}/etiqueta`}
-              target="_blank"
-              className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
-            >
-              Imprimir Etiqueta Interna
-            </Link>
+            {pickupPrintError && <p className="text-xs text-destructive">{pickupPrintError}</p>}
           </div>
         </section>
       )}
