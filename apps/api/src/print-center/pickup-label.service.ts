@@ -66,7 +66,7 @@ export class PickupLabelService {
     const itemsSvg = input.itemLines
       .map(
         (line, i) =>
-          `<text x="32" y="${ITEMS_START_Y + 30 + i * ROW_HEIGHT}" font-family="monospace" font-size="16">${this.escapeXml(
+          `<text x="32" y="${ITEMS_START_Y + 30 + i * ROW_HEIGHT}" font-family="DejaVu Sans Mono, monospace" font-size="16">${this.escapeXml(
             line,
           )}</text>`,
       )
@@ -75,20 +75,20 @@ export class PickupLabelService {
     return `<svg width="${WIDTH}" height="${height}" viewBox="0 0 ${WIDTH} ${height}" xmlns="http://www.w3.org/2000/svg">
   <rect width="${WIDTH}" height="${height}" fill="white" stroke="black" stroke-width="2"/>
   <line x1="0" y1="80" x2="${WIDTH}" y2="80" stroke="black" stroke-width="2"/>
-  <text x="${WIDTH / 2}" y="36" text-anchor="middle" font-family="sans-serif" font-size="22" font-weight="bold">SALDÃO DA RESERVA</text>
-  <text x="${WIDTH / 2}" y="62" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" letter-spacing="2">ETIQUETA DE RETIRADA</text>
+  <text x="${WIDTH / 2}" y="36" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="22" font-weight="bold">SALDÃO DA RESERVA</text>
+  <text x="${WIDTH / 2}" y="62" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="16" font-weight="bold" letter-spacing="2">ETIQUETA DE RETIRADA</text>
 
-  <text x="32" y="112" font-family="sans-serif" font-size="15"><tspan font-weight="bold">Pedido:</tspan> #${this.escapeXml(input.shortId)}</text>
-  <text x="32" y="138" font-family="sans-serif" font-size="15"><tspan font-weight="bold">Cliente:</tspan> ${this.escapeXml(input.buyerName)}</text>
-  <text x="32" y="164" font-family="sans-serif" font-size="15"><tspan font-weight="bold">Telefone:</tspan> ${this.escapeXml(input.phone)}</text>
-  <text x="32" y="190" font-family="sans-serif" font-size="15"><tspan font-weight="bold">Data:</tspan> ${this.escapeXml(input.date)}</text>
-  <text x="32" y="216" font-family="sans-serif" font-size="15" font-weight="bold">Tipo: RETIRADA</text>
+  <text x="32" y="112" font-family="DejaVu Sans, sans-serif" font-size="15"><tspan font-weight="bold">Pedido:</tspan> #${this.escapeXml(input.shortId)}</text>
+  <text x="32" y="138" font-family="DejaVu Sans, sans-serif" font-size="15"><tspan font-weight="bold">Cliente:</tspan> ${this.escapeXml(input.buyerName)}</text>
+  <text x="32" y="164" font-family="DejaVu Sans, sans-serif" font-size="15"><tspan font-weight="bold">Telefone:</tspan> ${this.escapeXml(input.phone)}</text>
+  <text x="32" y="190" font-family="DejaVu Sans, sans-serif" font-size="15"><tspan font-weight="bold">Data:</tspan> ${this.escapeXml(input.date)}</text>
+  <text x="32" y="216" font-family="DejaVu Sans, sans-serif" font-size="15" font-weight="bold">Tipo: RETIRADA</text>
 
   <line x1="0" y1="234" x2="${WIDTH}" y2="234" stroke="black" stroke-width="1"/>
   <image x="${WIDTH / 2 - 90}" y="248" width="180" height="180" href="data:image/png;base64,${input.qrBase64}"/>
   <line x1="0" y1="${ITEMS_START_Y - 30}" x2="${WIDTH}" y2="${ITEMS_START_Y - 30}" stroke="black" stroke-width="1"/>
 
-  <text x="32" y="${ITEMS_START_Y}" font-family="sans-serif" font-size="14" font-weight="bold">ITENS:</text>
+  <text x="32" y="${ITEMS_START_Y}" font-family="DejaVu Sans, sans-serif" font-size="14" font-weight="bold">ITENS:</text>
 ${itemsSvg}
 </svg>`;
   }

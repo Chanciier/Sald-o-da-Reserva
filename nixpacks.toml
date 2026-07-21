@@ -1,5 +1,9 @@
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+# dejavu_fonts + fontconfig: o `sharp` (via librsvg) precisa de uma fonte de
+# verdade instalada no container pra rasterizar <text> do SVG — sem isso, todo
+# texto (etiqueta de retirada, etc.) sai como caixinha (glifo ausente),
+# incluindo acentos do português. DejaVu cobre bem Latin + acentuação.
+nixPkgs = ["nodejs_20", "dejavu_fonts", "fontconfig"]
 
 [phases.install]
 cmds = []
