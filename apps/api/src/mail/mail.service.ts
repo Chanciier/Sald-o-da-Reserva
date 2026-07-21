@@ -289,7 +289,7 @@ export class MailService {
     name: string | undefined,
     orderId: string,
     amount: number,
-    refundId: string,
+    _refundId: string,
   ): Promise<void> {
     const greeting = name ? `Olá, ${name}!` : 'Olá!';
     const shortId = orderId.slice(-8).toUpperCase();
@@ -310,7 +310,6 @@ export class MailService {
               <span style="font-size:14px;color:#3b82f6">Valor reembolsado</span>
               <strong style="font-size:18px;color:#1d4ed8">${fmtAmount}</strong>
             </div>
-            <p style="margin:8px 0 0;font-size:12px;color:#60a5fa">ID do reembolso: ${refundId}</p>
           </div>
           <p style="margin:0 0 16px;font-size:14px;color:#444">O valor será estornado em sua forma de pagamento original em <strong>até 10 dias úteis</strong>, dependendo da operadora.</p>
           <a href="${ordersUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600">
