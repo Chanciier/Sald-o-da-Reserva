@@ -84,6 +84,7 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const qc = useQueryClient();
   const [labelError, setLabelError] = useState('');
   const [pickupPrintError, setPickupPrintError] = useState('');
+  const [shippingPrintError, setShippingPrintError] = useState('');
   const [invoiceError, setInvoiceError] = useState('');
   const [buyerCpf, setBuyerCpf] = useState('');
   const [buyerNameOverride, setBuyerNameOverride] = useState('');
@@ -204,6 +205,18 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
     mutationFn: () => createManualPrintJob(token!, params.id),
     onSuccess: () => setPickupPrintError(''),
     onError: (e: Error) => setPickupPrintError(e.message),
+  });
+
+  // Mesmo endpoint/caminho da retirada — pra pedido de envio, o backend cria
+  // o job PENDING e observa o labelUrl do Melhor Envio ficar pronto (já
+  // pronto neste caso, resolve quase na hora) antes de empurrar pro Print
+  // Agent. O PDF já vem em 2 páginas (etiqueta + DACE) no tamanho físico
+  // certo — o Print Agent imprime as duas em sequência sem precisar de
+  // nenhum recorte.
+  const printShippingLabelMutation = useMutation({
+    mutationFn: () => createManualPrintJob(token!, params.id),
+    onSuccess: () => setShippingPrintError(''),
+    onError: (e: Error) => setShippingPrintError(e.message),
   });
 
   async function openCarrierModal() {
@@ -599,12 +612,33 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                     <span className="ml-2 font-mono text-xs">{shipment.trackingCode}</span>
                   )}
                 </div>
-                <button
-                  onClick={() => window.open(shipment.labelUrl!, '_blank')}
-                  className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
-                >
-                  Imprimir Etiqueta
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => window.open(shipment.labelUrl!, '_blank')}
+                    className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+                  >
+                    Ver Etiqueta
+                  </button>
+                  <button
+                    onClick={() => printShippingLabelMutation.mutate()}
+                    disabled={printShippingLabelMutation.isPending}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                  >
+                    {printShippingLabelMutation.isPending
+                      ? 'Enviando para o Print Agent...'
+                      : 'Enviar Etiqueta para o Print Agent'}
+                  </button>
+                </div>
+                {printShippingLabelMutation.isSuccess && (
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Job criado (status: {printShippingLabelMutation.data.status}) — o Print Agent
+                    imprime as 2 páginas do PDF (etiqueta + DACE) em sequência assim que a etiqueta
+                    do Melhor Envio estiver pronta.
+                  </p>
+                )}
+                {shippingPrintError && (
+                  <p className="text-xs text-destructive">{shippingPrintError}</p>
+                )}
               </div>
             )}
           </div>
