@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrintJob, PrintJobStatus, PrintJobType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { QueryPrintJobsDto } from './dto/query-print-jobs.dto';
+import { PrintAgentWsGateway } from './print-agent-ws.gateway';
 
 /** Transições que o Print Agent (device) tem permissão de reportar. */
 const DEVICE_ALLOWED_TRANSITIONS: Partial<Record<PrintJobStatus, PrintJobStatus[]>> = {
@@ -16,7 +17,10 @@ const JOB_INCLUDE = {
 
 @Injectable()
 export class PrintJobsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly printAgentWs: PrintAgentWsGateway,
+  ) {}
 
   // ── Admin ───────────────────────────────────────────────────────────────
 
@@ -59,6 +63,10 @@ export class PrintJobsService {
       },
     });
 
+    if (updated.status === PrintJobStatus.READY) {
+      this.printAgentWs.pushJobReady(updated);
+    }
+
     return updated;
   }
 
@@ -72,17 +80,28 @@ export class PrintJobsService {
     });
   }
 
+  /**
+   * Atômico por construção (`updateMany` condicionado a `status: READY`):
+   * se dois devices tentarem reivindicar o mesmo job ao mesmo tempo (o push
+   * por WS vai para todos os devices com o perfil compatível), só um dos
+   * `updateMany` afeta uma linha — o outro recebe `count === 0` e vê o erro
+   * "já foi reivindicado" em vez de imprimir em duplicidade.
+   */
   async claim(id: string, deviceId: string): Promise<PrintJob> {
-    const job = await this.findOne(id);
-    if (job.status !== PrintJobStatus.READY) {
-      throw new BadRequestException(
-        `Job não está pronto para ser enviado (status atual: ${job.status}).`,
-      );
-    }
-    return this.prisma.printJob.update({
-      where: { id },
+    const result = await this.prisma.printJob.updateMany({
+      where: { id, status: PrintJobStatus.READY },
       data: { status: PrintJobStatus.SENT, deviceId, sentAt: new Date() },
     });
+
+    if (result.count === 0) {
+      const job = await this.prisma.printJob.findUnique({ where: { id } });
+      if (!job) throw new NotFoundException('Job de impressão não encontrado.');
+      throw new BadRequestException(
+        `Job já foi reivindicado por outro dispositivo (status atual: ${job.status}).`,
+      );
+    }
+
+    return this.findOne(id);
   }
 
   async updateStatus(

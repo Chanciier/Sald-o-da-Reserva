@@ -55,6 +55,14 @@ export const regeneratePrintDeviceToken = (token: string, id: string) =>
     method: 'POST',
   });
 
+// Primeiro acesso do Print Agent: o admin gera um código de 8 caracteres
+// (válido por 15min, uso único) e o app desktop troca esse código pelo token
+// real em POST /print-agent/pair — o admin nunca vê o token nesse fluxo.
+export const createPrintDevicePairingCode = (token: string, id: string) =>
+  apiFetch<{ code: string; expiresAt: string }>(`/print-center/devices/${id}/pairing-code`, token, {
+    method: 'POST',
+  });
+
 // ── Confirmar retirada (a partir da etiqueta impressa) ──────────────────────
 // Reaproveita o endpoint já existente do módulo de Expedição — o Print Center
 // nunca reescreve essa lógica, só chama.

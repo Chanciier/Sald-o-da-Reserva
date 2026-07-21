@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import {
   createPrintDevice,
+  createPrintDevicePairingCode,
   getPrintDevices,
   regeneratePrintDeviceToken,
   updatePrintDevice,
@@ -19,6 +20,11 @@ export default function PrintCenterDevicesPage() {
   const [revealedToken, setRevealedToken] = useState<{ deviceName: string; token: string } | null>(
     null,
   );
+  const [pairingCode, setPairingCode] = useState<{
+    deviceName: string;
+    code: string;
+    expiresAt: string;
+  } | null>(null);
 
   const { data: devices, isLoading } = useQuery({
     queryKey: ['print-center-devices'],
@@ -56,6 +62,14 @@ export default function PrintCenterDevicesPage() {
     },
   });
 
+  const pairingCodeMutation = useMutation({
+    mutationFn: (id: string) => createPrintDevicePairingCode(token!, id),
+    onSuccess: (result, id) => {
+      const device = devices?.find((d) => d.id === id);
+      setPairingCode({ deviceName: device?.name ?? 'Dispositivo', ...result });
+    },
+  });
+
   return (
     <div className="space-y-5">
       {revealedToken && (
@@ -69,6 +83,25 @@ export default function PrintCenterDevicesPage() {
           </code>
           <button
             onClick={() => setRevealedToken(null)}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
+
+      {pairingCode && (
+        <div className="rounded-lg border border-primary/40 bg-primary/5 px-4 py-3 text-sm space-y-2">
+          <p className="font-medium">
+            Código de pareamento de <strong>{pairingCode.deviceName}</strong> — digite no primeiro
+            acesso do Saldão Print Agent (válido até{' '}
+            {new Date(pairingCode.expiresAt).toLocaleTimeString('pt-BR')}, uso único):
+          </p>
+          <code className="block text-center rounded bg-background px-3 py-3 text-2xl font-bold tracking-[0.3em]">
+            {pairingCode.code}
+          </code>
+          <button
+            onClick={() => setPairingCode(null)}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             Fechar
@@ -159,6 +192,13 @@ export default function PrintCenterDevicesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => pairingCodeMutation.mutate(device.id)}
+                          disabled={pairingCodeMutation.isPending || !!device.revokedAt}
+                          className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+                        >
+                          Gerar código de pareamento
+                        </button>
                         <button
                           onClick={() => regenerateMutation.mutate(device.id)}
                           disabled={regenerateMutation.isPending}

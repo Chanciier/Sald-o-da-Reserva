@@ -6,6 +6,7 @@ import { OmsEvents } from '../events/oms-events';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PickupLabelService } from './pickup-label.service';
 import { ShippingPrintService } from './shipping-print.service';
+import { PrintAgentWsGateway } from './print-agent-ws.gateway';
 import { PrintCenterService } from './print-center.service';
 
 /**
@@ -25,6 +26,7 @@ describe('PrintCenterService', () => {
   let notifications: { notify: jest.Mock };
   let pickupLabel: { generate: jest.Mock };
   let shippingPrint: { enqueueWatch: jest.Mock };
+  let printAgentWs: { pushJobReady: jest.Mock };
 
   const ORDER_ID = 'order-1';
 
@@ -66,6 +68,7 @@ describe('PrintCenterService', () => {
     notifications = { notify: jest.fn().mockResolvedValue(undefined) };
     pickupLabel = { generate: jest.fn().mockResolvedValue('https://cdn.example.com/label.png') };
     shippingPrint = { enqueueWatch: jest.fn().mockResolvedValue(undefined) };
+    printAgentWs = { pushJobReady: jest.fn() };
 
     service = new PrintCenterService(
       prisma as unknown as PrismaService,
@@ -74,6 +77,7 @@ describe('PrintCenterService', () => {
       notifications as unknown as NotificationsService,
       pickupLabel as unknown as PickupLabelService,
       shippingPrint as unknown as ShippingPrintService,
+      printAgentWs as unknown as PrintAgentWsGateway,
     );
     service.onModuleInit();
   });
@@ -119,6 +123,9 @@ describe('PrintCenterService', () => {
     expect(notifications.notify).toHaveBeenCalledWith(
       expect.objectContaining({ orderId: ORDER_ID, type: 'PRINT_JOB_READY' }),
     );
+    expect(printAgentWs.pushJobReady).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'job-1', type: 'PICKUP' }),
+    );
   });
 
   it('entrega paga com AUTO_PRINT_SHIPPING ligado: cria job PENDING e enfileira o watch', async () => {
@@ -135,6 +142,9 @@ describe('PrintCenterService', () => {
       }),
     );
     expect(shippingPrint.enqueueWatch).toHaveBeenCalledWith(ORDER_ID, 'job-2');
+    // Job de envio nasce PENDING, não READY — o push só acontece depois, quando
+    // o ShippingPrintService confirmar que a etiqueta do ME está pronta.
+    expect(printAgentWs.pushJobReady).not.toHaveBeenCalled();
   });
 
   it('pagamento/webhook duplicado: segunda chamada de order.paid não duplica o job (P2002 é no-op)', async () => {

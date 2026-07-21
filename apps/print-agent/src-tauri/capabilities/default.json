@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window — o app só expõe os comandos próprios (pair/connect/test_print/pause/resume/reprocess/save_settings/list_printers/open_logs_folder); toda rede, disco e impressão acontecem em Rust, nunca via plugin JS.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

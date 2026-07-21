@@ -9,6 +9,8 @@ import { PrintDevicesService } from './print-devices.service';
 import { PrintJobsController } from './print-jobs.controller';
 import { PrintDevicesController } from './print-devices.controller';
 import { PrintAgentController } from './print-agent.controller';
+import { PrintAgentPairingController } from './print-agent-pairing.controller';
+import { PrintAgentWsGateway } from './print-agent-ws.gateway';
 import { DeviceTokenGuard } from './guards/device-token.guard';
 
 /**
@@ -18,7 +20,12 @@ import { DeviceTokenGuard } from './guards/device-token.guard';
  * são módulos globais — nada precisa ser importado aqui.
  */
 @Module({
-  controllers: [PrintJobsController, PrintDevicesController, PrintAgentController],
+  controllers: [
+    PrintJobsController,
+    PrintDevicesController,
+    PrintAgentController,
+    PrintAgentPairingController,
+  ],
   providers: [
     PrintCenterService,
     PickupLabelService,
@@ -28,6 +35,7 @@ import { DeviceTokenGuard } from './guards/device-token.guard';
     PrintJobsService,
     PrintDevicesService,
     DeviceTokenGuard,
+    PrintAgentWsGateway,
   ],
 })
 export class PrintCenterModule {}

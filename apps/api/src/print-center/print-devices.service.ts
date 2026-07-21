@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { createHash, randomBytes } from 'crypto';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { createHash, randomBytes, randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { CreatePrintDeviceDto } from './dto/create-print-device.dto';
 import { UpdatePrintDeviceDto } from './dto/update-print-device.dto';
 
@@ -15,6 +16,11 @@ const DEVICE_LIST_SELECT = {
   createdAt: true,
 } as const;
 
+// Sem 0/O/1/I — evita confusão quando o código é digitado à mão no primeiro acesso.
+const PAIRING_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const PAIRING_CODE_LENGTH = 8;
+const PAIRING_CODE_TTL_SECONDS = 15 * 60;
+
 /**
  * CRUD dos computadores autorizados a puxar jobs de impressão. Nunca usa
  * login administrativo nem JWT de usuário para o próprio device — só o token
@@ -23,7 +29,10 @@ const DEVICE_LIST_SELECT = {
  */
 @Injectable()
 export class PrintDevicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   list() {
     return this.prisma.printDevice.findMany({
@@ -73,6 +82,73 @@ export class PrintDevicesService {
       data: { online: true, lastSeen: new Date() },
     });
     return { ok: true };
+  }
+
+  /** Marca online/offline sem tocar `lastSeen` (usado pelo WS gateway ao conectar/desconectar). */
+  async setOnline(id: string, online: boolean): Promise<void> {
+    await this.prisma.printDevice.update({ where: { id }, data: { online } });
+  }
+
+  // ── Pareamento (primeiro acesso do Print Agent) ────────────────────────
+  // Fluxo "código temporário → token": o admin gera um código de 8
+  // caracteres (TTL 15min, uso único, guardado no Redis — mesmo padrão de
+  // idempotência via chave que o resto do projeto já usa). O app desktop
+  // troca esse código pelo token real em `redeemPairingCode`. Isso é
+  // paralelo à criação normal de device (`create`, acima) — nada nela muda.
+
+  async createPairingCode(id: string): Promise<{ code: string; expiresAt: string }> {
+    await this.assertExists(id);
+    const code = this.generatePairingCode();
+    await this.redis.set(this.pairingKey(code), id, PAIRING_CODE_TTL_SECONDS);
+    return {
+      code,
+      expiresAt: new Date(Date.now() + PAIRING_CODE_TTL_SECONDS * 1000).toISOString(),
+    };
+  }
+
+  /** Troca o código por um token novo (rotaciona qualquer token anterior do device). Uso único. */
+  async redeemPairingCode(code: string): Promise<{
+    token: string;
+    deviceId: string;
+    deviceName: string;
+    pickupPrinter: string | null;
+    shippingPrinter: string | null;
+  }> {
+    const key = this.pairingKey(code);
+    const deviceId = await this.redis.get(key);
+    if (!deviceId) throw new BadRequestException('Código de pareamento inválido ou expirado.');
+    await this.redis.del(key); // uso único — apagado antes de qualquer outra coisa
+
+    const device = await this.prisma.printDevice.findUnique({ where: { id: deviceId } });
+    if (!device || device.revokedAt) {
+      throw new BadRequestException('Dispositivo não encontrado ou revogado.');
+    }
+
+    const { token, tokenHash } = this.generateToken();
+    await this.prisma.printDevice.update({
+      where: { id: deviceId },
+      data: { tokenHash, online: true, lastSeen: new Date() },
+    });
+
+    return {
+      token,
+      deviceId: device.id,
+      deviceName: device.name,
+      pickupPrinter: device.pickupPrinter,
+      shippingPrinter: device.shippingPrinter,
+    };
+  }
+
+  private pairingKey(code: string): string {
+    return `print:pairing:${code}`;
+  }
+
+  private generatePairingCode(): string {
+    let code = '';
+    for (let i = 0; i < PAIRING_CODE_LENGTH; i++) {
+      code += PAIRING_CODE_ALPHABET[randomInt(PAIRING_CODE_ALPHABET.length)];
+    }
+    return code;
   }
 
   private generateToken(): { token: string; tokenHash: string } {

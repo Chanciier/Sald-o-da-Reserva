@@ -14,6 +14,7 @@ import { OmsEvents } from '../events/oms-events';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PickupLabelService } from './pickup-label.service';
 import { ShippingPrintService } from './shipping-print.service';
+import { PrintAgentWsGateway } from './print-agent-ws.gateway';
 
 interface LoadedOrder {
   id: string;
@@ -42,6 +43,7 @@ export class PrintCenterService implements OnModuleInit {
     private readonly notifications: NotificationsService,
     private readonly pickupLabel: PickupLabelService,
     private readonly shippingPrint: ShippingPrintService,
+    private readonly printAgentWs: PrintAgentWsGateway,
   ) {}
 
   onModuleInit(): void {
@@ -96,6 +98,7 @@ export class PrintCenterService implements OnModuleInit {
     if (!job) return null;
 
     await this.notifyReady(order.id, 'Etiqueta de retirada pronta');
+    this.printAgentWs.pushJobReady(job);
     return job;
   }
 

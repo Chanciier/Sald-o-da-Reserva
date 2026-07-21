@@ -1,6 +1,7 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { QueueService } from '../queue/queue.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PrintAgentWsGateway } from './print-agent-ws.gateway';
 import { ShippingPrintService, PrintQueueNames } from './shipping-print.service';
 
 /**
@@ -21,6 +22,7 @@ describe('ShippingPrintService', () => {
     handler?: (data: unknown) => Promise<void>;
   };
   let notifications: { notify: jest.Mock };
+  let printAgentWs: { pushJobReady: jest.Mock };
 
   const ORDER_ID = 'order-1';
   const JOB_ID = 'job-1';
@@ -37,11 +39,13 @@ describe('ShippingPrintService', () => {
       enqueue: jest.fn().mockResolvedValue(undefined),
     };
     notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    printAgentWs = { pushJobReady: jest.fn() };
 
     service = new ShippingPrintService(
       prisma as unknown as PrismaService,
       queue as unknown as QueueService,
       notifications as unknown as NotificationsService,
+      printAgentWs as unknown as PrintAgentWsGateway,
     );
     service.onModuleInit();
   });
@@ -86,6 +90,13 @@ describe('ShippingPrintService', () => {
   it('etiqueta aparece: marca READY com o documentUrl e notifica o admin', async () => {
     prisma.printJob.findUnique.mockResolvedValue({ id: JOB_ID, status: 'PENDING', attempts: 5 });
     prisma.shipment.findUnique.mockResolvedValue({ labelUrl: 'https://me.example.com/label.pdf' });
+    prisma.printJob.update.mockResolvedValue({
+      id: JOB_ID,
+      orderId: ORDER_ID,
+      type: 'SHIPPING',
+      status: 'READY',
+      documentUrl: 'https://me.example.com/label.pdf',
+    });
 
     await queue.handler!({ orderId: ORDER_ID, printJobId: JOB_ID });
 
@@ -95,6 +106,9 @@ describe('ShippingPrintService', () => {
     });
     expect(notifications.notify).toHaveBeenCalledWith(
       expect.objectContaining({ orderId: ORDER_ID, type: 'PRINT_JOB_READY' }),
+    );
+    expect(printAgentWs.pushJobReady).toHaveBeenCalledWith(
+      expect.objectContaining({ id: JOB_ID, status: 'READY' }),
     );
   });
 

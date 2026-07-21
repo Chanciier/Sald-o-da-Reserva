@@ -29,4 +29,9 @@ export class PrintDevicesController {
   regenerateToken(@Param('id') id: string) {
     return this.devices.regenerateToken(id);
   }
+
+  @Post(':id/pairing-code')
+  createPairingCode(@Param('id') id: string) {
+    return this.devices.createPairingCode(id);
+  }
 }

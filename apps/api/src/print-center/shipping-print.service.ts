@@ -3,6 +3,7 @@ import { PrintJobStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { QueueService } from '../queue/queue.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PrintAgentWsGateway } from './print-agent-ws.gateway';
 
 export const PrintQueueNames = {
   ShippingLabelWatch: 'print.shipping.watch',
@@ -33,6 +34,7 @@ export class ShippingPrintService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
     private readonly notifications: NotificationsService,
+    private readonly printAgentWs: PrintAgentWsGateway,
   ) {}
 
   onModuleInit(): void {
@@ -61,11 +63,12 @@ export class ShippingPrintService implements OnModuleInit {
     });
 
     if (shipment?.labelUrl) {
-      await this.prisma.printJob.update({
+      const updated = await this.prisma.printJob.update({
         where: { id: printJobId },
         data: { status: PrintJobStatus.READY, documentUrl: shipment.labelUrl },
       });
       await this.notifyReady(orderId);
+      this.printAgentWs.pushJobReady(updated);
       return;
     }
 
