@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
@@ -13,6 +13,8 @@ interface NotifyInput {
   /** Se informado, notifica apenas este usuário; senão, todos da role. */
   userId?: string;
 }
+
+const CUSTOMER_FORBIDDEN_TYPES = new Set(['PAYMENT_APPROVED', 'PRODUCT_SOLD']);
 
 @Injectable()
 export class NotificationsService {
@@ -61,8 +63,10 @@ export class NotificationsService {
    * falha de publicação, etc.).
    */
   async notify(input: NotifyInput): Promise<void> {
+    this.assertAllowed(input);
+
     const targets = input.userId
-      ? [{ id: input.userId }]
+      ? await this.findSingleTarget(input.userId, input.role)
       : await this.prisma.user.findMany({
           where: { role: input.role, isActive: true },
           select: { id: true },
@@ -95,6 +99,28 @@ export class NotificationsService {
       }
       throw error;
     }
+  }
+
+  private assertAllowed(input: NotifyInput): void {
+    if (input.role === Role.CLIENTE && CUSTOMER_FORBIDDEN_TYPES.has(input.type)) {
+      throw new BadRequestException(
+        'Notificações de venda aprovada não podem ser enviadas a clientes.',
+      );
+    }
+  }
+
+  private async findSingleTarget(userId: string, role: Role): Promise<Array<{ id: string }>> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, isActive: true },
+    });
+
+    if (!user?.isActive) return [];
+    if (user.role !== role) {
+      throw new BadRequestException('Usuário alvo não pertence ao perfil da notificação.');
+    }
+
+    return [{ id: user.id }];
   }
 
   async listForUser(userId: string) {
