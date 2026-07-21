@@ -14,6 +14,12 @@ export interface PickupLabelOrder {
 }
 
 const WIDTH = 600;
+// `sharp` rasteriza SVG a 72dpi de referência por padrão — um PNG de 600px
+// esticado pros ~104mm físicos da etiqueta vira só ~147dpi efetivos (visível
+// como pixelado/borrado). RENDER_DENSITY escala a rasterização inteira (todo
+// o SVG, texto e QR incluso) pra bater com os ~203dpi nativos da impressora.
+const RENDER_DENSITY = 100;
+const QR_SOURCE_SIZE = Math.round(220 * (RENDER_DENSITY / 72));
 const HEADER_HEIGHT = 80;
 const CODE_BLOCK_HEIGHT = 110;
 const INFO_LINE_HEIGHT = 26;
@@ -54,7 +60,7 @@ export class PickupLabelService {
       .trim();
     const target = `${baseUrl}/admin/print-center/pickup/${order.id}`;
 
-    const qrBuffer = await this.qr.toPngBuffer(target, 220);
+    const qrBuffer = await this.qr.toPngBuffer(target, QR_SOURCE_SIZE);
     const itemLines = order.items.map(
       (item) => `${item.quantity}x ${item.name}${item.sku ? ` — SKU: ${item.sku}` : ''}`,
     );
@@ -68,7 +74,7 @@ export class PickupLabelService {
       qrBase64: qrBuffer.toString('base64'),
     });
 
-    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    const png = await sharp(Buffer.from(svg), { density: RENDER_DENSITY }).png().toBuffer();
     const url = await this.storage.uploadPng(png, 'print-jobs');
     this.logger.log(`Etiqueta de retirada gerada para o pedido ${code}`);
     return url;
