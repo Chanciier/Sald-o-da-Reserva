@@ -13,7 +13,7 @@ import { HashService } from './services/hash.service';
 import { TokenService } from './services/token.service';
 import { RateLimitService } from './services/rate-limit.service';
 import { AuditAction, AuditService } from './services/audit.service';
-import { MailService } from './services/mail.service';
+import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';

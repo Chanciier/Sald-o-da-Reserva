@@ -96,6 +96,7 @@ function fmt(n: number) {
 function PendentesTab({ token }: { token: string }) {
   const qc = useQueryClient();
   const [deletingAll, setDeletingAll] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['admin-orders-pending'],
@@ -106,10 +107,11 @@ function PendentesTab({ token }: { token: string }) {
   const deleteMutation = useMutation({
     mutationFn: (orderId: string) => deleteOrder(token, orderId),
     onSuccess: () => {
+      setErrorMsg(null);
       qc.invalidateQueries({ queryKey: ['admin-orders-pending'] });
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => setErrorMsg(e.message),
   });
 
   async function handleDeleteAll() {
@@ -123,14 +125,21 @@ function PendentesTab({ token }: { token: string }) {
       return;
 
     setDeletingAll(true);
+    setErrorMsg(null);
+    const failed: string[] = [];
     for (const o of orders) {
       try {
         await deleteOrder(token, o.id);
       } catch {
-        // continua mesmo se um falhar
+        failed.push(o.id.slice(-8).toUpperCase());
       }
     }
     setDeletingAll(false);
+    if (failed.length) {
+      setErrorMsg(
+        `${failed.length} pedido${failed.length !== 1 ? 's' : ''} não p${failed.length !== 1 ? 'uderam' : 'ôde'} ser excluído${failed.length !== 1 ? 's' : ''}: ${failed.join(', ')}`,
+      );
+    }
     qc.invalidateQueries({ queryKey: ['admin-orders-pending'] });
     qc.invalidateQueries({ queryKey: ['admin-orders'] });
   }
@@ -178,6 +187,12 @@ function PendentesTab({ token }: { token: string }) {
           </button>
         )}
       </div>
+
+      {errorMsg && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {errorMsg}
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
@@ -286,6 +301,7 @@ function TodosTab({ token }: { token: string }) {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['admin-orders', page, statusFilter, search],
@@ -297,19 +313,22 @@ function TodosTab({ token }: { token: string }) {
     mutationFn: ({ orderId, status }: { orderId: string; status: string }) =>
       patchStatus(token, orderId, status),
     onSuccess: () => {
+      setErrorMsg(null);
       setEditingId(null);
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
       qc.invalidateQueries({ queryKey: ['admin-orders-pending'] });
     },
+    onError: (e: Error) => setErrorMsg(e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (orderId: string) => deleteOrder(token, orderId),
     onSuccess: () => {
+      setErrorMsg(null);
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
       qc.invalidateQueries({ queryKey: ['admin-orders-pending'] });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => setErrorMsg(e.message),
   });
 
   function handleDelete(orderId: string) {
@@ -390,6 +409,12 @@ function TodosTab({ token }: { token: string }) {
           Atualizar
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {errorMsg}
+        </div>
+      )}
 
       {/* Table */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

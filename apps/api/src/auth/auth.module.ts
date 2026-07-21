@@ -9,7 +9,7 @@ import { TokenService } from './services/token.service';
 import { RateLimitService } from './services/rate-limit.service';
 import { TurnstileService } from './services/turnstile.service';
 import { AuditService } from './services/audit.service';
-import { MailService } from './services/mail.service';
+import { MailService } from '../mail/mail.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';

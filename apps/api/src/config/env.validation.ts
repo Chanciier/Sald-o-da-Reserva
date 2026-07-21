@@ -134,55 +134,11 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  ENOTAS_API_KEY: string = '';
-
-  @IsString()
-  @IsOptional()
-  ENOTAS_COMPANY_ID: string = '';
-
-  @IsString()
-  @IsOptional()
-  ENOTAS_ENVIRONMENT: string = 'sandbox';
-
-  @IsString()
-  @IsOptional()
-  ENOTAS_WEBHOOK_SECRET: string = '';
-
-  @IsString()
-  @IsOptional()
   RESEND_API_KEY: string = '';
 
   @IsString()
   @IsOptional()
   RESEND_FROM_EMAIL: string = 'noreply@saldaodareserva.com.br';
-
-  @IsString()
-  @IsOptional()
-  EVOLUTION_API_URL: string = '';
-
-  @IsString()
-  @IsOptional()
-  EVOLUTION_API_KEY: string = '';
-
-  @IsString()
-  @IsOptional()
-  EVOLUTION_INSTANCE: string = '';
-
-  @IsString()
-  @IsOptional()
-  META_PIXEL_ID: string = '';
-
-  @IsString()
-  @IsOptional()
-  META_CONVERSIONS_API_TOKEN: string = '';
-
-  @IsString()
-  @IsOptional()
-  META_CATALOG_ID: string = '';
-
-  @IsString()
-  @IsOptional()
-  META_CATALOG_ACCESS_TOKEN: string = '';
 
   // VisionModule / IdentificationModule (Funcionário Virtual): Claude via API da Anthropic.
   @IsString()

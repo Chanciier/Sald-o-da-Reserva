@@ -9,9 +9,9 @@ esses dados e reage a dois eventos já existentes no barramento interno
 (`OmsEvents`): `order.paid` e `order.cancelled`.
 
 Este documento cobre o que foi implementado nesta etapa: fila, tabelas,
-painel admin e a API que um Print Agent físico vai consumir. **O Print Agent
-em si (software rodando no PC da loja falando com a impressora) não foi
-construído** — fica para uma etapa futura.
+painel admin e a API que o Print Agent consome. **O Print Agent em si
+(software Tauri rodando no PC da loja, que fala com a impressora) já foi
+construído** — ver [apps/print-agent](../apps/print-agent/README.md).
 
 ## Arquitetura
 
@@ -41,7 +41,7 @@ PrintJob READY        ShippingPrintService.watch
                        (documentUrl = Shipment.labelUrl)
 ```
 
-A partir daí, um Print Agent (fora do escopo desta etapa) consome
+A partir daí, o Print Agent consome
 `GET /print-agent/jobs` e reporta o progresso via
 `POST /print-agent/jobs/:id/claim` → `PATCH /print-agent/jobs/:id/status`.
 
@@ -137,18 +137,20 @@ layout do módulo.
 1. Admin acessa **Print Center → Dispositivos** e cria um novo dispositivo
    (nome + impressoras opcionais). O token aparece **uma única vez** — copiar
    nesse momento.
-2. O Print Agent (a construir) guarda esse token e o envia no header
+2. O Print Agent guarda esse token e o envia no header
    `X-Print-Device-Token` em toda chamada a `/print-agent/*`.
 3. Se o token vazar ou o computador for trocado, revogar em
    **Dispositivos → Revogar** e gerar um novo com **Novo token**.
 
-## Escopo desta etapa
+## Escopo
 
 Construído: módulo NestJS completo (`apps/api/src/print-center/`), tabelas,
 fila de observação da etiqueta de envio, geração local da etiqueta de
 retirada (QR + `sharp`, sem depender de API pública), API do Print Agent,
-painel admin, testes.
+painel admin, testes, e o próprio Print Agent (app Tauri em
+[apps/print-agent](../apps/print-agent/README.md)) que roda no PC da loja e
+fala com a impressora.
 
-**Fora do escopo**: o software que roda fisicamente no PC da loja e envia o
-documento para a impressora. A API `/print-agent/*` já está no formato que
-esse agente vai consumir.
+**Ainda desligado em produção**: `PRINT_CENTER_ENABLED`, `AUTO_PRINT_PICKUP`
+e `AUTO_PRINT_SHIPPING` continuam `false` por padrão — ver
+[Feature flags](#feature-flags).

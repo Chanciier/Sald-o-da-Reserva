@@ -164,7 +164,6 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
       if (!tokenResult.id) throw new Error('Falha ao tokenizar o cartão.');
 
       let pmId = tokenResult.payment_method_id || detectedPaymentMethodId;
-      let debugInfo = '';
       if (!pmId && mp) {
         // Fallback for the case where the user submits before the bin lookup
         // (triggered on card-number change) has finished resolving.
@@ -176,23 +175,23 @@ export function CardForm({ amount, publicKey, onSubmit, onError }: CardFormProps
             if (pmId) {
               setDetectedPaymentMethodId(pmId);
             } else {
-              debugInfo = `MP retornou ${result.length} método(s) para o BIN ${bin}`;
               console.error('[card-form] getInstallments sem payment_method_id', {
                 bin,
                 result,
               });
             }
           } catch (err) {
-            debugInfo = `erro ao consultar bandeira: ${(err as Error)?.message ?? JSON.stringify(err)}`;
             console.error('[card-form] getInstallments falhou', err);
           }
         } else {
-          debugInfo = `BIN incompleto (${bin.length} dígitos)`;
+          console.error('[card-form] bin incompleto ao tentar identificar bandeira', {
+            digits: bin.length,
+          });
         }
       }
       if (!pmId)
         throw new Error(
-          `Não foi possível identificar a bandeira do cartão. Verifique o número e tente novamente.${debugInfo ? ` [${debugInfo}]` : ''}`,
+          'Não foi possível identificar a bandeira do cartão. Verifique o número e tente novamente.',
         );
 
       await onSubmit({

@@ -28,13 +28,20 @@ pub fn load_token() -> Option<String> {
 /// Configuração não-secreta (URL da API, impressoras, cópias, device
 /// id/nome) — JSON simples via `tauri-plugin-store`, sem nada sensível.
 pub fn load_config(app: &AppHandle) -> AgentConfig {
-    let Ok(store) = app.store(CONFIG_STORE_FILE) else {
-        return AgentConfig::default();
+    let store = match app.store(CONFIG_STORE_FILE) {
+        Ok(store) => store,
+        Err(err) => {
+            warn!("Falha ao abrir o config store: {err}");
+            return AgentConfig::default();
+        }
     };
-    store
-        .get(CONFIG_KEY)
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default()
+    match store.get(CONFIG_KEY) {
+        Some(value) => serde_json::from_value(value).unwrap_or_else(|err| {
+            warn!("Falha ao interpretar config salva, usando padrão: {err}");
+            AgentConfig::default()
+        }),
+        None => AgentConfig::default(),
+    }
 }
 
 pub fn save_config(app: &AppHandle, config: &AgentConfig) -> Result<(), Box<dyn std::error::Error>> {

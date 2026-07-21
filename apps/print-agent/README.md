@@ -14,8 +14,11 @@ outra parte do sistema além de `/print-agent/*`.
    disco em texto puro.
 2. **Conexão**: WebSocket (`/print-agent/ws`) com reconexão automática
    (backoff de 1s a 30s) e heartbeat de aplicação a cada 25s.
-3. **Job de retirada** (`PICKUP`): baixa o PNG gerado pelo Print Center e
-   imprime via `rundll32 shimgvw.dll,ImageView_PrintTo` (nativo do Windows).
+3. **Job de retirada** (`PICKUP`): baixa o PNG gerado pelo Print Center,
+   embrulha num PDF do tamanho físico exato da etiqueta (104x150mm) e
+   imprime via **SumatraPDF** — o `rundll32 shimgvw.dll,ImageView_PrintTo`
+   nativo do Windows foi abandonado porque ignorava o tamanho de papel do
+   driver e sempre imprimia num template interno pequeno.
 4. **Job de envio** (`SHIPPING`): baixa o PDF da etiqueta do Melhor Envio (o
    agente nunca fala com o Melhor Envio diretamente — só baixa o arquivo já
    pronto que o Print Center indicou) e imprime via **SumatraPDF**
@@ -39,7 +42,7 @@ src-tauri/src/
   api_client.rs     REST /print-agent/* (pair, jobs, claim, status)
   ws_client.rs      WebSocket: conecta, reconecta, heartbeat — sem depender do Tauri
   download.rs        baixa o documento com validação de assinatura (PNG/PDF)
-  print/              rundll32 (PNG) e SumatraPDF (PDF), + etiqueta de teste
+  print/              PNG (retirada) e PDF (envio) convertidos e impressos via SumatraPDF, + etiqueta de teste
   processor.rs        claim → download → imprime → reporta, um job por vez
   runtime.rs          liga ws_client + processor, ponte de status pro AppState
   commands.rs         comandos invocados pelo front

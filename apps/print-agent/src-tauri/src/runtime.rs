@@ -5,6 +5,7 @@ use crate::{storage, ws_client};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, watch, Mutex};
+use tracing::warn;
 
 /// Dono dos handles das tasks de background (WS + processador de fila).
 /// `start`/`stop` são idempotentes — chamar `start` com a conexão já de pé
@@ -89,7 +90,9 @@ async fn bridge_status(
             guard.connection = status;
             guard.snapshot()
         };
-        let _ = app.emit("state-changed", snapshot);
+        if let Err(err) = app.emit("state-changed", snapshot) {
+            warn!("Falha ao emitir state-changed na mudança de conexão: {err}");
+        }
 
         if status == ConnectionStatus::Connected {
             let app = app.clone();

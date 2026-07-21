@@ -6,6 +6,7 @@ use crate::state::{AppSnapshot, AppState};
 use crate::storage;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tracing::warn;
 
 /// Comandos expostos ao front. Cada um só fala com `/print-agent/*` (via
 /// `ApiClient`) e com o próprio sistema (impressora/disco/keyring) — nunca
@@ -43,7 +44,9 @@ pub async fn pair(
     runtime.start(app.clone(), state.inner().clone(), api_url, response.token).await;
 
     let snapshot = state.lock().await.snapshot();
-    let _ = app.emit("state-changed", snapshot.clone());
+    if let Err(err) = app.emit("state-changed", snapshot.clone()) {
+        warn!("Falha ao emitir state-changed após pareamento: {err}");
+    }
     Ok(snapshot)
 }
 
@@ -76,7 +79,9 @@ pub async fn disconnect(runtime: State<'_, AgentRuntime>) -> Result<(), String> 
 pub async fn pause(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     let mut guard = state.lock().await;
     guard.paused = true;
-    let _ = app.emit("state-changed", guard.snapshot());
+    if let Err(err) = app.emit("state-changed", guard.snapshot()) {
+        warn!("Falha ao emitir state-changed ao pausar: {err}");
+    }
     Ok(())
 }
 
@@ -89,7 +94,9 @@ pub async fn resume(
     {
         let mut guard = state.lock().await;
         guard.paused = false;
-        let _ = app.emit("state-changed", guard.snapshot());
+        if let Err(err) = app.emit("state-changed", guard.snapshot()) {
+            warn!("Falha ao emitir state-changed ao retomar: {err}");
+        }
     }
     reprocess(app, state, runtime).await
 }
@@ -179,7 +186,9 @@ pub async fn save_settings(
     result.map_err(|e| e.to_string())?;
 
     let snapshot = state.lock().await.snapshot();
-    let _ = app.emit("state-changed", snapshot.clone());
+    if let Err(err) = app.emit("state-changed", snapshot.clone()) {
+        warn!("Falha ao emitir state-changed após salvar configurações: {err}");
+    }
     Ok(snapshot)
 }
 
