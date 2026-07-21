@@ -84,6 +84,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
     try {
       await this.socket?.end(undefined as never);
     } catch {
@@ -135,11 +136,6 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
   }
 
   async connect(): Promise<void> {
-    if (this.connectTimeoutTimer) {
-      clearTimeout(this.connectTimeoutTimer);
-      this.connectTimeoutTimer = null;
-    }
-
     const { state, saveCreds } = await this.loadState();
     const hasSavedCreds = !!(await this.redis.get(CREDS_KEY));
 
@@ -175,13 +171,19 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
+        if (this.connectTimeoutTimer) {
+          clearTimeout(this.connectTimeoutTimer);
+          this.connectTimeoutTimer = null;
+        }
         this.qrBase64 = await QRCode.toDataURL(qr).catch(() => null);
         this.logger.log('QR code gerado');
       }
 
       if (connection === 'open') {
-        if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
+        if (this.connectTimeoutTimer) {
+          clearTimeout(this.connectTimeoutTimer);
+          this.connectTimeoutTimer = null;
+        }
         this.connected = true;
         this.qrBase64 = null;
         this.logger.log('WhatsApp conectado');
@@ -202,8 +204,11 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
-    // Se tinha credenciais salvas mas em 30s não conectou nem gerou QR → limpa e recomeça
-    if (hasSavedCreds) {
+    // Se tinha credenciais salvas mas em 30s não conectou nem gerou QR → limpa e recomeça.
+    // Não reagenda se já existe um timer pendente: connect() é chamado de novo a cada
+    // tentativa de reconexão (5s), e resetar aqui faria o timeout nunca disparar
+    // enquanto o loop de reconexão continuar falhando (5s < 30s sempre cancela antes).
+    if (hasSavedCreds && !this.connectTimeoutTimer) {
       this.connectTimeoutTimer = setTimeout(async () => {
         if (!this.connected && !this.qrBase64) {
           this.logger.warn('Timeout aguardando reconexão com credenciais salvas — limpando sessão');

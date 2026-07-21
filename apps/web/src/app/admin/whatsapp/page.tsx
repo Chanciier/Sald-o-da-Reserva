@@ -147,7 +147,16 @@ function WhatsappStatusBanner({ token }: { token: string }) {
         </div>
       )}
       {!data?.connected && !data?.qr && (
-        <p className="text-sm text-gray-400">Aguardando QR code... (atualiza automaticamente)</p>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-sm text-gray-400">Aguardando QR code... (atualiza automaticamente)</p>
+          <button
+            onClick={() => logout.mutate()}
+            disabled={logout.isPending}
+            className="text-xs text-red-500 hover:underline disabled:opacity-50"
+          >
+            {logout.isPending ? 'Gerando...' : 'Forçar novo QR code'}
+          </button>
+        </div>
       )}
     </div>
   );
