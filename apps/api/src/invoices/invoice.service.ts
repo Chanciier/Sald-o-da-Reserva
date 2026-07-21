@@ -87,8 +87,10 @@ export class InvoiceService {
         reference,
         customer: {
           name: overrides?.name || order.buyerName || order.user.name || order.user.email,
-          email: order.user.email,
-          cpf: overrides?.cpf || order.user.cpf || undefined,
+          // Prefere o snapshot gravado no pedido (imutável desde a compra); cai
+          // para o dado atual da conta só em pedidos anteriores a essa coluna.
+          email: order.recipientEmail || order.user.email,
+          cpf: overrides?.cpf || order.recipientDocument || order.user.cpf || undefined,
           address: address?.cep
             ? {
                 cep: address.cep,

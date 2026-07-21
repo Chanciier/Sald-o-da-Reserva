@@ -19,10 +19,14 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/types/auth.types';
 import { RequireSection } from '../seller-permissions/decorators/require-section.decorator';
+import { CheckoutSavedProfilesFlagService } from '../feature-flags/checkout-saved-profiles-flag.service';
 
 @Controller()
 export class CheckoutController {
-  constructor(private readonly checkout: CheckoutService) {}
+  constructor(
+    private readonly checkout: CheckoutService,
+    private readonly savedProfilesFlag: CheckoutSavedProfilesFlagService,
+  ) {}
 
   private getIp(req: Request): string {
     return (
@@ -41,6 +45,15 @@ export class CheckoutController {
   getShipping(@Query('subtotal') subtotal: string, @Query('cep') cep?: string) {
     const amount = parseFloat(subtotal) || 0;
     return this.checkout.getShippingOptions(amount, cep);
+  }
+
+  // Frontend consulta antes de decidir se mostra a UI de perfis/endereços
+  // salvos. Off por padrão (CHECKOUT_SAVED_PROFILES_ENABLED=false).
+  @Get('checkout/feature-flags')
+  async getFeatureFlags(@CurrentUser() user: AuthenticatedUser) {
+    return {
+      savedProfilesEnabled: await this.savedProfilesFlag.isEnabledForUser(user.id, user.role),
+    };
   }
 
   @Post('checkout')

@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { recordOrderEvent } from '../common/order-timeline';
 import { EventBusService } from '../events/event-bus.service';
 import { OmsEvents } from '../events/oms-events';
+import { CheckoutIdentityNormalizer } from './recipient/checkout-identity.normalizer';
 import type { CreateOrderDto } from './dto/create-order.dto';
 
 function round2(n: number) {
@@ -42,6 +43,7 @@ export class CheckoutService {
     private readonly stock: StockService,
     private readonly notifications: NotificationsService,
     private readonly events: EventBusService,
+    private readonly identityNormalizer: CheckoutIdentityNormalizer,
   ) {}
 
   async getShippingOptions(_subtotal: number, cep?: string): Promise<ShippingQuoteOption[]> {
@@ -66,7 +68,7 @@ export class CheckoutService {
   async createOrder(userId: string, dto: CreateOrderDto) {
     const isPickup = dto.deliveryMethod === DeliveryMethod.PICKUP;
 
-    if (!isPickup && !dto.shippingAddress) {
+    if (!isPickup && !dto.shippingAddress && !dto.savedAddressId) {
       throw new BadRequestException('Endereço de entrega obrigatório para envio.');
     }
 
@@ -75,6 +77,21 @@ export class CheckoutService {
         'Selecione uma transportadora com integração Melhor Envio para prosseguir.',
       );
     }
+
+    // Perfil selecionado → normaliza os dados e produz o snapshot que será
+    // gravado no pedido. Sem recipientProfileId/savedAddressId, o resultado é
+    // idêntico ao fluxo inline de sempre (buyerName/cpf/shippingAddress do DTO).
+    const identity = await this.identityNormalizer.resolveIdentity(userId, {
+      recipientProfileId: dto.recipientProfileId,
+      buyerName: dto.buyerName,
+      cpf: dto.cpf,
+    });
+    const resolvedAddress = isPickup
+      ? { savedAddressId: null, address: undefined }
+      : await this.identityNormalizer.resolveAddress(userId, identity.recipientProfileId, {
+          savedAddressId: dto.savedAddressId,
+          shippingAddress: dto.shippingAddress,
+        });
 
     const cart = await this.cartService.getCart(userId);
     const availableItems = cart.items.filter((item) => item.available);
@@ -106,7 +123,7 @@ export class CheckoutService {
     const shippingCost = isPickup
       ? 0
       : await this.shippingService.resolveQuotedPrice(
-          dto.shippingAddress!.cep,
+          resolvedAddress.address!.cep,
           dto.meServiceId!,
           dto.shippingPrice ?? 0,
         );
@@ -163,11 +180,16 @@ export class CheckoutService {
           total,
           shippingAddress: isPickup
             ? Prisma.JsonNull
-            : (dto.shippingAddress as unknown as Prisma.InputJsonValue),
+            : (resolvedAddress.address as unknown as Prisma.InputJsonValue),
           shippingMethod: isPickup ? 'PICKUP' : (dto.shippingMethod ?? 'N/A'),
           notes: dto.notes,
-          buyerName: dto.buyerName ?? null,
+          buyerName: identity.buyerName,
           customerPhone: dto.customerPhone ?? null,
+          recipientProfileId: identity.recipientProfileId,
+          savedAddressId: isPickup ? null : resolvedAddress.savedAddressId,
+          recipientDocument: identity.recipientDocument,
+          recipientDocumentType: identity.recipientDocumentType,
+          recipientEmail: identity.recipientEmail,
           items: {
             create: availableItems.map((item) => {
               const unitPrice = item.salePrice ?? item.price;
@@ -238,7 +260,10 @@ export class CheckoutService {
       title: 'Pedido criado',
     });
 
-    if (dto.cpf) {
+    // Só sincroniza User.cpf no fluxo inline (sem perfil). Um perfil selecionado
+    // pode representar um terceiro — nunca gravar o documento de outra pessoa
+    // como CPF da própria conta.
+    if (dto.cpf && !dto.recipientProfileId) {
       await this.prisma.user.update({ where: { id: userId }, data: { cpf: dto.cpf } });
     }
 

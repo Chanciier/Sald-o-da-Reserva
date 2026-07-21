@@ -3,7 +3,11 @@ import type { Order } from '@/types/order';
 
 const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
-async function apiFetch<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  token: string,
+  options: RequestInit = {},
+): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: {
@@ -56,6 +60,11 @@ export const createOrder = (token: string, body: unknown) =>
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+// Off por padrão (CHECKOUT_SAVED_PROFILES_ENABLED=false) — o frontend consulta
+// antes de mostrar qualquer UI de perfis/endereços salvos.
+export const getCheckoutFeatureFlags = (token: string) =>
+  apiFetch<{ savedProfilesEnabled: boolean }>('/checkout/feature-flags', token);
 
 export const getOrders = (token: string) => apiFetch<Order[]>('/orders', token);
 

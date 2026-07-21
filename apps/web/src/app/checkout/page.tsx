@@ -3,14 +3,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
-import { createOrder } from '@/lib/cart-api';
+import { createOrder, getCheckoutFeatureFlags } from '@/lib/cart-api';
+import {
+  addSavedAddress,
+  createRecipientProfile,
+  getRecipientProfiles,
+} from '@/lib/recipient-profiles-api';
 import { getShippingQuote } from '@/lib/shipping';
 import { trackCheckoutStart } from '@/lib/analytics';
 import type { ShippingOption } from '@/types/cart';
 import type { PaymentMethod } from '@/types/payment';
+import type { RecipientProfile, SavedAddress } from '@/types/recipient-profile';
 
 import { STORE } from '@/lib/store';
 
@@ -119,6 +125,7 @@ export default function CheckoutPage() {
   const { user, token } = useAuth();
   const { cart, refresh } = useCart();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('SHIPPING');
   const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
@@ -137,6 +144,16 @@ export default function CheckoutPage() {
   const lastQuotedCep = useRef('');
   const checkoutStartTracked = useRef(false);
 
+  // Perfis de recebimento / endereços salvos — atrás de feature flag, desligada
+  // por padrão. Sem a flag, o resto do componente se comporta exatamente como
+  // antes (nenhuma das queries/estados abaixo é consultada nem exibida).
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [saveAsProfile, setSaveAsProfile] = useState(false);
+  const [newProfileLabel, setNewProfileLabel] = useState('');
+  const [saveAddress, setSaveAddress] = useState(false);
+  const [newAddressLabel, setNewAddressLabel] = useState('');
+
   const isPickup = deliveryMethod === 'PICKUP';
 
   useEffect(() => {
@@ -150,6 +167,62 @@ export default function CheckoutPage() {
     queryFn: () => fetchOrders(token!),
     enabled: !!token,
   });
+
+  const { data: featureFlags } = useQuery({
+    queryKey: ['checkout-feature-flags'],
+    queryFn: () => getCheckoutFeatureFlags(token!),
+    enabled: !!token,
+  });
+  const savedProfilesEnabled = featureFlags?.savedProfilesEnabled ?? false;
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['recipient-profiles'],
+    queryFn: () => getRecipientProfiles(token!),
+    enabled: !!token && savedProfilesEnabled,
+  });
+
+  const selectedProfile = profiles.find((p) => p.id === selectedProfileId) ?? null;
+
+  function selectRecipientProfile(profile: RecipientProfile) {
+    setSelectedProfileId(profile.id);
+    setSelectedAddressId(null);
+    setBuyerName(profile.name);
+    setCpf(formatCpf(profile.document));
+    if (profile.phone) setPhone(formatPhone(profile.phone));
+    setSaveAsProfile(false);
+    // Perfil pode já vir com um endereço padrão — pré-seleciona pra agilizar,
+    // mas o cliente ainda pode trocar/editar antes de continuar.
+    const defaultAddr = profile.addresses.find((a) => a.isDefault) ?? profile.addresses[0];
+    if (defaultAddr) selectSavedProfileAddress(defaultAddr);
+  }
+
+  function startNewRecipient() {
+    setSelectedProfileId(null);
+    setSelectedAddressId(null);
+    setBuyerName('');
+    setCpf('');
+    setPhone('');
+  }
+
+  function selectSavedProfileAddress(a: SavedAddress) {
+    setSelectedAddressId(a.id);
+    setAddress({
+      name: selectedProfile?.name ?? buyerName,
+      cep: a.postalCode,
+      street: a.street,
+      number: a.number,
+      complement: a.complement ?? '',
+      neighborhood: a.neighborhood,
+      city: a.city,
+      state: a.state,
+    });
+    void fetchShippingQuotes(a.postalCode);
+  }
+
+  function startNewAddress() {
+    setSelectedAddressId(null);
+    setAddress(EMPTY_ADDRESS);
+  }
 
   const savedAddresses = useMemo(() => {
     const seen = new Set<string>();
@@ -176,6 +249,9 @@ export default function CheckoutPage() {
 
   function set(field: keyof AddressForm, value: string) {
     setAddress((prev) => ({ ...prev, [field]: value }));
+    // Editar manualmente "desconecta" o endereço salvo escolhido — vira um
+    // endereço avulso para este pedido, sem sobrescrever o registro salvo.
+    setSelectedAddressId(null);
   }
 
   function selectSavedAddress(a: AddressForm) {
@@ -236,8 +312,11 @@ export default function CheckoutPage() {
     setError('');
     setSubmitting(true);
     try {
+      // Com um perfil salvo selecionado, o backend ignora buyerName/cpf do body
+      // (usa os dados do perfil) — então a validação local de CPF só faz
+      // sentido para o fluxo inline (perfil novo/avulso).
       const cleanCpf = cpf.replace(/\D/g, '');
-      if (cleanCpf.length !== 11) {
+      if (!selectedProfileId && cleanCpf.length !== 11) {
         setError('Informe um CPF válido.');
         setSubmitting(false);
         return;
@@ -252,12 +331,14 @@ export default function CheckoutPage() {
 
       const order = await createOrder(token, {
         deliveryMethod,
-        cpf: cleanCpf,
+        cpf: selectedProfileId ? undefined : cleanCpf,
         customerPhone: cleanPhone,
-        buyerName: buyerName.trim() || undefined,
+        buyerName: selectedProfileId ? undefined : buyerName.trim() || undefined,
+        recipientProfileId: selectedProfileId ?? undefined,
         ...(isPickup
           ? {}
           : {
+              savedAddressId: selectedAddressId ?? undefined,
               shippingAddress: {
                 name: address.name,
                 cep: address.cep.replace(/\D/g, ''),
@@ -278,6 +359,43 @@ export default function CheckoutPage() {
         couponCode: cart.couponCode ?? undefined,
       });
       await refresh();
+
+      // Oferta de salvar perfil/endereço — melhor esforço, nunca bloqueia o
+      // checkout nem impede o redirecionamento para o pagamento.
+      if (savedProfilesEnabled) {
+        try {
+          let profileIdForAddress = selectedProfileId;
+          if (saveAsProfile && !selectedProfileId) {
+            const created = await createRecipientProfile(token, {
+              label: newProfileLabel.trim() || buyerName.trim() || 'Perfil',
+              name: buyerName.trim(),
+              document: cleanCpf,
+              phone: cleanPhone,
+              isDefault: profiles.length === 0,
+            });
+            profileIdForAddress = created.id;
+          }
+          if (!isPickup && saveAddress && !selectedAddressId && profileIdForAddress) {
+            await addSavedAddress(token, profileIdForAddress, {
+              label: newAddressLabel.trim() || 'Endereço',
+              postalCode: address.cep.replace(/\D/g, ''),
+              street: address.street,
+              number: address.number,
+              complement: address.complement || undefined,
+              neighborhood: address.neighborhood,
+              city: address.city,
+              state: address.state,
+            });
+          }
+          if (profileIdForAddress) {
+            queryClient.invalidateQueries({ queryKey: ['recipient-profiles'] });
+          }
+        } catch (saveErr) {
+          // eslint-disable-next-line no-console
+          console.error('Falha ao salvar perfil/endereço (não bloqueia o pedido):', saveErr);
+        }
+      }
+
       router.push(`/pagamento/${order.id}?method=${selectedPayment}`);
     } catch (err) {
       setError((err as Error).message);
@@ -375,6 +493,50 @@ export default function CheckoutPage() {
               )}
             </section>
 
+            {/* Perfis de destinatário salvos — só aparece com a flag ligada e
+                pelo menos um perfil já salvo; caso contrário o formulário
+                manual abaixo já cobre o fluxo (idêntico ao de sempre). */}
+            {savedProfilesEnabled && profiles.length > 0 && (
+              <section className="rounded-xl border border-border p-5 space-y-3">
+                <h2 className="font-semibold">Quem irá receber?</h2>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {profiles.map((p) => (
+                    <button
+                      type="button"
+                      key={p.id}
+                      onClick={() => selectRecipientProfile(p)}
+                      className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                        selectedProfileId === p.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:bg-muted'
+                      }`}
+                    >
+                      <p className="truncate font-medium text-foreground">
+                        {p.label}
+                        {p.isDefault && (
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            (principal)
+                          </span>
+                        )}
+                      </p>
+                      <p className="truncate text-muted-foreground">{p.name}</p>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={startNewRecipient}
+                    className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                      selectedProfileId === null
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:bg-muted'
+                    }`}
+                  >
+                    <p className="font-medium text-foreground">+ Adicionar nova pessoa</p>
+                  </button>
+                </div>
+              </section>
+            )}
+
             {/* CPF + Nome — required for NF-e */}
             <section className="rounded-xl border border-border p-5 space-y-3">
               <h2 className="font-semibold">Dados do comprador</h2>
@@ -383,7 +545,12 @@ export default function CheckoutPage() {
                 <input
                   required
                   value={buyerName}
-                  onChange={(e) => setBuyerName(e.target.value)}
+                  onChange={(e) => {
+                    setBuyerName(e.target.value);
+                    // Editar manualmente "desconecta" o perfil salvo escolhido
+                    // — vira um destinatário avulso para este pedido.
+                    setSelectedProfileId(null);
+                  }}
                   placeholder="Nome como deve constar na nota fiscal"
                   maxLength={150}
                   autoComplete="name"
@@ -411,7 +578,10 @@ export default function CheckoutPage() {
                 <input
                   required
                   value={cpf}
-                  onChange={(e) => setCpf(formatCpf(e.target.value))}
+                  onChange={(e) => {
+                    setCpf(formatCpf(e.target.value));
+                    setSelectedProfileId(null);
+                  }}
                   placeholder="000.000.000-00"
                   maxLength={14}
                   inputMode="numeric"
@@ -421,50 +591,124 @@ export default function CheckoutPage() {
                   Necessário para emissão de nota fiscal.
                 </p>
               </div>
+
+              {savedProfilesEnabled && selectedProfileId === null && (
+                <div className="space-y-2 border-t border-border pt-3">
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveAsProfile}
+                      onChange={(e) => setSaveAsProfile(e.target.checked)}
+                      className="mt-0.5 accent-primary shrink-0"
+                    />
+                    <span>Salvar estes dados como um perfil para agilizar próximas compras</span>
+                  </label>
+                  {saveAsProfile && (
+                    <input
+                      value={newProfileLabel}
+                      onChange={(e) => setNewProfileLabel(e.target.value)}
+                      placeholder="Nome do perfil (ex.: Eu mesmo, Maria Souza)"
+                      maxLength={60}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  )}
+                </div>
+              )}
             </section>
 
             {/* Shipping address — hidden for PICKUP */}
             {!isPickup && (
               <section className="rounded-xl border border-border p-5 space-y-4">
-                <h2 className="font-semibold">Endereço de entrega</h2>
+                <h2 className="font-semibold">Onde será entregue?</h2>
 
-                {savedAddresses.length > 0 && (
+                {savedProfilesEnabled && selectedProfile && selectedProfile.addresses.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground">
-                      Usar um endereço salvo
+                      Endereços de {selectedProfile.label}
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {savedAddresses.map((a, i) => {
-                        const active =
-                          address.cep.replace(/\D/g, '') === a.cep.replace(/\D/g, '') &&
-                          address.number === a.number &&
-                          address.street === a.street;
-                        return (
-                          <button
-                            type="button"
-                            key={`${a.cep}-${a.number}-${i}`}
-                            onClick={() => selectSavedAddress(a)}
-                            className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
-                              active
-                                ? 'border-primary bg-primary/5'
-                                : 'border-border hover:bg-muted'
-                            }`}
-                          >
-                            <p className="truncate font-medium text-foreground">{a.name}</p>
-                            <p className="truncate text-muted-foreground">
-                              {a.street}, {a.number}
-                            </p>
-                            <p className="truncate text-muted-foreground">
-                              {a.neighborhood} · {a.city}/{a.state}
-                            </p>
-                          </button>
-                        );
-                      })}
+                      {selectedProfile.addresses.map((a) => (
+                        <button
+                          type="button"
+                          key={a.id}
+                          onClick={() => selectSavedProfileAddress(a)}
+                          className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                            selectedAddressId === a.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:bg-muted'
+                          }`}
+                        >
+                          <p className="truncate font-medium text-foreground">
+                            {a.label}
+                            {a.isDefault && (
+                              <span className="ml-1 font-normal text-muted-foreground">
+                                (padrão)
+                              </span>
+                            )}
+                          </p>
+                          <p className="truncate text-muted-foreground">
+                            {a.street}, {a.number}
+                          </p>
+                          <p className="truncate text-muted-foreground">
+                            {a.neighborhood} · {a.city}/{a.state}
+                          </p>
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={startNewAddress}
+                        className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                          selectedAddressId === null
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:bg-muted'
+                        }`}
+                      >
+                        <p className="font-medium text-foreground">+ Adicionar outro endereço</p>
+                      </button>
                     </div>
                     <p className="border-t border-border pt-2 text-xs text-muted-foreground">
-                      ou preencha um novo endereço abaixo
+                      ou edite/preencha um endereço abaixo
                     </p>
                   </div>
+                ) : (
+                  savedAddresses.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Usar um endereço salvo
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {savedAddresses.map((a, i) => {
+                          const active =
+                            address.cep.replace(/\D/g, '') === a.cep.replace(/\D/g, '') &&
+                            address.number === a.number &&
+                            address.street === a.street;
+                          return (
+                            <button
+                              type="button"
+                              key={`${a.cep}-${a.number}-${i}`}
+                              onClick={() => selectSavedAddress(a)}
+                              className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                                active
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-border hover:bg-muted'
+                              }`}
+                            >
+                              <p className="truncate font-medium text-foreground">{a.name}</p>
+                              <p className="truncate text-muted-foreground">
+                                {a.street}, {a.number}
+                              </p>
+                              <p className="truncate text-muted-foreground">
+                                {a.neighborhood} · {a.city}/{a.state}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="border-t border-border pt-2 text-xs text-muted-foreground">
+                        ou preencha um novo endereço abaixo
+                      </p>
+                    </div>
+                  )
                 )}
 
                 <div>
@@ -576,6 +820,31 @@ export default function CheckoutPage() {
                     />
                   </div>
                 </div>
+
+                {savedProfilesEnabled &&
+                  selectedAddressId === null &&
+                  (selectedProfileId !== null || saveAsProfile) && (
+                    <div className="space-y-2 border-t border-border pt-3">
+                      <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={saveAddress}
+                          onChange={(e) => setSaveAddress(e.target.checked)}
+                          className="mt-0.5 accent-primary shrink-0"
+                        />
+                        <span>Salvar este endereço para próximas compras</span>
+                      </label>
+                      {saveAddress && (
+                        <input
+                          value={newAddressLabel}
+                          onChange={(e) => setNewAddressLabel(e.target.value)}
+                          placeholder="Nome do endereço (ex.: Minha casa, Trabalho)"
+                          maxLength={60}
+                          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      )}
+                    </div>
+                  )}
               </section>
             )}
 

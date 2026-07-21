@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { DeliveryMethod, OrderStatus } from '@prisma/client';
+import { DeliveryMethod, DocumentType, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { ShippingService } from '../shipping/shipping.service';
@@ -7,6 +7,7 @@ import { StockService } from '../stock/stock.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EventBusService } from '../events/event-bus.service';
 import { CheckoutService } from './checkout.service';
+import { CheckoutIdentityNormalizer } from './recipient/checkout-identity.normalizer';
 
 // ShippingService (transitively required by CheckoutService) depends on
 // OrderWhatsappService -> BaileysService -> the ESM-only `@whiskeysockets/baileys`
@@ -63,6 +64,7 @@ describe('CheckoutService.confirmarRetiradaCliente', () => {
       {} as unknown as StockService,
       {} as unknown as NotificationsService,
       {} as unknown as EventBusService,
+      {} as unknown as CheckoutIdentityNormalizer,
     );
   });
 
@@ -168,5 +170,253 @@ describe('CheckoutService.confirmarRetiradaCliente', () => {
       'Este pedido já foi retirado.',
     );
     expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Testes unitários de CheckoutService.createOrder — cobrem que o fluxo inline
+ * (sem perfil) permanece byte-a-byte igual ao de hoje, e que o novo fluxo com
+ * RecipientProfile/SavedAddress grava exatamente o que o normalizador resolve,
+ * nunca lendo os perfis de novo depois. Prisma/colaboradores são mockados.
+ */
+describe('CheckoutService.createOrder', () => {
+  const USER_ID = 'user-1';
+
+  const CART = {
+    items: [
+      {
+        productId: 'prod-1',
+        name: 'Produto Teste',
+        sku: 'SKU-1',
+        price: 100,
+        salePrice: null,
+        quantity: 1,
+        available: true,
+      },
+    ],
+    subtotal: 100,
+    couponCode: null,
+  };
+
+  const INLINE_ADDRESS = {
+    name: 'Fulano',
+    cep: '12345678',
+    street: 'Rua A',
+    number: '10',
+    neighborhood: 'Centro',
+    city: 'SJC',
+    state: 'SP',
+  };
+
+  function baseDto(overrides: Record<string, unknown> = {}) {
+    return {
+      deliveryMethod: DeliveryMethod.SHIPPING,
+      shippingAddress: INLINE_ADDRESS,
+      shippingMethod: 'PAC',
+      shippingPrice: 20,
+      meServiceId: 1,
+      meCarrier: 'Correios',
+      customerPhone: '12991234567',
+      ...overrides,
+    };
+  }
+
+  let prisma: {
+    product: { findMany: jest.Mock };
+    coupon: { findFirst: jest.Mock };
+    user: { update: jest.Mock };
+    order: { findFirst: jest.Mock };
+    orderStatusEvent: { create: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let tx: {
+    order: { create: jest.Mock; findFirst: jest.Mock };
+    coupon: { updateMany: jest.Mock };
+    shipment: { create: jest.Mock };
+  };
+  let cartService: { getCart: jest.Mock; clearCart: jest.Mock };
+  let shippingService: { resolveQuotedPrice: jest.Mock };
+  let stock: { reserveForOrder: jest.Mock };
+  let notifications: { notifyNewOrder: jest.Mock };
+  let events: { emit: jest.Mock };
+  let identityNormalizer: { resolveIdentity: jest.Mock; resolveAddress: jest.Mock };
+  let service: CheckoutService;
+
+  function decimal(n: number) {
+    return { toNumber: () => n };
+  }
+
+  const CREATED_ORDER = {
+    id: 'order-1',
+    items: [],
+    coupon: null,
+    subtotal: decimal(100),
+    discount: decimal(0),
+    shipping: decimal(20),
+    total: decimal(120),
+  };
+
+  beforeEach(() => {
+    tx = {
+      order: {
+        create: jest.fn().mockResolvedValue(CREATED_ORDER),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      coupon: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      shipment: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prisma = {
+      product: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'prod-1', status: 'ACTIVE', stock: 10 }]),
+      },
+      coupon: { findFirst: jest.fn() },
+      user: { update: jest.fn().mockResolvedValue({}) },
+      order: { findFirst: jest.fn() },
+      orderStatusEvent: { create: jest.fn().mockResolvedValue({}) },
+      $transaction: jest.fn((cb) => cb(tx)),
+    };
+    cartService = {
+      getCart: jest.fn().mockResolvedValue(CART),
+      clearCart: jest.fn().mockResolvedValue(undefined),
+    };
+    shippingService = { resolveQuotedPrice: jest.fn().mockResolvedValue(20) };
+    stock = { reserveForOrder: jest.fn().mockResolvedValue(undefined) };
+    notifications = { notifyNewOrder: jest.fn().mockResolvedValue(undefined) };
+    events = { emit: jest.fn() };
+    identityNormalizer = {
+      resolveIdentity: jest.fn().mockResolvedValue({
+        recipientProfileId: null,
+        buyerName: 'Fulano',
+        recipientDocument: '11122233396',
+        recipientDocumentType: DocumentType.CPF,
+        recipientEmail: null,
+      }),
+      resolveAddress: jest.fn().mockResolvedValue({
+        savedAddressId: null,
+        address: INLINE_ADDRESS,
+      }),
+    };
+
+    service = new CheckoutService(
+      prisma as unknown as PrismaService,
+      cartService as unknown as CartService,
+      shippingService as unknown as ShippingService,
+      stock as unknown as StockService,
+      notifications as unknown as NotificationsService,
+      events as unknown as EventBusService,
+      identityNormalizer as unknown as CheckoutIdentityNormalizer,
+    );
+  });
+
+  it('old inline flow: writes buyerName/document straight from the DTO and syncs User.cpf', async () => {
+    await service.createOrder(USER_ID, baseDto({ buyerName: 'Fulano', cpf: '11122233396' }));
+
+    expect(identityNormalizer.resolveIdentity).toHaveBeenCalledWith(USER_ID, {
+      recipientProfileId: undefined,
+      buyerName: 'Fulano',
+      cpf: '11122233396',
+    });
+    expect(tx.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          buyerName: 'Fulano',
+          recipientProfileId: null,
+          savedAddressId: null,
+          recipientDocument: '11122233396',
+          recipientDocumentType: DocumentType.CPF,
+          recipientEmail: null,
+          shippingAddress: INLINE_ADDRESS,
+        }),
+      }),
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: USER_ID },
+      data: { cpf: '11122233396' },
+    });
+  });
+
+  it('new flow: uses the normalizer snapshot for a selected profile/address and skips the User.cpf sync', async () => {
+    identityNormalizer.resolveIdentity.mockResolvedValue({
+      recipientProfileId: 'profile-1',
+      buyerName: 'Maria Souza',
+      recipientDocument: '22233344400',
+      recipientDocumentType: DocumentType.CPF,
+      recipientEmail: 'maria@example.com',
+    });
+    identityNormalizer.resolveAddress.mockResolvedValue({
+      savedAddressId: 'addr-1',
+      address: { ...INLINE_ADDRESS, name: 'Maria Souza' },
+    });
+
+    await service.createOrder(
+      USER_ID,
+      baseDto({
+        recipientProfileId: 'profile-1',
+        savedAddressId: 'addr-1',
+        cpf: '99999999999', // should be ignored: a profile was selected
+      }),
+    );
+
+    expect(identityNormalizer.resolveAddress).toHaveBeenCalledWith(USER_ID, 'profile-1', {
+      savedAddressId: 'addr-1',
+      shippingAddress: INLINE_ADDRESS,
+    });
+    expect(tx.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          buyerName: 'Maria Souza',
+          recipientProfileId: 'profile-1',
+          savedAddressId: 'addr-1',
+          recipientDocument: '22233344400',
+          recipientEmail: 'maria@example.com',
+        }),
+      }),
+    );
+    // Um perfil foi selecionado — nunca sobrescrever o CPF da CONTA com o
+    // documento de um perfil que pode representar um terceiro.
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('propagates 404 when the normalizer rejects a profile owned by another user', async () => {
+    identityNormalizer.resolveIdentity.mockRejectedValue(
+      new NotFoundException('Perfil de destinatário não encontrado.'),
+    );
+
+    await expect(
+      service.createOrder(USER_ID, baseDto({ recipientProfileId: 'someone-elses-profile' })),
+    ).rejects.toThrow(NotFoundException);
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  it('PICKUP: never resolves an address and stores shippingAddress as JsonNull', async () => {
+    await service.createOrder(
+      USER_ID,
+      baseDto({
+        deliveryMethod: DeliveryMethod.PICKUP,
+        shippingAddress: undefined,
+        meServiceId: undefined,
+      }),
+    );
+
+    expect(identityNormalizer.resolveAddress).not.toHaveBeenCalled();
+    expect(tx.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          shippingAddress: Prisma.JsonNull,
+          savedAddressId: null,
+        }),
+      }),
+    );
+    expect(tx.shipment.create).not.toHaveBeenCalled();
+  });
+
+  it('requires either shippingAddress or savedAddressId for SHIPPING orders', async () => {
+    await expect(
+      service.createOrder(
+        USER_ID,
+        baseDto({ shippingAddress: undefined, savedAddressId: undefined }),
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(identityNormalizer.resolveIdentity).not.toHaveBeenCalled();
   });
 });

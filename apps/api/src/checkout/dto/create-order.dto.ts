@@ -126,4 +126,18 @@ export class CreateOrderDto {
   @IsString()
   @Matches(/^\d{11}$/, { message: 'CPF deve conter 11 dígitos numéricos.' })
   cpf?: string;
+
+  // Perfil de destinatário salvo (opcional). Quando informado, o backend
+  // normaliza os dados do perfil (nome/documento/e-mail) e os grava no pedido
+  // no lugar dos campos abaixo — nunca lê o perfil de novo depois. Omitir mantém
+  // o fluxo inline de sempre (buyerName/cpf do próprio body).
+  @IsOptional()
+  @IsString()
+  recipientProfileId?: string;
+
+  // Endereço salvo (opcional, só relevante para SHIPPING). Quando informado,
+  // substitui `shippingAddress` como origem do endereço do pedido.
+  @IsOptional()
+  @IsString()
+  savedAddressId?: string;
 }
