@@ -382,9 +382,13 @@ export class ShippingService {
         from: this.from,
         to: {
           name: addr.name,
-          email: order.user.email,
+          // Prefere o snapshot do pedido (imutável); cai para o dado atual da
+          // conta em pedidos anteriores a essas colunas.
+          email: order.recipientEmail || order.user.email,
           phone: '',
-          ...(order.user.cpf ? { document: order.user.cpf.replace(/\D/g, '') } : {}),
+          ...((order.recipientDocument ?? order.user.cpf)
+            ? { document: (order.recipientDocument ?? order.user.cpf)!.replace(/\D/g, '') }
+            : {}),
           address: addr.street,
           complement: addr.complement ?? '',
           number: addr.number,
@@ -513,9 +517,11 @@ export class ShippingService {
         service: serviceId,
         from: {
           name: addr.name,
-          email: order.user.email,
+          email: order.recipientEmail || order.user.email,
           phone: '',
-          ...(order.user.cpf ? { document: order.user.cpf.replace(/\D/g, '') } : {}),
+          ...((order.recipientDocument ?? order.user.cpf)
+            ? { document: (order.recipientDocument ?? order.user.cpf)!.replace(/\D/g, '') }
+            : {}),
           address: addr.street,
           complement: addr.complement ?? '',
           number: addr.number,
@@ -931,10 +937,14 @@ export class ShippingService {
     }
   }
 
+  // Note: a shipment reaching CANCELLED (e.g. Melhor Envio cancels/expires the
+  // label) never cascades to the order — by the time a shipment exists the order
+  // is already paid, and auto-cancelling it would silently drop a paid order out
+  // of every fulfillment queue. The shipment's own status carries the "needs a
+  // new label" signal instead.
   private toOrderStatus(s: ShipmentStatus): OrderStatus | null {
     if (s === 'SHIPPED' || s === 'IN_TRANSIT') return 'SHIPPED';
     if (s === 'DELIVERED') return 'DELIVERED';
-    if (s === 'CANCELLED') return 'CANCELLED';
     return null;
   }
 
