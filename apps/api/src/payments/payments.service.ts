@@ -274,7 +274,10 @@ export class PaymentsService {
     if (!order.payment) return null;
 
     const p = order.payment;
-    if (p.method === method && p.status === 'APPROVED') return p;
+    // An approved payment is never cleared, regardless of method — deleting it here
+    // would orphan the order on whatever new (pending) attempt replaces it, and a
+    // later expiration/cancellation of that attempt would wrongly cancel a paid order.
+    if (p.status === 'APPROVED') return p;
     if (p.method === method && !TERMINAL.includes(p.status)) return p;
 
     await this.prisma.payment.delete({ where: { id: p.id } });
