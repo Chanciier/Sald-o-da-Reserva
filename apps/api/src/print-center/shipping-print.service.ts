@@ -110,6 +110,11 @@ export class ShippingPrintService implements OnModuleInit {
           lastError: 'Etiqueta do Melhor Envio não ficou pronta a tempo.',
         },
       });
+      await this.notifications.notifyPrintError({
+        title: 'Erro ao gerar etiqueta de envio',
+        message: `Etiqueta de envio do pedido #${orderId.slice(-8).toUpperCase()} não ficou pronta a tempo.`,
+        orderId,
+      });
       return;
     }
 
@@ -234,7 +239,7 @@ export class ShippingPrintService implements OnModuleInit {
 
   private async notifyReady(orderId: string): Promise<void> {
     await this.notifications.notify({
-      role: Role.ADMIN,
+      role: Role.VENDEDOR,
       type: 'PRINT_JOB_READY',
       title: 'Etiqueta de envio pronta',
       message: `Etiqueta de envio do pedido #${orderId.slice(-8).toUpperCase()} pronta para impressão.`,

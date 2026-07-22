@@ -88,6 +88,11 @@ export class PrintCenterService implements OnModuleInit {
       documentUrl = await this.pickupLabel.generate(order);
     } catch (err) {
       this.logger.error(`Falha ao gerar etiqueta de retirada do pedido ${order.id}`, err as Error);
+      await this.notifications.notifyPrintError({
+        title: 'Erro ao gerar etiqueta de retirada',
+        message: `Falha ao gerar etiqueta de retirada do pedido #${order.id.slice(-8).toUpperCase()}.`,
+        orderId: order.id,
+      });
       return null;
     }
 
@@ -158,7 +163,7 @@ export class PrintCenterService implements OnModuleInit {
 
   private async notifyReady(orderId: string, title: string): Promise<void> {
     await this.notifications.notify({
-      role: Role.ADMIN,
+      role: Role.VENDEDOR,
       type: 'PRINT_JOB_READY',
       title,
       message: `Pedido #${orderId.slice(-8).toUpperCase()} pronto para impressão.`,

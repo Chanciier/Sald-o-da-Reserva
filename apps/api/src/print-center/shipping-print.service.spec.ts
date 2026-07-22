@@ -27,7 +27,7 @@ describe('ShippingPrintService', () => {
     enqueue: jest.Mock;
     handler?: (data: unknown) => Promise<void>;
   };
-  let notifications: { notify: jest.Mock };
+  let notifications: { notify: jest.Mock; notifyPrintError: jest.Mock };
   let printAgentWs: { pushJobReady: jest.Mock };
   let config: { get: jest.Mock };
   let storage: { uploadPdf: jest.Mock };
@@ -60,7 +60,10 @@ describe('ShippingPrintService', () => {
       }),
       enqueue: jest.fn().mockResolvedValue(undefined),
     };
-    notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    notifications = {
+      notify: jest.fn().mockResolvedValue(undefined),
+      notifyPrintError: jest.fn().mockResolvedValue(undefined),
+    };
     printAgentWs = { pushJobReady: jest.fn() };
     config = { get: jest.fn((_key: string, def?: string) => def) };
     storage = {
@@ -173,7 +176,7 @@ describe('ShippingPrintService', () => {
       data: { status: 'READY', documentUrl: 'https://cdn.example.com/print-jobs/fitted.pdf' },
     });
     expect(notifications.notify).toHaveBeenCalledWith(
-      expect.objectContaining({ orderId: ORDER_ID, type: 'PRINT_JOB_READY' }),
+      expect.objectContaining({ role: 'VENDEDOR', orderId: ORDER_ID, type: 'PRINT_JOB_READY' }),
     );
     expect(printAgentWs.pushJobReady).toHaveBeenCalledWith(
       expect.objectContaining({ id: JOB_ID, status: 'READY' }),
@@ -244,5 +247,8 @@ describe('ShippingPrintService', () => {
       },
     });
     expect(notifications.notify).not.toHaveBeenCalled();
+    expect(notifications.notifyPrintError).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: ORDER_ID }),
+    );
   });
 });

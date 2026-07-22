@@ -23,7 +23,7 @@ describe('PrintCenterService', () => {
   };
   let config: { get: jest.Mock };
   let events: { on: jest.Mock; handlers: Record<string, (payload: unknown) => Promise<void>> };
-  let notifications: { notify: jest.Mock };
+  let notifications: { notify: jest.Mock; notifyPrintError: jest.Mock };
   let pickupLabel: { generate: jest.Mock };
   let shippingPrint: { enqueueWatch: jest.Mock };
   let printAgentWs: { pushJobReady: jest.Mock };
@@ -65,7 +65,10 @@ describe('PrintCenterService', () => {
         events.handlers[event] = handler;
       }),
     };
-    notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    notifications = {
+      notify: jest.fn().mockResolvedValue(undefined),
+      notifyPrintError: jest.fn().mockResolvedValue(undefined),
+    };
     pickupLabel = { generate: jest.fn().mockResolvedValue('https://cdn.example.com/label.png') };
     shippingPrint = { enqueueWatch: jest.fn().mockResolvedValue(undefined) };
     printAgentWs = { pushJobReady: jest.fn() };
@@ -121,10 +124,24 @@ describe('PrintCenterService', () => {
       }),
     );
     expect(notifications.notify).toHaveBeenCalledWith(
-      expect.objectContaining({ orderId: ORDER_ID, type: 'PRINT_JOB_READY' }),
+      expect.objectContaining({ role: 'VENDEDOR', orderId: ORDER_ID, type: 'PRINT_JOB_READY' }),
     );
     expect(printAgentWs.pushJobReady).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'job-1', type: 'PICKUP' }),
+    );
+  });
+
+  it('falha ao gerar a etiqueta de retirada: notifica erro (só a conta do dono) e não cria job', async () => {
+    flags({ PRINT_CENTER_ENABLED: 'true', AUTO_PRINT_PICKUP: 'true' });
+    prisma.order.findUnique.mockResolvedValue(pickupOrder());
+    pickupLabel.generate.mockRejectedValue(new Error('falha ao renderizar SVG'));
+
+    await events.handlers[OmsEvents.OrderPaid]({ orderId: ORDER_ID });
+
+    expect(prisma.printJob.create).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
+    expect(notifications.notifyPrintError).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: ORDER_ID }),
     );
   });
 

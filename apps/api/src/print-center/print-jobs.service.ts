@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrintJob, PrintJobStatus, PrintJobType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { QueryPrintJobsDto } from './dto/query-print-jobs.dto';
 import { PrintAgentWsGateway } from './print-agent-ws.gateway';
 
@@ -20,6 +21,7 @@ export class PrintJobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly printAgentWs: PrintAgentWsGateway,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ── Admin ───────────────────────────────────────────────────────────────
@@ -120,7 +122,7 @@ export class PrintJobsService {
       throw new BadRequestException(`Transição inválida: ${job.status} → ${status}.`);
     }
 
-    return this.prisma.printJob.update({
+    const updated = await this.prisma.printJob.update({
       where: { id },
       data: {
         status,
@@ -130,5 +132,16 @@ export class PrintJobsService {
         printedAt: status === PrintJobStatus.PRINTED ? new Date() : undefined,
       },
     });
+
+    if (status === PrintJobStatus.FAILED) {
+      const reason = error ?? 'Falha reportada pelo dispositivo.';
+      await this.notifications.notifyPrintError({
+        title: 'Erro de impressão',
+        message: `Falha ao imprimir o job do pedido #${job.orderId.slice(-8).toUpperCase()}: ${reason}`,
+        orderId: job.orderId,
+      });
+    }
+
+    return updated;
   }
 }

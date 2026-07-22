@@ -16,6 +16,10 @@ interface NotifyInput {
 
 const CUSTOMER_FORBIDDEN_TYPES = new Set(['PAYMENT_APPROVED', 'PRODUCT_SOLD']);
 
+// Erro de impressão não vai pra role nenhuma — só pra esta conta específica
+// (pedido explícito do dono da loja, 22/07/2026).
+const PRINT_ERROR_NOTIFICATION_EMAIL = 'adriansanluz@gmail.com';
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -53,6 +57,31 @@ export class NotificationsService {
         ? `Pagamento aprovado: ${amount}.`
         : 'Um pagamento foi aprovado.',
       orderId,
+    });
+  }
+
+  /**
+   * Erro de impressão (etiqueta ou impressora) — só para o dono da loja, nunca
+   * broadcast por role. Silencioso se a conta não existir/estiver inativa: é
+   * best-effort, nunca deve derrubar o fluxo de impressão que a chamou.
+   */
+  async notifyPrintError(input: {
+    title: string;
+    message: string;
+    orderId?: string;
+  }): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: PRINT_ERROR_NOTIFICATION_EMAIL },
+      select: { id: true, role: true, isActive: true },
+    });
+    if (!user?.isActive) return;
+
+    await this.createForUser(user.id, {
+      role: user.role,
+      type: 'PRINT_JOB_ERROR',
+      title: input.title,
+      message: input.message,
+      orderId: input.orderId,
     });
   }
 

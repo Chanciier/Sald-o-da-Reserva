@@ -1,4 +1,5 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrintAgentWsGateway } from './print-agent-ws.gateway';
 import { PrintJobsService } from './print-jobs.service';
 
@@ -14,6 +15,7 @@ describe('PrintJobsService', () => {
     auditLog: { create: jest.Mock };
   };
   let printAgentWs: { pushJobReady: jest.Mock };
+  let notifications: { notifyPrintError: jest.Mock };
 
   const JOB_ID = 'job-1';
   const DEVICE_ID = 'device-1';
@@ -24,9 +26,11 @@ describe('PrintJobsService', () => {
       auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
     printAgentWs = { pushJobReady: jest.fn() };
+    notifications = { notifyPrintError: jest.fn().mockResolvedValue(undefined) };
     service = new PrintJobsService(
       prisma as unknown as PrismaService,
       printAgentWs as unknown as PrintAgentWsGateway,
+      notifications as unknown as NotificationsService,
     );
   });
 
@@ -175,6 +179,7 @@ describe('PrintJobsService', () => {
     it('erro de impressora: PRINTING → FAILED registra o motivo e soma uma tentativa', async () => {
       prisma.printJob.findUnique.mockResolvedValue({
         id: JOB_ID,
+        orderId: 'order-1',
         status: 'PRINTING',
         deviceId: DEVICE_ID,
       });
@@ -191,6 +196,9 @@ describe('PrintJobsService', () => {
           printedAt: undefined,
         },
       });
+      expect(notifications.notifyPrintError).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId: 'order-1' }),
+      );
     });
   });
 });
