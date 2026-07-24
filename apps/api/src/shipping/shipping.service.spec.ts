@@ -304,3 +304,168 @@ describe('ShippingService.cancelLabel', () => {
     await expect(service.cancelLabel('order-1')).rejects.toThrow('Erro ao cancelar etiqueta');
   });
 });
+
+/**
+ * Cancelamento pode acontecer FORA do app (admin cancela direto no painel do
+ * Melhor Envio). Esses dois caminhos — webhook e o poller periódico — são a
+ * única forma do app descobrir isso, então ambos precisam limpar labelUrl/
+ * trackingCode igual o cancelLabel do app já faz, senão a UI trava mostrando
+ * a etiqueta antiga como se ainda fosse válida.
+ */
+describe('ShippingService.handleWebhook — cancelamento externo (via painel do ME)', () => {
+  let service: ShippingService;
+  let prisma: {
+    shipment: { findUnique: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let txShipmentUpdate: jest.Mock;
+
+  beforeEach(() => {
+    const env: Record<string, string> = {
+      MELHOR_ENVIO_TOKEN: 'fake-token',
+      MELHOR_ENVIO_SANDBOX: 'true',
+    };
+    const config = {
+      get: (key: string, def?: string) => env[key] ?? def,
+    } as unknown as ConfigService;
+
+    txShipmentUpdate = jest.fn().mockResolvedValue({});
+
+    prisma = {
+      shipment: { findUnique: jest.fn() },
+      $transaction: jest.fn(async (cb) =>
+        cb({
+          shipment: { update: txShipmentUpdate },
+          shipmentEvent: { create: jest.fn().mockResolvedValue({}) },
+          order: { update: jest.fn().mockResolvedValue({}) },
+          auditLog: { create: jest.fn().mockResolvedValue({}) },
+        }),
+      ),
+    };
+
+    service = new ShippingService(
+      prisma as unknown as PrismaService,
+      config,
+      {} as unknown as MailService,
+      {} as unknown as OrderWhatsappService,
+    );
+  });
+
+  it('clears labelUrl and trackingCode when the ME webhook reports the shipment as cancelled', async () => {
+    prisma.shipment.findUnique.mockResolvedValue({
+      id: 'shipment-1',
+      orderId: 'order-1',
+      status: 'SHIPPED',
+      shippedAt: new Date(),
+      deliveredAt: null,
+      order: { status: 'SHIPPED' },
+    });
+
+    await service.handleWebhook({ id: 'me-order-1', status: 'cancelled', tracking: null });
+
+    expect(txShipmentUpdate).toHaveBeenCalledWith({
+      where: { id: 'shipment-1' },
+      data: expect.objectContaining({
+        status: 'CANCELLED',
+        labelUrl: null,
+        trackingCode: null,
+      }),
+    });
+  });
+
+  it('does not touch labelUrl for a normal (non-cancelled) status update', async () => {
+    prisma.shipment.findUnique.mockResolvedValue({
+      id: 'shipment-1',
+      orderId: 'order-1',
+      status: 'SHIPPED',
+      shippedAt: new Date(),
+      deliveredAt: null,
+      order: { status: 'SHIPPED' },
+    });
+
+    await service.handleWebhook({ id: 'me-order-1', status: 'undelivered', tracking: 'ABC123' });
+
+    const data = txShipmentUpdate.mock.calls[0][0].data;
+    expect(data.labelUrl).toBeUndefined();
+    expect(data.trackingCode).toBe('ABC123');
+  });
+});
+
+describe('ShippingService.syncActiveShipments — cancelamento externo via poller', () => {
+  let service: ShippingService;
+  let prisma: {
+    shipment: { findMany: jest.Mock; findUnique: jest.Mock };
+    shipmentEvent: { findMany: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let fetchMock: jest.Mock;
+  let txShipmentUpdate: jest.Mock;
+
+  beforeEach(() => {
+    const env: Record<string, string> = {
+      MELHOR_ENVIO_TOKEN: 'fake-token',
+      MELHOR_ENVIO_SANDBOX: 'true',
+    };
+    const config = {
+      get: (key: string, def?: string) => env[key] ?? def,
+    } as unknown as ConfigService;
+
+    txShipmentUpdate = jest.fn().mockResolvedValue({});
+
+    prisma = {
+      shipment: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'shipment-1' }]),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'shipment-1',
+          orderId: 'order-1',
+          meOrderId: 'me-order-1',
+          status: 'SHIPPED',
+          shippedAt: new Date(),
+          deliveredAt: null,
+          order: { status: 'SHIPPED' },
+        }),
+      },
+      shipmentEvent: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn(async (cb) =>
+        cb({
+          shipment: { update: txShipmentUpdate },
+          order: { update: jest.fn().mockResolvedValue({}) },
+          auditLog: { create: jest.fn().mockResolvedValue({}) },
+        }),
+      ),
+    };
+
+    fetchMock = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/me/shipment/tracking')) {
+        return Promise.resolve(
+          jsonResponse({
+            'me-order-1': { status: 'cancelled', tracking: null, histories: [] },
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({}, false));
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    service = new ShippingService(
+      prisma as unknown as PrismaService,
+      config,
+      {} as unknown as MailService,
+      {} as unknown as OrderWhatsappService,
+    );
+  });
+
+  it('clears labelUrl and trackingCode when the periodic sync finds the shipment cancelled on ME', async () => {
+    const synced = await service.syncActiveShipments();
+
+    expect(synced).toBe(1);
+    expect(txShipmentUpdate).toHaveBeenCalledWith({
+      where: { id: 'shipment-1' },
+      data: expect.objectContaining({
+        status: 'CANCELLED',
+        labelUrl: null,
+        trackingCode: null,
+      }),
+    });
+  });
+});

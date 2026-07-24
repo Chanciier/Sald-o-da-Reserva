@@ -755,6 +755,10 @@ export class ShippingService {
           ...(newStatus === 'DELIVERED' && !shipment.deliveredAt
             ? { deliveredAt: new Date() }
             : {}),
+          // Cancelamento pode vir de fora (admin cancela direto no painel do ME,
+          // ou o ME expira a etiqueta) — sem isso a UI continua mostrando a
+          // etiqueta/rastreio antigos como se ainda fossem válidos.
+          ...(newStatus === 'CANCELLED' ? { labelUrl: null, trackingCode: null } : {}),
           rawData: body as unknown as Prisma.InputJsonValue,
         },
       });
@@ -913,6 +917,10 @@ export class ShippingService {
           ...(newStatus === 'DELIVERED' && !shipment.deliveredAt
             ? { deliveredAt: new Date() }
             : {}),
+          // Mesmo motivo do webhook: cancelamento pode ter sido feito direto no
+          // painel do ME, então esse poller é às vezes a única forma de o app
+          // saber. Sem limpar labelUrl a UI trava mostrando a etiqueta antiga.
+          ...(newStatus === 'CANCELLED' ? { labelUrl: null, trackingCode: null } : {}),
         },
       });
 
