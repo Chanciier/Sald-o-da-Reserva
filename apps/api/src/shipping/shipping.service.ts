@@ -62,6 +62,13 @@ export interface ShippingQuoteOption {
   deliveryMax: number;
 }
 
+export interface PackageOverrides {
+  height?: number;
+  width?: number;
+  length?: number;
+  weight?: number;
+}
+
 @Injectable()
 export class ShippingService {
   private readonly logger = new Logger(ShippingService.name);
@@ -333,7 +340,7 @@ export class ShippingService {
 
   // ── Purchase label (admin) ────────────────────────────────────────────────
 
-  async purchaseLabel(orderId: string) {
+  async purchaseLabel(orderId: string, overrides?: PackageOverrides) {
     if (!this.token) throw new BadRequestException('Melhor Envio não configurado.');
 
     const shipment = await this.prisma.shipment.findUnique({
@@ -343,7 +350,10 @@ export class ShippingService {
       },
     });
     if (!shipment) throw new NotFoundException('Envio não encontrado.');
-    if (shipment.status !== 'PENDING') {
+    // CANCELLED é permitido para regenerar a etiqueta após um cancelamento
+    // manual (ex.: dimensões erradas) — o próprio cancelamento já garante que
+    // não havia postagem em andamento.
+    if (shipment.status !== 'PENDING' && shipment.status !== 'CANCELLED') {
       throw new BadRequestException(`Etiqueta já processada. Status: ${shipment.status}`);
     }
     if (!shipment.serviceId) {
@@ -360,7 +370,18 @@ export class ShippingService {
       (acc: number, i: any) => acc + i.price.toNumber() * i.quantity,
       0,
     );
-    const { height, width, length, weight } = this.calcPackage(order.items);
+    // Prioridade: override explícito desta chamada > último override salvo no
+    // envio > cálculo automático pela quantidade/dimensões dos itens. Isso
+    // deixa o admin corrigir o pacote (ex.: várias unidades de um item pequeno
+    // que juntas não cabem na caixa "padrão") sem depender só do auto-cálculo.
+    const auto = this.calcPackage(order.items);
+    const height = this.overrideDim(overrides?.height, shipment.packageHeight ?? auto.height);
+    const width = this.overrideDim(overrides?.width, shipment.packageWidth ?? auto.width);
+    const length = this.overrideDim(overrides?.length, shipment.packageLength ?? auto.length);
+    const weight = this.overrideWeight(
+      overrides?.weight,
+      shipment.packageWeight ? shipment.packageWeight.toNumber() : auto.weight,
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const products = order.items.map((i: any) => ({
@@ -457,6 +478,10 @@ export class ShippingService {
           status: 'LABEL_PURCHASED',
           labelUrl,
           rawData: cartData as unknown as Prisma.InputJsonValue,
+          packageHeight: height,
+          packageWidth: width,
+          packageLength: length,
+          packageWeight: weight,
           ...(meCarrierName ? { carrier: meCarrierName } : {}),
         },
       });
@@ -480,6 +505,95 @@ export class ShippingService {
 
     this.logger.log(`Label purchased: shipment=${shipment.id} meOrderId=${meOrderId}`);
     return { meOrderId, labelUrl };
+  }
+
+  // ── Cancel label (admin) ──────────────────────────────────────────────────
+  // Solicita o cancelamento da etiqueta já comprada. O ME só aceita cancelar
+  // antes da postagem (reason_id é sempre 2 — único valor aceito pela API
+  // pública) e estorna o valor na carteira ME em até 12h. Reseta o envio para
+  // CANCELLED com labelUrl/trackingCode limpos, deixando purchaseLabel livre
+  // para gerar uma etiqueta nova (ex.: depois de corrigir as dimensões).
+
+  async cancelLabel(orderId: string, reason?: string) {
+    if (!this.token) throw new BadRequestException('Melhor Envio não configurado.');
+
+    const shipment = await this.prisma.shipment.findUnique({ where: { orderId } });
+    if (!shipment) throw new NotFoundException('Envio não encontrado.');
+    if (!shipment.meOrderId) {
+      throw new BadRequestException('Nenhuma etiqueta gerada para este pedido.');
+    }
+    if (shipment.status !== 'LABEL_PURCHASED') {
+      throw new BadRequestException(
+        `Não é possível cancelar etiqueta com status atual: ${shipment.status}.`,
+      );
+    }
+
+    const description = reason?.trim() || 'Cancelado pelo lojista via painel administrativo.';
+
+    const res = await fetch(`${this.baseUrl}/me/shipment/cancel`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({
+        order: { id: shipment.meOrderId, reason_id: 2, description },
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new BadRequestException(`Erro ao cancelar etiqueta: ${body}`);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.shipment.update({
+        where: { id: shipment.id },
+        data: { status: 'CANCELLED', labelUrl: null, trackingCode: null },
+      });
+
+      await tx.shipmentEvent.create({
+        data: {
+          shipmentId: shipment.id,
+          event: 'label.cancelled',
+          status: 'CANCELLED',
+          description,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'shipment.label.cancelled',
+          metadata: {
+            shipmentId: shipment.id,
+            orderId,
+            meOrderId: shipment.meOrderId,
+            reason: description,
+          },
+        },
+      });
+    });
+
+    this.logger.log(`Label cancelled: shipment=${shipment.id} meOrderId=${shipment.meOrderId}`);
+    return { cancelled: true };
+  }
+
+  // ── Package dimensions (admin: ver/editar antes de gerar a etiqueta) ──────
+  // Retorna o override salvo no envio quando existir; senão o cálculo
+  // automático (mesma lógica usada por purchaseLabel), para a UI sempre ter um
+  // valor concreto pra mostrar e deixar o admin ajustar antes de gerar.
+
+  async getPackage(orderId: string) {
+    const shipment = await this.prisma.shipment.findUnique({
+      where: { orderId },
+      include: { order: { include: { items: { include: { product: true } } } } },
+    });
+    if (!shipment) throw new NotFoundException('Envio não encontrado.');
+
+    const auto = this.calcPackage(shipment.order.items);
+    return {
+      height: shipment.packageHeight ?? auto.height,
+      width: shipment.packageWidth ?? auto.width,
+      length: shipment.packageLength ?? auto.length,
+      weight: shipment.packageWeight ? shipment.packageWeight.toNumber() : auto.weight,
+    };
   }
 
   // ── Reverse label (returns) ───────────────────────────────────────────────
@@ -882,6 +996,21 @@ export class ShippingService {
       width,
       length,
     };
+  }
+
+  // Valores inválidos (negativos, zero, NaN) caem no fallback em vez de
+  // travar a geração da etiqueta — a API do ME é quem valida os mínimos reais
+  // de cada transportadora, então só filtramos o obviamente errado aqui.
+  private overrideDim(value: number | undefined, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? Math.round(value)
+      : fallback;
+  }
+
+  private overrideWeight(value: number | undefined, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? Math.round(value * 1000) / 1000
+      : fallback;
   }
 
   // ── Private: status mapping ───────────────────────────────────────────────

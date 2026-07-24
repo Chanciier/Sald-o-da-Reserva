@@ -35,6 +35,12 @@ export class ShippingController {
     return this.shipping.getTracking(orderId, userId);
   }
 
+  @Get(':orderId/package')
+  @Roles('ADMIN')
+  getPackage(@Param('orderId') orderId: string) {
+    return this.shipping.getPackage(orderId);
+  }
+
   @Patch(':orderId/carrier')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
@@ -56,8 +62,19 @@ export class ShippingController {
   @Post('label/:orderId')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
-  purchaseLabel(@Param('orderId') orderId: string) {
-    return this.shipping.purchaseLabel(orderId);
+  purchaseLabel(
+    @Param('orderId') orderId: string,
+    @Body()
+    body?: { height?: number; width?: number; length?: number; weight?: number },
+  ) {
+    return this.shipping.purchaseLabel(orderId, body);
+  }
+
+  @Post(':orderId/cancel-label')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  cancelLabel(@Param('orderId') orderId: string, @Body() body?: { reason?: string }) {
+    return this.shipping.cancelLabel(orderId, body?.reason);
   }
 
   @Post('webhook')

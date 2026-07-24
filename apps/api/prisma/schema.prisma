@@ -697,29 +697,38 @@ model PushSubscription {
 }
 
 model Shipment {
-  id           String         @id @default(cuid())
-  orderId      String         @unique @map("order_id")
-  meOrderId    String?        @unique @map("me_order_id")
-  frenetTicket String?        @unique @map("frenet_ticket")
+  id            String         @id @default(cuid())
+  orderId       String         @unique @map("order_id")
+  meOrderId     String?        @unique @map("me_order_id")
+  frenetTicket  String?        @unique @map("frenet_ticket")
   // Id do envio no marketplace de origem (ex.: shipment do Mercado Livre). Usado
   // para baixar a etiqueta e sincronizar o rastreio quando o canal não é o ME.
-  externalId   String?        @map("external_id")
-  carrier      String
-  service      String
-  serviceId    Int            @map("service_id")
-  serviceCode  String?        @map("service_code")
-  trackingCode String?        @map("tracking_code")
-  status       ShipmentStatus @default(PENDING)
-  labelUrl     String?        @map("label_url") @db.Text
-  price        Decimal        @db.Decimal(10, 2)
-  deliveryMin  Int?           @map("delivery_min")
-  deliveryMax  Int?           @map("delivery_max")
-  rawQuote     Json?          @map("raw_quote")
-  rawData      Json?          @map("raw_data")
-  shippedAt    DateTime?      @map("shipped_at")
-  deliveredAt  DateTime?      @map("delivered_at")
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  externalId    String?        @map("external_id")
+  carrier       String
+  service       String
+  serviceId     Int            @map("service_id")
+  serviceCode   String?        @map("service_code")
+  trackingCode  String?        @map("tracking_code")
+  status        ShipmentStatus @default(PENDING)
+  labelUrl      String?        @map("label_url") @db.Text
+  price         Decimal        @db.Decimal(10, 2)
+  deliveryMin   Int?           @map("delivery_min")
+  deliveryMax   Int?           @map("delivery_max")
+  rawQuote      Json?          @map("raw_quote")
+  rawData       Json?          @map("raw_data")
+  // Dimensões do pacote (cm/kg) realmente usadas na última etiqueta gerada.
+  // Null = ainda não gerou etiqueta com override manual; o cálculo automático
+  // (ShippingService.calcPackage, baseado nos itens do pedido) é usado como
+  // fallback. Preenchido tanto no auto-cálculo quanto no override do admin,
+  // para a UI sempre ter um valor concreto para mostrar/editar.
+  packageHeight Int?           @map("package_height")
+  packageWidth  Int?           @map("package_width")
+  packageLength Int?           @map("package_length")
+  packageWeight Decimal?       @map("package_weight") @db.Decimal(8, 3)
+  shippedAt     DateTime?      @map("shipped_at")
+  deliveredAt   DateTime?      @map("delivered_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
 
   order  Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   events ShipmentEvent[]

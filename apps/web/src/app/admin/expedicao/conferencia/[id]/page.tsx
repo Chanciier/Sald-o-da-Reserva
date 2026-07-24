@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +18,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { getOrder } from '@/lib/cart-api';
 import { fetchInvoices, emitInvoice, reemitInvoice } from '@/actions/invoices';
-import { purchaseLabel } from '@/lib/shipping';
+import { purchaseLabel, getPackageDimensions, cancelLabel } from '@/lib/shipping';
 import { createManualPrintJob } from '@/lib/print-center-api';
 import { marcarPronto, confirmarRetirada, cancelarPedido } from '@/actions/expedicao';
 import type { Order } from '@/types/order';
@@ -97,12 +97,37 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   const [carrierLoading, setCarrierLoading] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState<ShippingOption | null>(null);
   const [carrierError, setCarrierError] = useState('');
+  const [packageDims, setPackageDims] = useState({ height: '', width: '', length: '', weight: '' });
+  const [confirmCancelLabel, setConfirmCancelLabel] = useState(false);
+  const [cancelLabelReason, setCancelLabelReason] = useState('');
+  const [cancelLabelError, setCancelLabelError] = useState('');
+  const [cancelLabelSuccess, setCancelLabelSuccess] = useState('');
 
   const { data: order, isLoading: orderLoading } = useQuery<Order>({
     queryKey: ['order', params.id],
     queryFn: () => getOrder(token!, params.id),
     enabled: !!token,
   });
+
+  // Só faz sentido pedir dimensões pra pedidos com envio (ME) e sem etiqueta
+  // ativa — depois de gerada, a etiqueta já está com o ME e mudar aqui não
+  // afeta o que já foi comprado.
+  const { data: packageData } = useQuery({
+    queryKey: ['shipping-package', params.id],
+    queryFn: () => getPackageDimensions(params.id, token!),
+    enabled: !!token && !!order && order.deliveryMethod !== 'PICKUP' && !order.shipment?.labelUrl,
+  });
+
+  useEffect(() => {
+    if (packageData) {
+      setPackageDims({
+        height: String(packageData.height),
+        width: String(packageData.width),
+        length: String(packageData.length),
+        weight: String(packageData.weight),
+      });
+    }
+  }, [packageData]);
 
   const {
     data: invoicesData,
@@ -192,9 +217,38 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
   }
 
   const labelMutation = useMutation({
-    mutationFn: () => purchaseLabel(params.id, token!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['order', params.id] }),
+    mutationFn: () => {
+      const toDim = (v: string) => {
+        const n = Number(v);
+        return v.trim() !== '' && Number.isFinite(n) && n > 0 ? n : undefined;
+      };
+      return purchaseLabel(params.id, token!, {
+        height: toDim(packageDims.height),
+        width: toDim(packageDims.width),
+        length: toDim(packageDims.length),
+        weight: toDim(packageDims.weight),
+      });
+    },
+    onSuccess: () => {
+      setCancelLabelSuccess('');
+      qc.invalidateQueries({ queryKey: ['order', params.id] });
+    },
     onError: (e: Error) => setLabelError(e.message),
+  });
+
+  const cancelLabelMutation = useMutation({
+    mutationFn: () => cancelLabel(params.id, token!, cancelLabelReason.trim() || undefined),
+    onSuccess: () => {
+      setCancelLabelError('');
+      setConfirmCancelLabel(false);
+      setCancelLabelReason('');
+      setCancelLabelSuccess(
+        'Etiqueta cancelada. O reembolso deve cair na carteira do Melhor Envio em até 12h.',
+      );
+      qc.invalidateQueries({ queryKey: ['order', params.id] });
+      qc.invalidateQueries({ queryKey: ['shipping-package', params.id] });
+    },
+    onError: (e: Error) => setCancelLabelError(e.message),
   });
 
   // Dispara o mesmo caminho real de produção (PickupLabelService + push pro
@@ -559,50 +613,113 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
             <Tag className="h-4 w-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm">Etiqueta de Envio</h2>
           </div>
-          <div className="p-4">
+          <div className="p-4 space-y-3">
+            {cancelLabelSuccess && (
+              <p className="text-xs text-green-600 dark:text-green-400">{cancelLabelSuccess}</p>
+            )}
             {!shipment || !shipment.labelUrl ? (
-              <div className="flex items-center gap-3 flex-wrap">
-                <p className="text-sm text-muted-foreground">Sem etiqueta gerada.</p>
-                {shipment?.serviceId ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        setLabelError('');
-                        labelMutation.mutate();
-                      }}
-                      disabled={labelMutation.isPending}
-                      className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                    >
-                      {labelMutation.isPending ? 'Gerando...' : 'Gerar Etiqueta'}
-                    </button>
-                    {shipment.status === 'PENDING' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="text-sm text-muted-foreground">Sem etiqueta gerada.</p>
+                  {shipment?.serviceId ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setLabelError('');
+                          labelMutation.mutate();
+                        }}
+                        disabled={labelMutation.isPending}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                      >
+                        {labelMutation.isPending ? 'Gerando...' : 'Gerar Etiqueta'}
+                      </button>
+                      {shipment.status === 'PENDING' && (
+                        <button
+                          onClick={openCarrierModal}
+                          className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+                        >
+                          <Truck className="h-3 w-3" /> Trocar
+                        </button>
+                      )}
+                      {labelError && <span className="text-xs text-red-500">{labelError}</span>}
+                    </>
+                  ) : shipment?.service === 'FREE' || order.shipping === 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      Frete grátis — sem etiqueta necessária.
+                    </span>
+                  ) : shipment ? (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-xs text-amber-600 dark:text-amber-400">
+                        Pedido sem integração ME — gere a etiqueta manualmente no site da
+                        transportadora.
+                      </span>
                       <button
                         onClick={openCarrierModal}
                         className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
                       >
-                        <Truck className="h-3 w-3" /> Trocar
+                        <Truck className="h-3 w-3" /> Trocar Transportadora
                       </button>
-                    )}
-                    {labelError && <span className="text-xs text-red-500">{labelError}</span>}
-                  </>
-                ) : shipment?.service === 'FREE' || order.shipping === 0 ? (
-                  <span className="text-xs text-muted-foreground">
-                    Frete grátis — sem etiqueta necessária.
-                  </span>
-                ) : shipment ? (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-xs text-amber-600 dark:text-amber-400">
-                      Pedido sem integração ME — gere a etiqueta manualmente no site da
-                      transportadora.
-                    </span>
-                    <button
-                      onClick={openCarrierModal}
-                      className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
-                    >
-                      <Truck className="h-3 w-3" /> Trocar Transportadora
-                    </button>
+                    </div>
+                  ) : null}
+                </div>
+                {shipment?.serviceId && (
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="mb-2 text-xs font-medium">Dimensões do Pacote</p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Altura (cm)
+                        <input
+                          type="number"
+                          min="1"
+                          value={packageDims.height}
+                          onChange={(e) =>
+                            setPackageDims((d) => ({ ...d, height: e.target.value }))
+                          }
+                          className="h-8 w-20 rounded-lg border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Largura (cm)
+                        <input
+                          type="number"
+                          min="1"
+                          value={packageDims.width}
+                          onChange={(e) => setPackageDims((d) => ({ ...d, width: e.target.value }))}
+                          className="h-8 w-20 rounded-lg border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Comprimento (cm)
+                        <input
+                          type="number"
+                          min="1"
+                          value={packageDims.length}
+                          onChange={(e) =>
+                            setPackageDims((d) => ({ ...d, length: e.target.value }))
+                          }
+                          className="h-8 w-20 rounded-lg border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Peso (kg)
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={packageDims.weight}
+                          onChange={(e) =>
+                            setPackageDims((d) => ({ ...d, weight: e.target.value }))
+                          }
+                          className="h-8 w-20 rounded-lg border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </label>
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Calculado automaticamente pela quantidade de itens — ajuste se a caixa real
+                      for diferente.
+                    </p>
                   </div>
-                ) : null}
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -638,6 +755,52 @@ export default function ConferenciaPage({ params }: { params: { id: string } }) 
                 )}
                 {shippingPrintError && (
                   <p className="text-xs text-destructive">{shippingPrintError}</p>
+                )}
+                {shipment.status === 'LABEL_PURCHASED' && (
+                  <div className="mt-2 border-t pt-3">
+                    {cancelLabelError && (
+                      <p className="mb-2 text-xs text-destructive">{cancelLabelError}</p>
+                    )}
+                    {confirmCancelLabel ? (
+                      <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5">
+                        <span className="text-sm font-medium text-destructive">
+                          Cancelar esta etiqueta? O valor é reembolsado pelo Melhor Envio em até
+                          12h.
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="Motivo (opcional)"
+                          value={cancelLabelReason}
+                          onChange={(e) => setCancelLabelReason(e.target.value)}
+                          className="h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => cancelLabelMutation.mutate()}
+                            disabled={cancelLabelMutation.isPending}
+                            className="rounded-lg bg-destructive px-3 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                          >
+                            {cancelLabelMutation.isPending
+                              ? 'Cancelando...'
+                              : 'Confirmar Cancelamento'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmCancelLabel(false)}
+                            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
+                          >
+                            Voltar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmCancelLabel(true)}
+                        className="rounded-lg border border-destructive/50 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        Cancelar Etiqueta
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}

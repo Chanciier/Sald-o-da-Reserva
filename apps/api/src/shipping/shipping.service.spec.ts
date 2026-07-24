@@ -138,4 +138,169 @@ describe('ShippingService.purchaseLabel — contrato de payload (Melhor Envio)',
     const body = firstCartCallBody();
     expect(body.to.document).toBeUndefined();
   });
+
+  it('falls back to the auto-calculated package when no dimension override is given', async () => {
+    prisma.shipment.findUnique.mockResolvedValue(baseShipment());
+
+    await service.purchaseLabel('order-1');
+
+    const body = firstCartCallBody();
+    // Item único sem product (null) -> peso padrão 0.3kg/un, caixa padrão 10x15x20.
+    expect(body.volumes).toEqual([{ height: 10, width: 15, length: 20, weight: 0.3 }]);
+  });
+
+  it('uses explicit dimension overrides in volumes instead of the auto-calculated package', async () => {
+    prisma.shipment.findUnique.mockResolvedValue(baseShipment());
+
+    await service.purchaseLabel('order-1', { height: 30, width: 25, length: 40, weight: 2.5 });
+
+    const body = firstCartCallBody();
+    expect(body.volumes).toEqual([{ height: 30, width: 25, length: 40, weight: 2.5 }]);
+  });
+
+  it('ignores invalid overrides (zero/negative/NaN) and falls back to the computed default', async () => {
+    prisma.shipment.findUnique.mockResolvedValue(baseShipment());
+
+    await service.purchaseLabel('order-1', { height: 0, width: -5, length: NaN, weight: -1 });
+
+    const body = firstCartCallBody();
+    expect(body.volumes).toEqual([{ height: 10, width: 15, length: 20, weight: 0.3 }]);
+  });
+
+  it('allows regenerating a label when the shipment was previously CANCELLED', async () => {
+    prisma.shipment.findUnique.mockResolvedValue({ ...baseShipment(), status: 'CANCELLED' });
+
+    await expect(service.purchaseLabel('order-1')).resolves.toEqual({
+      meOrderId: 'me-order-1',
+      labelUrl: 'https://label.example/x.pdf',
+    });
+  });
+
+  it('still blocks regenerating a label that is already LABEL_PURCHASED', async () => {
+    prisma.shipment.findUnique.mockResolvedValue({ ...baseShipment(), status: 'LABEL_PURCHASED' });
+
+    await expect(service.purchaseLabel('order-1')).rejects.toThrow('Etiqueta já processada');
+  });
+});
+
+/**
+ * Testes de ShippingService.cancelLabel — cancelamento de etiqueta já
+ * comprada, com reembolso solicitado ao Melhor Envio. Nenhuma chamada real à
+ * API acontece aqui; `global.fetch` é mockado.
+ */
+describe('ShippingService.cancelLabel', () => {
+  let service: ShippingService;
+  let prisma: {
+    shipment: { findUnique: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let fetchMock: jest.Mock;
+  let txShipmentUpdate: jest.Mock;
+
+  function baseCancelableShipment(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'shipment-1',
+      orderId: 'order-1',
+      meOrderId: 'me-order-1',
+      status: 'LABEL_PURCHASED',
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    const env: Record<string, string> = {
+      MELHOR_ENVIO_TOKEN: 'fake-token',
+      MELHOR_ENVIO_SANDBOX: 'true',
+    };
+    const config = {
+      get: (key: string, def?: string) => env[key] ?? def,
+    } as unknown as ConfigService;
+
+    txShipmentUpdate = jest.fn().mockResolvedValue({});
+
+    prisma = {
+      shipment: { findUnique: jest.fn() },
+      $transaction: jest.fn(async (cb) =>
+        cb({
+          shipment: { update: txShipmentUpdate },
+          shipmentEvent: { create: jest.fn().mockResolvedValue({}) },
+          auditLog: { create: jest.fn().mockResolvedValue({}) },
+        }),
+      ),
+    };
+
+    fetchMock = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/me/shipment/cancel')) return Promise.resolve(jsonResponse({ ok: true }));
+      return Promise.resolve(jsonResponse({}, false));
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    service = new ShippingService(
+      prisma as unknown as PrismaService,
+      config,
+      {} as unknown as MailService,
+      {} as unknown as OrderWhatsappService,
+    );
+  });
+
+  function cancelCallBody() {
+    const call = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('/me/shipment/cancel'),
+    );
+    return JSON.parse((call![1] as { body: string }).body);
+  }
+
+  it('sends reason_id=2 and the meOrderId to the ME cancel endpoint, then resets the shipment', async () => {
+    prisma.shipment.findUnique.mockResolvedValue(baseCancelableShipment());
+
+    const result = await service.cancelLabel('order-1', 'Dimensões erradas');
+
+    expect(result).toEqual({ cancelled: true });
+    expect(cancelCallBody()).toEqual({
+      order: { id: 'me-order-1', reason_id: 2, description: 'Dimensões erradas' },
+    });
+    expect(txShipmentUpdate).toHaveBeenCalledWith({
+      where: { id: 'shipment-1' },
+      data: { status: 'CANCELLED', labelUrl: null, trackingCode: null },
+    });
+  });
+
+  it('uses a default description when no reason is given', async () => {
+    prisma.shipment.findUnique.mockResolvedValue(baseCancelableShipment());
+
+    await service.cancelLabel('order-1');
+
+    expect(cancelCallBody().order.description).toBe(
+      'Cancelado pelo lojista via painel administrativo.',
+    );
+  });
+
+  it('rejects when the shipment has no meOrderId yet', async () => {
+    prisma.shipment.findUnique.mockResolvedValue(
+      baseCancelableShipment({ meOrderId: null, status: 'PENDING' }),
+    );
+
+    await expect(service.cancelLabel('order-1')).rejects.toThrow(
+      'Nenhuma etiqueta gerada para este pedido.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the shipment is not LABEL_PURCHASED (e.g. already SHIPPED)', async () => {
+    prisma.shipment.findUnique.mockResolvedValue(baseCancelableShipment({ status: 'SHIPPED' }));
+
+    await expect(service.cancelLabel('order-1')).rejects.toThrow(
+      'Não é possível cancelar etiqueta com status atual: SHIPPED.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the ME error body when cancellation is refused', async () => {
+    prisma.shipment.findUnique.mockResolvedValue(baseCancelableShipment());
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(jsonResponse({ message: 'já postado' }, false)),
+    );
+
+    await expect(service.cancelLabel('order-1')).rejects.toThrow('Erro ao cancelar etiqueta');
+  });
 });

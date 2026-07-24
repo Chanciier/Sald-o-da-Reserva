@@ -1,6 +1,13 @@
 import type { ShippingOption } from '@/types/cart';
 import type { Shipment } from '@/types/order';
 
+export interface PackageDimensions {
+  height: number;
+  width: number;
+  length: number;
+  weight: number;
+}
+
 const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
 async function apiFetch<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
@@ -26,7 +33,21 @@ export const getShipment = (orderId: string, token: string) =>
 export const getTracking = (orderId: string, token: string) =>
   apiFetch<Shipment>(`/shipping/${orderId}/tracking`, token);
 
-export const purchaseLabel = (orderId: string, token: string) =>
+export const purchaseLabel = (
+  orderId: string,
+  token: string,
+  dimensions?: Partial<PackageDimensions>,
+) =>
   apiFetch<{ meOrderId: string; labelUrl: string | null }>(`/shipping/label/${orderId}`, token, {
     method: 'POST',
+    body: JSON.stringify(dimensions ?? {}),
+  });
+
+export const getPackageDimensions = (orderId: string, token: string) =>
+  apiFetch<PackageDimensions>(`/shipping/${orderId}/package`, token);
+
+export const cancelLabel = (orderId: string, token: string, reason?: string) =>
+  apiFetch<{ cancelled: boolean }>(`/shipping/${orderId}/cancel-label`, token, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
   });
