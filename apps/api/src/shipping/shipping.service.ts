@@ -406,7 +406,7 @@ export class ShippingService {
           // Prefere o snapshot do pedido (imutável); cai para o dado atual da
           // conta em pedidos anteriores a essas colunas.
           email: order.recipientEmail || order.user.email,
-          phone: '',
+          phone: (order.customerPhone ?? '').replace(/\D/g, ''),
           ...((order.recipientDocument ?? order.user.cpf)
             ? { document: (order.recipientDocument ?? order.user.cpf)!.replace(/\D/g, '') }
             : {}),
@@ -632,7 +632,7 @@ export class ShippingService {
         from: {
           name: addr.name,
           email: order.recipientEmail || order.user.email,
-          phone: '',
+          phone: (order.customerPhone ?? '').replace(/\D/g, ''),
           ...((order.recipientDocument ?? order.user.cpf)
             ? { document: (order.recipientDocument ?? order.user.cpf)!.replace(/\D/g, '') }
             : {}),
