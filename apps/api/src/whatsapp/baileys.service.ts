@@ -12,6 +12,8 @@ import { RedisService } from '../redis/redis.service';
 
 const CREDS_KEY = 'wa:creds';
 const KEY_PREFIX = 'wa:k:';
+const RECONNECT_BASE_DELAY_MS = 5_000;
+const RECONNECT_MAX_DELAY_MS = 300_000; // 5min — evita martelar o servidor do WhatsApp em loop apertado
 
 export interface WaGroupMetadataLite {
   id: string;
@@ -72,6 +74,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
   private connected = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private connectTimeoutTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
   // Handlers externos de eventos de participantes — re-registrados a cada
   // reconexão, já que o socket é recriado do zero em connect().
   private readonly groupParticipantsHandlers: GroupParticipantsUpdateHandler[] = [];
@@ -175,6 +178,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
           clearTimeout(this.connectTimeoutTimer);
           this.connectTimeoutTimer = null;
         }
+        this.reconnectAttempts = 0;
         this.qrBase64 = await QRCode.toDataURL(qr).catch(() => null);
         this.logger.log('QR code gerado');
       }
@@ -184,6 +188,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
           clearTimeout(this.connectTimeoutTimer);
           this.connectTimeoutTimer = null;
         }
+        this.reconnectAttempts = 0;
         this.connected = true;
         this.qrBase64 = null;
         this.logger.log('WhatsApp conectado');
@@ -198,8 +203,18 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
           this.logger.warn('WhatsApp deslogado — credenciais limpas, escaneie o QR');
           await this.clearSession();
         } else {
-          this.logger.warn(`Desconectado (${code}) — reconectando em 5s`);
-          this.reconnectTimer = setTimeout(() => void this.connect(), 5000);
+          // Backoff exponencial: o WhatsApp já rejeitou conexão em loop apertado
+          // (código 405) quando o cliente ficava tentando de 5 em 5s sem parar —
+          // martelar o servidor deles só prolonga o bloqueio.
+          const delay = Math.min(
+            RECONNECT_BASE_DELAY_MS * 2 ** this.reconnectAttempts,
+            RECONNECT_MAX_DELAY_MS,
+          );
+          this.reconnectAttempts += 1;
+          this.logger.warn(
+            `Desconectado (${code}) — reconectando em ${Math.round(delay / 1000)}s (tentativa ${this.reconnectAttempts})`,
+          );
+          this.reconnectTimer = setTimeout(() => void this.connect(), delay);
         }
       }
     });
@@ -231,6 +246,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
       clearTimeout(this.connectTimeoutTimer);
       this.connectTimeoutTimer = null;
     }
+    this.reconnectAttempts = 0;
     await this.connect();
   }
 
