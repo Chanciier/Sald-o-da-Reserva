@@ -72,6 +72,7 @@ export default async function ProductPage({ params }: PageProps) {
 
   const tambemGosta = shuffleWithSeed(broadList, parseInt(product.id, 16) || 0).slice(0, 8);
 
+  const isAccessProduct = product.type === 'WHATSAPP_ACCESS';
   const price = effectivePrice(product);
   const discounted = hasDiscount(product);
   const discount = discountPercent(product);
@@ -165,7 +166,9 @@ export default async function ProductPage({ params }: PageProps) {
                 className={lowStock ? 'size-4 text-accent' : 'size-4 text-foreground'}
                 aria-hidden="true"
               />
-              {product.stock === 1 ? (
+              {isAccessProduct ? (
+                <span>{product.stock} vagas disponíveis</span>
+              ) : product.stock === 1 ? (
                 <span className="text-accent">Última unidade disponível!</span>
               ) : lowStock ? (
                 <span className="text-accent">Apenas {product.stock} unidades restantes</span>
@@ -194,11 +197,25 @@ export default async function ProductPage({ params }: PageProps) {
               <ShieldCheck className="size-4 text-foreground" aria-hidden="true" />
               Compra segura / NF-e
             </span>
-            <span className="inline-flex items-center gap-2 text-muted-foreground">
-              <Truck className="size-4 text-foreground" aria-hidden="true" />
-              Entrega para todo o Brasil
-            </span>
+            {isAccessProduct ? (
+              <span className="inline-flex items-center gap-2 text-muted-foreground">
+                <Zap className="size-4 text-foreground" aria-hidden="true" />
+                Link enviado por WhatsApp após o pagamento
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2 text-muted-foreground">
+                <Truck className="size-4 text-foreground" aria-hidden="true" />
+                Entrega para todo o Brasil
+              </span>
+            )}
           </div>
+          {isAccessProduct && (
+            <p className="text-xs text-muted-foreground">
+              {product.accessValidityDays
+                ? `Acesso válido por ${product.accessValidityDays} dias a partir da compra.`
+                : 'Acesso vitalício, sem expiração.'}
+            </p>
+          )}
         </div>
       </div>
 

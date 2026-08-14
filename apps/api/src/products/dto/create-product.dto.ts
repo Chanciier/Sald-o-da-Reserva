@@ -14,7 +14,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { Marketplace, ProductStatus } from '@prisma/client';
+import { Marketplace, ProductStatus, ProductType } from '@prisma/client';
 
 export class DimensionsDto {
   @IsNumber() width: number;
@@ -105,6 +105,23 @@ export class CreateProductDto {
   @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus;
+
+  @IsOptional()
+  @IsEnum(ProductType)
+  type?: ProductType;
+
+  // Só para type = WHATSAPP_ACCESS: JID do grupo (xxxx@g.us) vinculado.
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  accessGroupJid?: string;
+
+  // Validade em dias após a compra. Ausente/null = acesso vitalício.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  accessValidityDays?: number;
 
   @IsOptional()
   @IsString()

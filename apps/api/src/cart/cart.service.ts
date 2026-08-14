@@ -44,7 +44,7 @@ export class CartService {
   private async enrich(userId: string, cart: CartData): Promise<CartResponse> {
     const products = await this.prisma.product.findMany({
       where: { id: { in: cart.items.map((item) => item.productId) } },
-      select: { id: true, status: true, stock: true, price: true, salePrice: true },
+      select: { id: true, status: true, stock: true, price: true, salePrice: true, type: true },
     });
     const productById = new Map(products.map((product) => [product.id, product]));
     const items = cart.items.map((item) => {
@@ -55,6 +55,7 @@ export class CartService {
         stock: product?.stock ?? 0,
         price: product?.price.toNumber() ?? item.price,
         salePrice: product?.salePrice?.toNumber() ?? null,
+        type: product?.type ?? 'PHYSICAL',
         available,
       };
     });
@@ -134,6 +135,22 @@ export class CartService {
 
     const cart = await this.getRaw(userId);
     const existing = cart.items.find((i) => i.productId === productId);
+
+    // Produtos de acesso digital (WHATSAPP_ACCESS) não têm frete/endereço —
+    // misturar com produtos físicos no mesmo pedido quebraria o checkout.
+    if (!existing && cart.items.length > 0) {
+      const others = await this.prisma.product.findMany({
+        where: { id: { in: cart.items.map((i) => i.productId) } },
+        select: { type: true },
+      });
+      if (others.some((o) => o.type !== product.type)) {
+        throw new BadRequestException(
+          product.type === 'WHATSAPP_ACCESS'
+            ? 'Produtos de acesso digital não podem ser combinados com produtos físicos no carrinho. Finalize a compra atual antes de adicionar este item.'
+            : 'Seu carrinho tem um produto de acesso digital. Finalize essa compra antes de adicionar produtos físicos.',
+        );
+      }
+    }
 
     if (existing) {
       const newQty = existing.quantity + quantity;

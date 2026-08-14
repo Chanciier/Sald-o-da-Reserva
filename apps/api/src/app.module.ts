@@ -49,6 +49,7 @@ import { envValidation } from './config/env.validation';
 import { RecipientProfilesModule } from './recipient-profiles/recipient-profiles.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { PrintCenterModule } from './print-center/print-center.module';
+import { WhatsappAccessModule } from './whatsapp-access/whatsapp-access.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { PrintCenterModule } from './print-center/print-center.module';
     FeatureFlagsModule,
     RecipientProfilesModule,
     PrintCenterModule,
+    WhatsappAccessModule,
   ],
   controllers: [AppController],
   providers: [

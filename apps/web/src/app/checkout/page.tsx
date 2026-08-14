@@ -155,6 +155,9 @@ export default function CheckoutPage() {
   const [newAddressLabel, setNewAddressLabel] = useState('');
 
   const isPickup = deliveryMethod === 'PICKUP';
+  // Carrinho 100% de produtos de acesso (WHATSAPP_ACCESS): sem frete/endereço,
+  // o backend grava deliveryMethod=DIGITAL independente do que mandarmos aqui.
+  const isDigitalOnly = !!cart?.items.length && cart.items.every((i) => i.type === 'WHATSAPP_ACCESS');
 
   useEffect(() => {
     if (checkoutStartTracked.current || !cart?.items?.length) return;
@@ -301,10 +304,11 @@ export default function CheckoutPage() {
     }
   }
 
-  const shippingCost = isPickup ? 0 : (selectedShipping?.price ?? 0);
+  const shippingCost = isPickup || isDigitalOnly ? 0 : (selectedShipping?.price ?? 0);
   const total = (cart?.total ?? 0) + shippingCost;
 
-  const canSubmit = (isPickup ? true : !!selectedShipping) && termsAccepted && returnsAccepted;
+  const canSubmit =
+    (isPickup || isDigitalOnly ? true : !!selectedShipping) && termsAccepted && returnsAccepted;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -330,12 +334,12 @@ export default function CheckoutPage() {
       }
 
       const order = await createOrder(token, {
-        deliveryMethod,
+        deliveryMethod: isDigitalOnly ? 'DIGITAL' : deliveryMethod,
         cpf: selectedProfileId ? undefined : cleanCpf,
         customerPhone: cleanPhone,
         buyerName: selectedProfileId ? undefined : buyerName.trim() || undefined,
         recipientProfileId: selectedProfileId ?? undefined,
-        ...(isPickup
+        ...(isPickup || isDigitalOnly
           ? {}
           : {
               savedAddressId: selectedAddressId ?? undefined,
@@ -375,7 +379,7 @@ export default function CheckoutPage() {
             });
             profileIdForAddress = created.id;
           }
-          if (!isPickup && saveAddress && !selectedAddressId && profileIdForAddress) {
+          if (!isPickup && !isDigitalOnly && saveAddress && !selectedAddressId && profileIdForAddress) {
             await addSavedAddress(token, profileIdForAddress, {
               label: newAddressLabel.trim() || 'Endereço',
               postalCode: address.cep.replace(/\D/g, ''),
@@ -444,54 +448,64 @@ export default function CheckoutPage() {
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            {/* Delivery method selector */}
-            <section className="rounded-xl border border-border p-5 space-y-3">
-              <h2 className="font-semibold">Forma de recebimento</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                  <input
-                    type="radio"
-                    name="deliveryMethod"
-                    value="SHIPPING"
-                    checked={deliveryMethod === 'SHIPPING'}
-                    onChange={() => setDeliveryMethod('SHIPPING')}
-                    className="accent-primary"
-                  />
-                  <div>
-                    <p className="text-sm font-medium">Entrega</p>
-                    <p className="text-xs text-muted-foreground">Receber em casa</p>
-                  </div>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                  <input
-                    type="radio"
-                    name="deliveryMethod"
-                    value="PICKUP"
-                    checked={deliveryMethod === 'PICKUP'}
-                    onChange={() => setDeliveryMethod('PICKUP')}
-                    className="accent-primary"
-                  />
-                  <div>
-                    <p className="text-sm font-medium">Retirada na Loja</p>
-                    <p className="text-xs text-muted-foreground">Frete grátis</p>
-                  </div>
-                </label>
-              </div>
-
-              {isPickup && (
-                <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1.5">
-                  <p className="text-sm font-medium text-foreground">Local de retirada</p>
-                  <p className="text-sm font-semibold">{STORE.mall}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {STORE.address} — {STORE.neighborhood}, {STORE.city}/{STORE.state}
-                  </p>
-                  <p className="text-xs text-muted-foreground">CEP {STORE.cep}</p>
-                  <p className="text-xs text-muted-foreground pt-1">
-                    Você receberá uma notificação quando seu pedido estiver pronto para retirada.
-                  </p>
+            {/* Delivery method selector — não se aplica a carrinho 100% digital */}
+            {isDigitalOnly ? (
+              <section className="rounded-xl border border-border p-5 space-y-1.5">
+                <h2 className="font-semibold">Acesso digital</h2>
+                <p className="text-sm text-muted-foreground">
+                  Você receberá o link de acesso por WhatsApp assim que o pagamento for
+                  confirmado. Sem frete ou endereço de entrega.
+                </p>
+              </section>
+            ) : (
+              <section className="rounded-xl border border-border p-5 space-y-3">
+                <h2 className="font-semibold">Forma de recebimento</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      value="SHIPPING"
+                      checked={deliveryMethod === 'SHIPPING'}
+                      onChange={() => setDeliveryMethod('SHIPPING')}
+                      className="accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">Entrega</p>
+                      <p className="text-xs text-muted-foreground">Receber em casa</p>
+                    </div>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      value="PICKUP"
+                      checked={deliveryMethod === 'PICKUP'}
+                      onChange={() => setDeliveryMethod('PICKUP')}
+                      className="accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">Retirada na Loja</p>
+                      <p className="text-xs text-muted-foreground">Frete grátis</p>
+                    </div>
+                  </label>
                 </div>
-              )}
-            </section>
+
+                {isPickup && (
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1.5">
+                    <p className="text-sm font-medium text-foreground">Local de retirada</p>
+                    <p className="text-sm font-semibold">{STORE.mall}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {STORE.address} — {STORE.neighborhood}, {STORE.city}/{STORE.state}
+                    </p>
+                    <p className="text-xs text-muted-foreground">CEP {STORE.cep}</p>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Você receberá uma notificação quando seu pedido estiver pronto para retirada.
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* Perfis de destinatário salvos — só aparece com a flag ligada e
                 pelo menos um perfil já salvo; caso contrário o formulário
@@ -616,8 +630,8 @@ export default function CheckoutPage() {
               )}
             </section>
 
-            {/* Shipping address — hidden for PICKUP */}
-            {!isPickup && (
+            {/* Shipping address — hidden for PICKUP e carrinho digital */}
+            {!isPickup && !isDigitalOnly && (
               <section className="rounded-xl border border-border p-5 space-y-4">
                 <h2 className="font-semibold">Onde será entregue?</h2>
 
@@ -848,8 +862,8 @@ export default function CheckoutPage() {
               </section>
             )}
 
-            {/* Shipping options — hidden for PICKUP */}
-            {!isPickup && (
+            {/* Shipping options — hidden for PICKUP e carrinho digital */}
+            {!isPickup && !isDigitalOnly && (
               <section className="rounded-xl border border-border p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="font-semibold">Frete</h2>
@@ -965,7 +979,9 @@ export default function CheckoutPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Frete</span>
                   <span>
-                    {isPickup ? (
+                    {isDigitalOnly ? (
+                      '—'
+                    ) : isPickup ? (
                       <span className="text-green-600 dark:text-green-400 font-medium">Grátis</span>
                     ) : selectedShipping ? (
                       selectedShipping.price === 0 ? (

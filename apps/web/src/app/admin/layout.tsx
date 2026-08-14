@@ -171,6 +171,7 @@ const NAV: NavItem[] = [
       { href: '/admin/marketing', label: 'Dashboard' },
       { href: '/admin/whatsapp', label: 'Grupos WhatsApp' },
       { href: '/admin/comunidade', label: 'Hub de Grupos' },
+      { href: '/admin/whatsapp/acessos', label: 'Acessos Vendidos' },
       { href: '/admin/campanhas', label: 'Campanhas de E-mail' },
       { href: '/admin/marketing/meta-catalog', label: 'Meta Catalog' },
     ],

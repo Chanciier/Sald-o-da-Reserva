@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BaileysService } from './baileys.service';
 import { RedisService } from '../redis/redis.service';
+import { phoneToWhatsappJid } from './phone';
 
 export interface OrderNotifyTarget {
   phone?: string | null;
@@ -35,14 +36,8 @@ export class OrderWhatsappService {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  /** Normaliza telefone BR (apenas dígitos) para o JID do WhatsApp. */
   private toJid(phone?: string | null): string | null {
-    if (!phone) return null;
-    let d = phone.replace(/\D/g, '');
-    if (!d) return null;
-    if (d.length > 11 && d.startsWith('55')) d = d.slice(2);
-    if (d.length < 10 || d.length > 11) return null;
-    return `55${d}@s.whatsapp.net`;
+    return phoneToWhatsappJid(phone);
   }
 
   private greeting(name?: string | null): string {
@@ -120,6 +115,42 @@ export class OrderWhatsappService {
       `Acompanhe: ${this.orderUrl(t.orderId)}\n` +
       `${STORE_NAME}`;
     return this.send(t.phone, msg);
+  }
+
+  // ── Acesso a grupo WhatsApp (produto WHATSAPP_ACCESS) ───────────────────────
+
+  /**
+   * Envia o link de convite do grupo após a criação do WhatsappAccessGrant.
+   * Deduplicado por item de pedido (um produto de acesso pode gerar mais de um
+   * grant no mesmo pedido, com quantity > 1).
+   */
+  async notifyAccessGranted(
+    t: OrderNotifyTarget,
+    opts: { orderItemId: string; inviteLink: string; expiresAt: Date | null; productName?: string },
+    force = false,
+  ): Promise<boolean> {
+    if (!force) {
+      const first = await this.redis
+        .increment(`wa:access-granted:${opts.orderItemId}`, 7 * 24 * 60 * 60)
+        .catch(() => 1);
+      if (first !== 1) return false;
+    }
+
+    const lines = [
+      `${this.greeting(t.name)} 🎉`,
+      '',
+      `Seu pagamento do pedido *#${this.shortId(t.orderId)}* foi confirmado${opts.productName ? ` — *${opts.productName}*` : ''}!`,
+      '',
+      `Entre no grupo por aqui: ${opts.inviteLink}`,
+    ];
+    if (opts.expiresAt) {
+      lines.push(
+        '',
+        `Seu acesso é válido até *${opts.expiresAt.toLocaleDateString('pt-BR')}*. Depois dessa data você será removido do grupo automaticamente.`,
+      );
+    }
+    lines.push('', STORE_NAME);
+    return this.send(t.phone, lines.join('\n'));
   }
 
   // ── Envio (SHIPPING) ────────────────────────────────────────────────────────

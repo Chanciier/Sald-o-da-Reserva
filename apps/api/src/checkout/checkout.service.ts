@@ -66,33 +66,9 @@ export class CheckoutService {
   }
 
   async createOrder(userId: string, dto: CreateOrderDto) {
-    const isPickup = dto.deliveryMethod === DeliveryMethod.PICKUP;
-
-    if (!isPickup && !dto.shippingAddress && !dto.savedAddressId) {
-      throw new BadRequestException('Endereço de entrega obrigatório para envio.');
-    }
-
-    if (!isPickup && (!dto.meServiceId || dto.meServiceId <= 0)) {
-      throw new BadRequestException(
-        'Selecione uma transportadora com integração Melhor Envio para prosseguir.',
-      );
-    }
-
-    // Perfil selecionado → normaliza os dados e produz o snapshot que será
-    // gravado no pedido. Sem recipientProfileId/savedAddressId, o resultado é
-    // idêntico ao fluxo inline de sempre (buyerName/cpf/shippingAddress do DTO).
-    const identity = await this.identityNormalizer.resolveIdentity(userId, {
-      recipientProfileId: dto.recipientProfileId,
-      buyerName: dto.buyerName,
-      cpf: dto.cpf,
-    });
-    const resolvedAddress = isPickup
-      ? { savedAddressId: null, address: undefined }
-      : await this.identityNormalizer.resolveAddress(userId, identity.recipientProfileId, {
-          savedAddressId: dto.savedAddressId,
-          shippingAddress: dto.shippingAddress,
-        });
-
+    // Carrinho/produtos carregados primeiro: precisamos saber se e um pedido
+    // 100% digital (WHATSAPP_ACCESS) ANTES de exigir endereco/frete - nunca
+    // confiamos no `deliveryMethod` do DTO para essa decisao, so no banco.
     const cart = await this.cartService.getCart(userId);
     const availableItems = cart.items.filter((item) => item.available);
     if (!availableItems.length) {
@@ -117,16 +93,55 @@ export class CheckoutService {
       }
     }
 
+    const digitalCount = availableItems.filter(
+      (item) => productMap.get(item.productId)?.type === 'WHATSAPP_ACCESS',
+    ).length;
+    if (digitalCount > 0 && digitalCount < availableItems.length) {
+      throw new BadRequestException(
+        'Não é possível combinar produtos de acesso digital com produtos físicos no mesmo pedido. Finalize em compras separadas.',
+      );
+    }
+    const isDigitalOnly = digitalCount > 0;
+
+    const isPickup = !isDigitalOnly && dto.deliveryMethod === DeliveryMethod.PICKUP;
+
+    if (!isDigitalOnly && !isPickup && !dto.shippingAddress && !dto.savedAddressId) {
+      throw new BadRequestException('Endereço de entrega obrigatório para envio.');
+    }
+
+    if (!isDigitalOnly && !isPickup && (!dto.meServiceId || dto.meServiceId <= 0)) {
+      throw new BadRequestException(
+        'Selecione uma transportadora com integração Melhor Envio para prosseguir.',
+      );
+    }
+
+    // Perfil selecionado → normaliza os dados e produz o snapshot que será
+    // gravado no pedido. Sem recipientProfileId/savedAddressId, o resultado é
+    // idêntico ao fluxo inline de sempre (buyerName/cpf/shippingAddress do DTO).
+    const identity = await this.identityNormalizer.resolveIdentity(userId, {
+      recipientProfileId: dto.recipientProfileId,
+      buyerName: dto.buyerName,
+      cpf: dto.cpf,
+    });
+    const resolvedAddress =
+      isPickup || isDigitalOnly
+        ? { savedAddressId: null, address: undefined }
+        : await this.identityNormalizer.resolveAddress(userId, identity.recipientProfileId, {
+            savedAddressId: dto.savedAddressId,
+            shippingAddress: dto.shippingAddress,
+          });
+
     // Frete: o preço NUNCA é confiado a partir do DTO. Para envio, recotamos no
     // servidor e usamos o preço do serviço escolhido (anti-manipulação). PICKUP
-    // é sempre 0.
-    const shippingCost = isPickup
-      ? 0
-      : await this.shippingService.resolveQuotedPrice(
-          resolvedAddress.address!.cep,
-          dto.meServiceId!,
-          dto.shippingPrice ?? 0,
-        );
+    // e pedidos digitais são sempre 0.
+    const shippingCost =
+      isPickup || isDigitalOnly
+        ? 0
+        : await this.shippingService.resolveQuotedPrice(
+            resolvedAddress.address!.cep,
+            dto.meServiceId!,
+            dto.shippingPrice ?? 0,
+          );
 
     // Coupon
     const couponCode = dto.couponCode?.toUpperCase() ?? cart.couponCode ?? null;
@@ -172,21 +187,24 @@ export class CheckoutService {
         data: {
           userId,
           couponId,
-          deliveryMethod: dto.deliveryMethod ?? DeliveryMethod.SHIPPING,
+          deliveryMethod: isDigitalOnly
+            ? DeliveryMethod.DIGITAL
+            : (dto.deliveryMethod ?? DeliveryMethod.SHIPPING),
           pickupCode,
           subtotal: cart.subtotal,
           discount: round2(discount),
           shipping: shippingCost,
           total,
-          shippingAddress: isPickup
-            ? Prisma.JsonNull
-            : (resolvedAddress.address as unknown as Prisma.InputJsonValue),
-          shippingMethod: isPickup ? 'PICKUP' : (dto.shippingMethod ?? 'N/A'),
+          shippingAddress:
+            isPickup || isDigitalOnly
+              ? Prisma.JsonNull
+              : (resolvedAddress.address as unknown as Prisma.InputJsonValue),
+          shippingMethod: isDigitalOnly ? 'DIGITAL' : isPickup ? 'PICKUP' : (dto.shippingMethod ?? 'N/A'),
           notes: dto.notes,
           buyerName: identity.buyerName,
           customerPhone: dto.customerPhone ?? null,
           recipientProfileId: identity.recipientProfileId,
-          savedAddressId: isPickup ? null : resolvedAddress.savedAddressId,
+          savedAddressId: isPickup || isDigitalOnly ? null : resolvedAddress.savedAddressId,
           recipientDocument: identity.recipientDocument,
           recipientDocumentType: identity.recipientDocumentType,
           recipientEmail: identity.recipientEmail,
@@ -234,8 +252,8 @@ export class CheckoutService {
         }
       }
 
-      // Create shipment record (PICKUP orders have no shipment)
-      if (!isPickup) {
+      // Create shipment record (PICKUP e pedidos digitais não têm remessa)
+      if (!isPickup && !isDigitalOnly) {
         await tx.shipment.create({
           data: {
             orderId: newOrder.id,
@@ -521,6 +539,9 @@ export class CheckoutService {
           orderBy: { createdAt: 'asc' },
           take: 1,
           select: { createdAt: true },
+        },
+        accessGrants: {
+          select: { id: true, inviteLink: true, status: true, expiresAt: true, productId: true },
         },
       },
     });

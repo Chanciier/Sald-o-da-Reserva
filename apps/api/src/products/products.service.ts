@@ -1,10 +1,19 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Marketplace, Prisma, Product, ProductStatus, Role, SyncAction } from '@prisma/client';
+import {
+  Marketplace,
+  Prisma,
+  Product,
+  ProductStatus,
+  ProductType,
+  Role,
+  SyncAction,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { StorageService } from '../storage/storage.service';
@@ -44,6 +53,9 @@ const PUBLIC_OMIT_KEYS = [
   'autoPublishWhatsapp',
   'createdById',
   'createdBy',
+  // JID do grupo de WhatsApp — só usado internamente pelo WhatsappAccessService
+  // após o pagamento; nunca deve ser exposto no catálogo público.
+  'accessGroupJid',
 ] as const;
 
 function toPublicProduct<T extends Record<string, unknown>>(product: T): Partial<T> {
@@ -113,7 +125,18 @@ export class ProductsService {
     );
   }
 
+  // WHATSAPP_ACCESS não tem frete/peso — exige o grupo vinculado, sem o qual o
+  // WhatsappAccessService não teria pra onde mandar o comprador na hora do pagamento.
+  private assertAccessProductValid(type: ProductType | undefined, accessGroupJid?: string): void {
+    if (type === ProductType.WHATSAPP_ACCESS && !accessGroupJid) {
+      throw new BadRequestException(
+        'Selecione o grupo de WhatsApp vinculado a este produto de acesso.',
+      );
+    }
+  }
+
   async create(dto: CreateProductDto, userId?: string) {
+    this.assertAccessProductValid(dto.type, dto.accessGroupJid);
     const slug = dto.slug ?? slugify(dto.name);
     const sku = dto.sku || this.generateSku(dto.name);
 
@@ -152,6 +175,10 @@ export class ProductsService {
         pickupAvailable: dto.pickupAvailable ?? false,
         featuredOffer: dto.featuredOffer ?? false,
         status: dto.status,
+        type: dto.type ?? ProductType.PHYSICAL,
+        accessGroupJid: dto.type === ProductType.WHATSAPP_ACCESS ? dto.accessGroupJid : null,
+        accessValidityDays:
+          dto.type === ProductType.WHATSAPP_ACCESS ? (dto.accessValidityDays ?? null) : null,
         isUnique: dto.isUnique ?? false,
         autoPublishWhatsapp: dto.autoPublishWhatsapp ?? false,
         whatsappGroupIds: dto.whatsappGroupIds ?? [],
@@ -324,6 +351,11 @@ export class ProductsService {
       const conflict = await this.prisma.product.findUnique({ where: { sku: dto.sku } });
       if (conflict) throw new ConflictException('SKU já em uso.');
     }
+
+    this.assertAccessProductValid(
+      dto.type ?? existing.type,
+      dto.accessGroupJid ?? existing.accessGroupJid ?? undefined,
+    );
 
     const { imageIds, dimensions, publishTo, unpublishFrom, ...rest } = dto;
     const slug = rest.name && !rest.slug ? slugify(rest.name) : (rest.slug ?? existing.slug);

@@ -9,6 +9,7 @@ export interface CartItem {
   quantity: number;
   stock: number;
   available: boolean;
+  type: 'PHYSICAL' | 'WHATSAPP_ACCESS';
 }
 
 export interface CouponSummary {

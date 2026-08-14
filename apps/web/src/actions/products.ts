@@ -45,6 +45,9 @@ export interface Product {
   pickupAvailable: boolean;
   featuredOffer: boolean;
   status: string;
+  type: 'PHYSICAL' | 'WHATSAPP_ACCESS';
+  accessGroupJid: string | null;
+  accessValidityDays: number | null;
   metaTitle: string | null;
   metaDescription: string | null;
   ncm: string | null;

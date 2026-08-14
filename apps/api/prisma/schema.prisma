@@ -54,6 +54,14 @@ enum ProductStatus {
   REMOVED
 }
 
+// PHYSICAL: item de estoque normal (peso/dimensões usados no frete).
+// WHATSAPP_ACCESS: acesso a um grupo de WhatsApp — `stock` vira "vagas
+// disponíveis", sem frete/endereço no checkout (ver DeliveryMethod.DIGITAL).
+enum ProductType {
+  PHYSICAL
+  WHATSAPP_ACCESS
+}
+
 // ── OMS / Marketplace ─────────────────────────────────────────────────────────
 enum Marketplace {
   SITE
@@ -109,6 +117,8 @@ enum CouponType {
 enum DeliveryMethod {
   SHIPPING
   PICKUP
+  // Pedido 100% de produtos WHATSAPP_ACCESS — sem endereço/frete.
+  DIGITAL
 }
 
 // ── Perfis de recebimento e endereços salvos (checkout) ───────────────────────
@@ -326,6 +336,11 @@ model Product {
   pickupAvailable     Boolean       @default(false) @map("pickup_available")
   featuredOffer       Boolean       @default(false) @map("featured_offer")
   status              ProductStatus @default(ACTIVE)
+  type                ProductType   @default(PHYSICAL)
+  // Só para type = WHATSAPP_ACCESS: JID do grupo (xxxx@g.us) vendido como acesso
+  // e validade em dias após a compra (null = acesso vitalício, sem expiração).
+  accessGroupJid      String?       @map("access_group_jid")
+  accessValidityDays  Int?          @map("access_validity_days")
   metaTitle           String?       @map("meta_title") @db.VarChar(200)
   metaDescription     String?       @map("meta_description") @db.VarChar(500)
   autoPublishWhatsapp Boolean       @default(false) @map("auto_publish_whatsapp")
@@ -347,11 +362,13 @@ model Product {
   syncLogs        MarketplaceSyncLog[]
   notifications   Notification[]
   analyticsEvents AnalyticsEvent[]
+  accessGrants    WhatsappAccessGrant[]
 
   @@index([categoryId])
   @@index([status])
   @@index([createdById])
   @@index([isUnique])
+  @@index([type])
   @@map("products")
 }
 
@@ -479,9 +496,6 @@ model Order {
   couponId                     String?        @map("coupon_id")
   status                       OrderStatus    @default(PENDING)
   deliveryMethod               DeliveryMethod @default(SHIPPING) @map("delivery_method")
-  // OMS: canal de origem do pedido. SITE = loja própria; demais = marketplaces.
-  // `externalId` é o id do pedido no marketplace (idempotência de importação);
-  // `externalReference` guarda o pack/shipment usado para agrupar/rastrear.
   channel                      Marketplace    @default(SITE)
   externalId                   String?        @map("external_id")
   externalReference            String?        @map("external_reference")
@@ -500,14 +514,8 @@ model Order {
   pickupRemindedAt             DateTime?      @map("pickup_reminded_at")
   clientConfirmedPickupAt      DateTime?      @map("client_confirmed_pickup_at")
   stockApplied                 Boolean        @default(false) @map("stock_applied")
-  // Rastreabilidade opcional de qual perfil/endereço salvo originou este pedido.
-  // NUNCA lido por integrações externas (MP/Focus NF-e/Melhor Envio) — só UX/auditoria.
   recipientProfileId           String?        @map("recipient_profile_id")
   savedAddressId               String?        @map("saved_address_id")
-  // Snapshot imutável do documento/e-mail usados NESTE pedido, gravado na criação.
-  // Integrações preferem estes campos quando presentes, com fallback para o
-  // comportamento legado (order.user.cpf / order.user.email) quando nulos
-  // (todo pedido criado antes desta feature tem esses campos null).
   recipientDocument            String?        @map("recipient_document")
   recipientDocumentType        DocumentType?  @map("recipient_document_type")
   recipientEmail               String?        @map("recipient_email")
@@ -533,6 +541,7 @@ model Order {
   recipientProfile RecipientProfile?  @relation(fields: [recipientProfileId], references: [id], onDelete: SetNull)
   savedAddress     SavedAddress?      @relation(fields: [savedAddressId], references: [id], onDelete: SetNull)
   printJobs        PrintJob[]
+  accessGrants     WhatsappAccessGrant[]
 
   @@unique([channel, externalId], map: "orders_channel_external_id_key")
   @@index([userId])
@@ -543,9 +552,6 @@ model Order {
   @@map("orders")
 }
 
-// Linha do tempo de alto nível do pedido (estados visíveis ao cliente/admin).
-// Diferente de ShipmentEvent (eventos da transportadora) — aqui registramos cada
-// transição do pedido com título legível e quem executou.
 model OrderStatusEvent {
   id          String      @id @default(cuid())
   orderId     String      @map("order_id")
@@ -561,12 +567,6 @@ model OrderStatusEvent {
   @@map("order_status_events")
 }
 
-// Perfil de destinatário reutilizável (pessoa/empresa) — pode receber entrega,
-// retirar na loja, ser o destinatário da NF-e e/ou ser usado no pagamento.
-// NUNCA lido diretamente por integrações externas: o checkout normaliza e copia
-// os dados para colunas próprias do Order (ver Order.recipientDocument/
-// recipientDocumentType/recipientEmail e o Json Order.shippingAddress), que são
-// a única fonte lida por Mercado Pago, Focus NF-e e Melhor Envio.
 model RecipientProfile {
   id           String       @id @default(cuid())
   userId       String       @map("user_id")
@@ -626,6 +626,41 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+enum WhatsappAccessGrantStatus {
+  ACTIVE
+  EXPIRED
+  REMOVED
+  FAILED
+}
+
+// Uma linha por item de pedido de produto WHATSAPP_ACCESS pago. Criado pelo
+// WhatsappAccessService ao consumir OmsEvents.OrderPaid (idempotente via
+// unique orderItemId, mesmo padrao do Print Center). O cron de expiracao
+// varre status ACTIVE com expiresAt vencido e tenta remover o participante
+// do grupo pelo telefone salvo aqui (snapshot do checkout).
+model WhatsappAccessGrant {
+  id          String                     @id @default(cuid())
+  orderId     String                     @map("order_id")
+  orderItemId String                     @unique @map("order_item_id")
+  productId   String                     @map("product_id")
+  userId      String                     @map("user_id")
+  phone       String?
+  groupJid    String                     @map("group_jid")
+  inviteLink  String?                    @map("invite_link")
+  status      WhatsappAccessGrantStatus  @default(ACTIVE)
+  expiresAt   DateTime?                  @map("expires_at")
+  removedAt   DateTime?                  @map("removed_at")
+  createdAt   DateTime                   @default(now()) @map("created_at")
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([status, expiresAt])
+  @@index([orderId])
+  @@index([userId])
+  @@map("whatsapp_access_grants")
 }
 
 model Payment {
@@ -701,8 +736,6 @@ model Shipment {
   orderId       String         @unique @map("order_id")
   meOrderId     String?        @unique @map("me_order_id")
   frenetTicket  String?        @unique @map("frenet_ticket")
-  // Id do envio no marketplace de origem (ex.: shipment do Mercado Livre). Usado
-  // para baixar a etiqueta e sincronizar o rastreio quando o canal não é o ME.
   externalId    String?        @map("external_id")
   carrier       String
   service       String
@@ -716,11 +749,6 @@ model Shipment {
   deliveryMax   Int?           @map("delivery_max")
   rawQuote      Json?          @map("raw_quote")
   rawData       Json?          @map("raw_data")
-  // Dimensões do pacote (cm/kg) realmente usadas na última etiqueta gerada.
-  // Null = ainda não gerou etiqueta com override manual; o cálculo automático
-  // (ShippingService.calcPackage, baseado nos itens do pedido) é usado como
-  // fallback. Preenchido tanto no auto-cálculo quanto no override do admin,
-  // para a UI sempre ter um valor concreto para mostrar/editar.
   packageHeight Int?           @map("package_height")
   packageWidth  Int?           @map("package_width")
   packageLength Int?           @map("package_length")
@@ -892,10 +920,6 @@ model MetaCatalogSync {
   @@map("meta_catalog_syncs")
 }
 
-// ── OMS / Marketplace ─────────────────────────────────────────────────────────
-
-// Estado de publicação de um produto em cada marketplace. Um par
-// (product, marketplace) é único: representa "onde o produto está anunciado".
 model MarketplacePublication {
   id               String            @id @default(cuid())
   productId        String            @map("product_id")
@@ -917,7 +941,6 @@ model MarketplacePublication {
   @@map("marketplace_publications")
 }
 
-// Log de cada operação de sincronização disparada para um marketplace.
 model MarketplaceSyncLog {
   id           String      @id @default(cuid())
   productId    String      @map("product_id")
@@ -936,8 +959,6 @@ model MarketplaceSyncLog {
   @@map("marketplace_sync_logs")
 }
 
-// Log bruto de todo webhook recebido (MP, ML, Shopee). Persistido antes de
-// qualquer processamento para nunca travar o fluxo principal e permitir replay.
 model WebhookLog {
   id           String        @id @default(cuid())
   source       WebhookSource
@@ -953,8 +974,6 @@ model WebhookLog {
   @@map("webhook_logs")
 }
 
-// Sessão de navegação anônima (id gerado no cliente). `visitorId` persiste em
-// localStorage entre sessões e permite distinguir visitantes novos/recorrentes.
 model AnalyticsSession {
   id              String      @id
   visitorId       String      @map("visitor_id")
@@ -999,21 +1018,14 @@ model AnalyticsEvent {
   @@map("analytics_events")
 }
 
-// ── Permissões granulares de vendedor no painel admin ──────────────────────────
-
-// Configuração de acesso de um vendedor a uma seção do painel admin. Uma linha
-// por (vendedor, seção); ausência de linha equivale a NONE (sem acesso).
 model SellerSectionPermission {
   id                     String            @id @default(cuid())
   userId                 String            @map("user_id")
   section                AdminSection
   mode                   SectionAccessMode @default(NONE)
-  // Hash da senha específica desta seção (apenas quando mode = PASSWORD).
   passwordHash           String?           @map("password_hash")
   passwordGrantedAt      DateTime?         @map("password_granted_at")
   passwordGrantExpiresAt DateTime?         @map("password_grant_expires_at")
-  // Preenchido quando uma SellerAccessRequest para esta seção é aprovada
-  // (mode = AUTHORIZATION). Qualquer atualização da permissão limpa este campo.
   authorizationGrantedAt DateTime?         @map("authorization_granted_at")
   updatedByUserId        String?           @map("updated_by_user_id")
   createdAt              DateTime          @default(now()) @map("created_at")
@@ -1026,8 +1038,6 @@ model SellerSectionPermission {
   @@map("seller_section_permissions")
 }
 
-// Solicitação de acesso criada pelo vendedor para uma seção em modo
-// AUTHORIZATION, aguardando aprovação/negação de um admin.
 model SellerAccessRequest {
   id           String               @id @default(cuid())
   userId       String               @map("user_id")
@@ -1046,18 +1056,16 @@ model SellerAccessRequest {
   @@map("seller_access_requests")
 }
 
-// ── Hub de Distribuição de Grupos WhatsApp (CommunityModule) ─────────────────
-
 enum CommunityGroupStatus {
-  ACTIVE // recebendo novos membros
-  FULL // lotado (flipado automaticamente pela sync)
-  PAUSED // pausado manualmente pelo admin
-  ARCHIVED // fora de uso, mantido para histórico
+  ACTIVE
+  FULL
+  PAUSED
+  ARCHIVED
 }
 
 enum CommunityRedirectOutcome {
-  REDIRECTED // visitante recebeu um grupo
-  ALL_FULL // todos os grupos lotados no momento do acesso
+  REDIRECTED
+  ALL_FULL
 }
 
 enum CommunityMemberEventType {
@@ -1073,16 +1081,11 @@ enum CommunityMemberEventSource {
 model CommunityGroup {
   id           String               @id @default(cuid())
   name         String
-  // JID do grupo no WhatsApp (xxx@g.us). Opcional: sem ele o grupo não é
-  // sincronizado via Baileys e o contador de participantes é manual.
   groupJid     String?              @unique @map("group_jid")
-  // Link de convite divulgado ao público (chat.whatsapp.com/...).
   inviteLink   String               @map("invite_link")
   status       CommunityGroupStatus @default(ACTIVE)
   capacity     Int                  @default(1024)
   participants Int                  @default(0)
-  // Desempate na distribuição: entre grupos com ocupação equivalente, o de
-  // maior prioridade recebe primeiro.
   priority     Int                  @default(0)
   active       Boolean              @default(true)
   lastSyncAt   DateTime?            @map("last_sync_at")
@@ -1098,8 +1101,6 @@ model CommunityGroup {
   @@map("community_groups")
 }
 
-// Um registro por acesso ao link único /grupos — alimenta os analytics de
-// acessos, redirecionamentos por grupo e conversão por origem (UTM).
 model CommunityRedirect {
   id          String                   @id @default(cuid())
   groupId     String?                  @map("group_id")
@@ -1117,8 +1118,6 @@ model CommunityRedirect {
   @@map("community_redirects")
 }
 
-// Snapshot do total de participantes capturado pela sincronização — alimenta
-// o histórico de crescimento. Só é gravado quando o número muda.
 model CommunityGroupSnapshot {
   id           String         @id @default(cuid())
   groupId      String         @map("group_id")
@@ -1130,8 +1129,6 @@ model CommunityGroupSnapshot {
   @@map("community_group_snapshots")
 }
 
-// Eventos de entrada/saida observados pelo WhatsApp. Guarda apenas contagens
-// agregadas por evento para evitar persistir identificadores pessoais.
 model CommunityMemberEvent {
   id        String                     @id @default(cuid())
   groupId   String                     @map("group_id")
@@ -1147,11 +1144,6 @@ model CommunityMemberEvent {
   @@map("community_member_events")
 }
 
-// ── Print Center ────────────────────────────────────────────────────────────
-// Consumidor de eventos (order.paid / order.cancelled) que prepara documentos
-// de impressão (etiqueta interna de retirada / etiqueta oficial do Melhor
-// Envio) e os enfileira para um Print Agent autenticado por Device Token.
-// Nunca é escrito por checkout/pagamentos/frete/NF-e — só lê os pedidos.
 enum PrintJobType {
   PICKUP
   SHIPPING
@@ -1185,18 +1177,12 @@ model PrintJob {
   order  Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   device PrintDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
-  // Garante que a criação automática (order.paid) seja idempotente: pagamento
-  // duplicado, webhook duplicado ou reprocessamento nunca geram uma segunda
-  // etiqueta para o mesmo pedido/tipo (P2002 é tratado como no-op).
   @@unique([orderId, type])
   @@index([status, type])
   @@index([deviceId])
   @@map("print_jobs")
 }
 
-// Computador da loja autorizado a puxar/confirmar jobs de impressão. Nunca
-// usa login administrativo nem JWT de usuário — só o token próprio (hash
-// armazenado, valor em texto puro é mostrado uma única vez na criação).
 model PrintDevice {
   id              String    @id @default(cuid())
   name            String

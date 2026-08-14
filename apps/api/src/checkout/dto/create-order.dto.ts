@@ -61,8 +61,11 @@ export class CreateOrderDto {
   @IsEnum(DeliveryMethod)
   deliveryMethod?: DeliveryMethod;
 
-  // Required only for SHIPPING
-  @ValidateIf((o: CreateOrderDto) => o.deliveryMethod !== DeliveryMethod.PICKUP)
+  // Required only for SHIPPING (PICKUP e DIGITAL não precisam de endereço)
+  @ValidateIf(
+    (o: CreateOrderDto) =>
+      o.deliveryMethod !== DeliveryMethod.PICKUP && o.deliveryMethod !== DeliveryMethod.DIGITAL,
+  )
   @ValidateNested()
   @Type(() => ShippingAddressDto)
   shippingAddress?: ShippingAddressDto;

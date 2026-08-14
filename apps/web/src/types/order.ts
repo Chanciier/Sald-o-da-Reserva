@@ -95,6 +95,13 @@ export interface Order {
     amount: number;
   } | null;
   shipment?: Shipment | null;
+  accessGrants?: {
+    id: string;
+    inviteLink: string | null;
+    status: 'ACTIVE' | 'EXPIRED' | 'REMOVED' | 'FAILED';
+    expiresAt: string | null;
+    productId: string;
+  }[];
   deliveredAt?: string | null;
   clientConfirmedPickupAt?: string | null;
   createdAt: string;

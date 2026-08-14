@@ -74,6 +74,9 @@ const schema = z.object({
   pickupAvailable: z.boolean().default(false),
   featuredOffer: z.boolean().default(false),
   status: z.enum(['ACTIVE', 'INACTIVE', 'DRAFT', 'ARCHIVED', 'OUT_OF_STOCK']),
+  type: z.enum(['PHYSICAL', 'WHATSAPP_ACCESS']).default('PHYSICAL'),
+  accessGroupJid: z.string().optional(),
+  accessValidityDays: z.coerce.number().int().min(1).optional(),
   metaTitle: z.string().max(200).optional(),
   metaDescription: z.string().max(500).optional(),
   ncm: z.string().max(20).optional(),
@@ -122,6 +125,9 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
     initialData?.whatsappGroupIds ?? [],
   );
   const [isUnique, setIsUnique] = useState(initialData?.isUnique ?? false);
+  const [accessLifetime, setAccessLifetime] = useState(
+    initialData ? !initialData.accessValidityDays : true,
+  );
   // Canais originalmente publicados (referência imutável para calcular o diff no save).
   const originalChannels = useRef<Channel[]>(getPublishedChannels(initialData?.publications));
   // Estado visual dos checkboxes: na edição, pré-marca os canais onde já está publicado.
@@ -218,6 +224,9 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           cstCsosn: initialData.cstCsosn ?? '102',
           gtin: initialData.gtin ?? '',
           condition: (initialData.condition as FormData['condition']) ?? 'new',
+          type: initialData.type ?? 'PHYSICAL',
+          accessGroupJid: initialData.accessGroupJid ?? '',
+          accessValidityDays: initialData.accessValidityDays ?? undefined,
         }
       : {
           status: 'ACTIVE',
@@ -228,12 +237,30 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           sku: generateSku(),
           cstCsosn: '102',
           condition: 'new',
+          type: 'PHYSICAL',
         },
   });
 
   const nameValue = watch('name');
   const categoryIdValue = watch('categoryId');
   const ncmValue = watch('ncm');
+  const productTypeValue = watch('type');
+  const isAccessProduct = productTypeValue === 'WHATSAPP_ACCESS';
+
+  // Grupos reais conectados na sessão Baileys (com JID) — usado só para
+  // produtos de acesso, onde o comprador precisa entrar num grupo de verdade.
+  const { data: liveWaGroups = [] } = useQuery<{ id: string; subject: string; size: number }[]>({
+    queryKey: ['whatsapp-live-groups'],
+    queryFn: async () => {
+      const headers: HeadersInit = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${BASE}/api/v1/community/admin/wa-groups`, { headers });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!token && isAccessProduct,
+    staleTime: 60 * 1000,
+  });
 
   useEffect(() => {
     if (!slugManual && nameValue) {
@@ -391,6 +418,10 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
       pickupAvailable: data.pickupAvailable,
       featuredOffer: data.featuredOffer,
       status: data.status,
+      type: data.type,
+      accessGroupJid: data.type === 'WHATSAPP_ACCESS' ? data.accessGroupJid || undefined : null,
+      accessValidityDays:
+        data.type === 'WHATSAPP_ACCESS' && !accessLifetime ? data.accessValidityDays || null : null,
       metaTitle: data.metaTitle || undefined,
       metaDescription: data.metaDescription || undefined,
       ncm: data.ncm || undefined,
@@ -579,6 +610,88 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
             </div>
           </div>
 
+          {/* Tipo de produto */}
+          <div className={cardCls}>
+            <h2 className="text-sm font-semibold">Tipo de produto</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label
+                className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 ${!isAccessProduct ? 'border-primary bg-primary/5' : ''}`}
+              >
+                <input {...register('type')} type="radio" value="PHYSICAL" className="mt-0.5 accent-primary" />
+                <div>
+                  <p className="text-sm font-medium leading-tight">Físico</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Item de estoque normal, com peso/dimensões para frete.
+                  </p>
+                </div>
+              </label>
+              <label
+                className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 ${isAccessProduct ? 'border-primary bg-primary/5' : ''}`}
+              >
+                <input
+                  {...register('type')}
+                  type="radio"
+                  value="WHATSAPP_ACCESS"
+                  className="mt-0.5 accent-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium leading-tight">Acesso a grupo WhatsApp</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Comprador recebe o link do grupo por WhatsApp após o pagamento. Sem frete.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {isAccessProduct && (
+              <div className="mt-2 space-y-4 border-t pt-4">
+                <div>
+                  <label className={labelCls}>Grupo de WhatsApp *</label>
+                  <select {...register('accessGroupJid')} className={inputCls}>
+                    <option value="">Selecione o grupo…</option>
+                    {liveWaGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.subject} ({g.size} participantes)
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Só aparecem grupos onde o WhatsApp da loja já está — e precisa ser{' '}
+                    <strong>admin do grupo</strong> para gerar o link de convite e remover
+                    participantes na expiração. Lista vazia = WhatsApp desconectado.
+                  </p>
+                </div>
+                <div>
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={accessLifetime}
+                      onChange={(e) => setAccessLifetime(e.target.checked)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span className="text-sm">Acesso vitalício (sem expiração)</span>
+                  </label>
+                  {!accessLifetime && (
+                    <div className="mt-2">
+                      <label className={labelCls}>Validade (dias após a compra) *</label>
+                      <input
+                        {...register('accessValidityDays')}
+                        type="number"
+                        min="1"
+                        className={inputCls}
+                        placeholder="Ex: 30"
+                      />
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Depois desse prazo o comprador é removido do grupo automaticamente
+                        (melhor esforço).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Imagens */}
           <div className={`${cardCls}${mlSelected ? ' ring-1 ring-amber-400/70' : ''}`}>
             <h2 className="text-sm font-semibold">Imagens{mlBadge}</h2>
@@ -737,12 +850,14 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
             </div>
           </div>
 
-          {/* Estoque */}
+          {/* Estoque / Vagas */}
           <div className={cardCls}>
-            <h2 className="text-sm font-semibold">Estoque</h2>
+            <h2 className="text-sm font-semibold">{isAccessProduct ? 'Vagas' : 'Estoque'}</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className={labelCls}>Quantidade em estoque *</label>
+                <label className={labelCls}>
+                  {isAccessProduct ? 'Vagas disponíveis *' : 'Quantidade em estoque *'}
+                </label>
                 <input
                   {...register('stock')}
                   type="number"
@@ -751,81 +866,91 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
                   placeholder="0"
                 />
                 {errors.stock && <p className={errorCls}>{errors.stock.message}</p>}
+                {isAccessProduct && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Quantas pessoas ainda podem comprar este acesso (o WhatsApp limita grupos a
+                    1024 participantes).
+                  </p>
+                )}
               </div>
-              <div>
-                <label className={labelCls}>Estoque mínimo</label>
-                <input
-                  {...register('minimumStock')}
-                  type="number"
-                  min="0"
-                  className={inputCls}
-                  placeholder="0"
-                />
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Alerta quando o estoque atingir esse valor
-                </p>
-              </div>
+              {!isAccessProduct && (
+                <div>
+                  <label className={labelCls}>Estoque mínimo</label>
+                  <input
+                    {...register('minimumStock')}
+                    type="number"
+                    min="0"
+                    className={inputCls}
+                    placeholder="0"
+                  />
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Alerta quando o estoque atingir esse valor
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Logística */}
-          <div className={cardCls}>
-            <h2 className="text-sm font-semibold">Logística</h2>
-            {mlSelected && (
-              <p className="-mt-2 text-xs text-amber-700 dark:text-amber-400">
-                Peso e dimensões são usados pelo Mercado Livre para calcular o frete.
-              </p>
-            )}
-            <div>
-              <label className={labelCls}>Peso (kg){mlBadge}</label>
-              <input
-                {...register('weight')}
-                type="number"
-                step="0.001"
-                min="0"
-                className={inputCls}
-                placeholder="Ex: 0.500"
-              />
-            </div>
-            <div>
-              <p className={labelCls}>Dimensões (cm){mlBadge}</p>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <input
-                    {...register('dimHeight')}
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    className={inputCls}
-                    placeholder="Altura"
-                  />
-                  <p className="mt-0.5 text-xs text-muted-foreground text-center">Altura</p>
-                </div>
-                <div>
-                  <input
-                    {...register('dimWidth')}
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    className={inputCls}
-                    placeholder="Largura"
-                  />
-                  <p className="mt-0.5 text-xs text-muted-foreground text-center">Largura</p>
-                </div>
-                <div>
-                  <input
-                    {...register('dimDepth')}
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    className={inputCls}
-                    placeholder="Comprimento"
-                  />
-                  <p className="mt-0.5 text-xs text-muted-foreground text-center">Comprimento</p>
+          {!isAccessProduct && (
+            <div className={cardCls}>
+              <h2 className="text-sm font-semibold">Logística</h2>
+              {mlSelected && (
+                <p className="-mt-2 text-xs text-amber-700 dark:text-amber-400">
+                  Peso e dimensões são usados pelo Mercado Livre para calcular o frete.
+                </p>
+              )}
+              <div>
+                <label className={labelCls}>Peso (kg){mlBadge}</label>
+                <input
+                  {...register('weight')}
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  className={inputCls}
+                  placeholder="Ex: 0.500"
+                />
+              </div>
+              <div>
+                <p className={labelCls}>Dimensões (cm){mlBadge}</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <input
+                      {...register('dimHeight')}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className={inputCls}
+                      placeholder="Altura"
+                    />
+                    <p className="mt-0.5 text-xs text-muted-foreground text-center">Altura</p>
+                  </div>
+                  <div>
+                    <input
+                      {...register('dimWidth')}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className={inputCls}
+                      placeholder="Largura"
+                    />
+                    <p className="mt-0.5 text-xs text-muted-foreground text-center">Largura</p>
+                  </div>
+                  <div>
+                    <input
+                      {...register('dimDepth')}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className={inputCls}
+                      placeholder="Comprimento"
+                    />
+                    <p className="mt-0.5 text-xs text-muted-foreground text-center">Comprimento</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right column (sidebar) */}
@@ -955,22 +1080,24 @@ export function ProductForm({ initialData, onSubmit, isSubmitting, basePath }: P
           </div>
 
           {/* Retirada na loja */}
-          <div className={cardCls}>
-            <h2 className="text-sm font-semibold">Retirada na Loja</h2>
-            <label className="flex cursor-pointer items-start gap-3">
-              <input
-                {...register('pickupAvailable')}
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-primary"
-              />
-              <div>
-                <p className="text-sm font-medium leading-tight">Disponível para retirada</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Clientes poderão retirar este produto na loja sem custo de frete.
-                </p>
-              </div>
-            </label>
-          </div>
+          {!isAccessProduct && (
+            <div className={cardCls}>
+              <h2 className="text-sm font-semibold">Retirada na Loja</h2>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  {...register('pickupAvailable')}
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium leading-tight">Disponível para retirada</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Clientes poderão retirar este produto na loja sem custo de frete.
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* Página de Ofertas */}
           <div className={cardCls}>

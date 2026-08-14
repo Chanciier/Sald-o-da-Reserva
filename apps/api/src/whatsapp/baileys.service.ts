@@ -302,6 +302,24 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     this.groupParticipantsHandlers.push(handler);
   }
 
+  /**
+   * Remove um participante do grupo. Exige que a conta conectada seja ADMIN
+   * do grupo — sem admin o WhatsApp rejeita a operação e retornamos false.
+   */
+  async removeGroupParticipant(groupJid: string, participantJid: string): Promise<boolean> {
+    if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
+    try {
+      await this.socket.groupParticipantsUpdate(groupJid, [participantJid], 'remove');
+      return true;
+    } catch (err) {
+      this.logger.error(
+        `Falha ao remover participante ${participantJid} do grupo ${groupJid}`,
+        err as Error,
+      );
+      return false;
+    }
+  }
+
   async sendMessage(jid: string, text: string): Promise<string | undefined> {
     if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
     const result = await this.socket.sendMessage(jid, { text });

@@ -40,6 +40,8 @@ export interface Product {
   dimensions: Dimensions | null;
   stock: number;
   status: ProductStatus;
+  type: 'PHYSICAL' | 'WHATSAPP_ACCESS';
+  accessValidityDays: number | null;
   categoryId: string | null;
   category: Category | null;
   images: ProductImage[];
