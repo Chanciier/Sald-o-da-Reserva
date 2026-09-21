@@ -17,8 +17,17 @@
  */
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StorageService } from '../src/storage/storage.service';
+
+const productWithCounts = Prisma.validator<Prisma.ProductDefaultArgs>()({
+  include: {
+    images: { select: { key: true } },
+    _count: { select: { orderItems: true } },
+  },
+});
+type ProductWithCounts = Prisma.ProductGetPayload<typeof productWithCounts>;
 
 async function main() {
   const confirm = process.argv.includes('--confirm');
@@ -29,12 +38,9 @@ async function main() {
   const config = new ConfigService();
   const storage = new StorageService(config, prisma);
 
-  const products = await prisma.product.findMany({
+  const products: ProductWithCounts[] = await prisma.product.findMany({
     where: { status: 'ACTIVE' },
-    include: {
-      images: { select: { key: true } },
-      _count: { select: { orderItems: true } },
-    },
+    ...productWithCounts,
   });
 
   if (!products.length) {
@@ -43,8 +49,8 @@ async function main() {
     return;
   }
 
-  const toDelete = products.filter((p) => p._count.orderItems === 0);
-  const toArchive = products.filter((p) => p._count.orderItems > 0);
+  const toDelete = products.filter((p: ProductWithCounts) => p._count.orderItems === 0);
+  const toArchive = products.filter((p: ProductWithCounts) => p._count.orderItems > 0);
 
   console.log(`Produtos ACTIVE encontrados: ${products.length}`);
   console.log(`  -> serão APAGADOS (sem pedidos): ${toDelete.length}`);
@@ -72,7 +78,7 @@ async function main() {
   }
 
   for (const product of toDelete) {
-    const keys = product.images.map((i) => i.key);
+    const keys = product.images.map((i: { key: string }) => i.key);
     if (keys.length) await storage.deleteManyByKeys(keys);
     await prisma.product.delete({ where: { id: product.id } });
     await prisma.auditLog.create({
