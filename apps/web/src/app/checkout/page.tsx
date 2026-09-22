@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
-import { createOrder, getCheckoutFeatureFlags } from '@/lib/cart-api';
+import { createOrder, getCheckoutFeatureFlags, addToCart } from '@/lib/cart-api';
+import { getProduct } from '@/lib/api';
 import {
   addSavedAddress,
   createRecipientProfile,
@@ -126,6 +127,7 @@ const PAYMENT_METHODS: {
 // só de nome/telefone/CPF, sem tela de senha/e-mail.
 function GuestClubCheckoutForm() {
   const { guestCheckout } = useAuth();
+  const { refresh } = useCart();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [cpf, setCpf] = useState('');
@@ -137,7 +139,17 @@ function GuestClubCheckoutForm() {
     setError('');
     setSubmitting(true);
     try {
-      await guestCheckout(name.trim(), phone.replace(/\D/g, ''), cpf.replace(/\D/g, ''));
+      // guestCheckout devolve o accessToken fresco — usamos ele direto aqui
+      // (não via useCart().addItem) porque o token do contexto só reflete o
+      // valor novo depois que este componente re-renderizar.
+      const { accessToken } = await guestCheckout(
+        name.trim(),
+        phone.replace(/\D/g, ''),
+        cpf.replace(/\D/g, ''),
+      );
+      const product = await getProduct('clube-reversa');
+      await addToCart(accessToken, product.id, 1);
+      await refresh();
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);
@@ -201,9 +213,20 @@ function GuestClubCheckoutForm() {
 }
 
 export default function CheckoutPage() {
+  return (
+    <Suspense fallback={null}>
+      <CheckoutPageInner />
+    </Suspense>
+  );
+}
+
+// useSearchParams() (leitura do ?guestClub=1) exige um boundary de Suspense
+// no App Router — ver GuestClubCheckoutForm/wantsGuestClub acima.
+function CheckoutPageInner() {
   const { user, token } = useAuth();
   const { cart, refresh } = useCart();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('SHIPPING');
@@ -237,9 +260,14 @@ export default function CheckoutPage() {
 
   // Clube Reversa não é produto físico — não faz sentido escolher entrega,
   // e não é preciso estar logado pra comprar (ver GuestClubCheckoutForm acima).
-  const isClubOnlyCart = Boolean(
-    cart?.items.length && cart.items.every((item) => item.slug === 'clube-reversa'),
-  );
+  // Carrinho é 100% autenticado (sem carrinho "anônimo"), então um visitante
+  // deslogado nunca tem `cart` populado — por isso o botão "Assinar agora" na
+  // página do produto manda direto pra cá com ?guestClub=1, sinalizando a
+  // intenção antes mesmo de existir carrinho.
+  const wantsGuestClub = searchParams.get('guestClub') === '1';
+  const isClubOnlyCart =
+    wantsGuestClub ||
+    Boolean(cart?.items.length && cart.items.every((item) => item.slug === 'clube-reversa'));
 
   useEffect(() => {
     if (isClubOnlyCart) setDeliveryMethod('PICKUP');

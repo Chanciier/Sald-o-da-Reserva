@@ -7,9 +7,10 @@ import { useCart } from '@/contexts/cart-context';
 interface Props {
   productId: string;
   stock: number;
+  isClubMembership?: boolean;
 }
 
-export function AddToCartButton({ productId, stock }: Props) {
+export function AddToCartButton({ productId, stock, isClubMembership }: Props) {
   const { user } = useAuth();
   const { addItem, loading } = useCart();
   const [qty, setQty] = useState(1);
@@ -23,6 +24,21 @@ export function AddToCartButton({ productId, stock }: Props) {
       >
         Sem estoque
       </button>
+    );
+  }
+
+  if (!user && isClubMembership) {
+    // Clube Reversa não exige cadastro — vai direto pro checkout, que mostra
+    // um formulário de nome/telefone/CPF em vez da tela de login (ver
+    // GuestClubCheckoutForm em app/checkout/page.tsx). Não passa por
+    // "adicionar ao carrinho" porque o carrinho em si exige login.
+    return (
+      <a
+        href="/checkout?guestClub=1"
+        className="flex w-full items-center justify-center rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+      >
+        Assinar agora
+      </a>
     );
   }
 

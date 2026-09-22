@@ -40,6 +40,7 @@ export interface Product {
   dimensions: Dimensions | null;
   stock: number;
   status: ProductStatus;
+  isClubMembership: boolean;
   categoryId: string | null;
   category: Category | null;
   images: ProductImage[];

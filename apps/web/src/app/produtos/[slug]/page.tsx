@@ -62,8 +62,14 @@ export default async function ProductPage({ params }: PageProps) {
   const product = await getProduct(params.slug).catch(() => null);
   if (!product) notFound();
 
-  // Related products — one broad fetch, two slices
-  const broadResult = await getProducts({ limit: 24 }).catch(() => ({ data: [] }));
+  // Related products — one broad fetch, two slices. status: 'ACTIVE' é
+  // obrigatório aqui: sem ele o backend só esconde RESERVED/SOLD/UNAVAILABLE/
+  // REMOVED do catálogo público, deixando ARCHIVED/INACTIVE/DRAFT vazarem pra
+  // esses carrosséis (achado real: produtos arquivados numa limpeza em massa
+  // continuavam aparecendo aqui mesmo sumidos da listagem principal).
+  const broadResult = await getProducts({ limit: 24, status: 'ACTIVE' }).catch(() => ({
+    data: [],
+  }));
   const broadList = broadResult.data.filter((p) => p.id !== product.id);
 
   const semelhantes = product.category?.slug
@@ -177,7 +183,11 @@ export default async function ProductPage({ params }: PageProps) {
 
           {/* CTAs */}
           {product.status === 'ACTIVE' && (
-            <AddToCartButton productId={product.id} stock={product.stock} />
+            <AddToCartButton
+              productId={product.id}
+              stock={product.stock}
+              isClubMembership={product.isClubMembership}
+            />
           )}
           <SaveButton product={product} />
 
