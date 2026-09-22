@@ -364,18 +364,30 @@ export class PaymentsService {
           this.events.emit(OmsEvents.OrderPaid, { orderId, paymentId: p.id });
           this.events.emit(OmsEvents.PaymentApproved, { orderId, paymentId: p.id });
           this.prisma.order
-            .findUnique({ where: { id: orderId }, include: { user: true } })
+            .findUnique({
+              where: { id: orderId },
+              include: {
+                user: true,
+                items: { include: { product: { select: { isClubMembership: true } } } },
+              },
+            })
             .then((o) => {
               if (!o) return;
               if (o.user)
                 this.mail
                   .sendOrderConfirmedEmail(o.user.email, o.user.name, orderId, o.total.toNumber())
                   .catch((e) => this.logger.error('Order confirmed email failed', e));
-              void this.orderWa.notifyOrderConfirmed({
-                phone: o.customerPhone,
-                name: o.buyerName ?? o.user?.name,
-                orderId,
-              });
+              // Clube Reversa não é "pedido" físico — quem assina já recebe a
+              // confirmação de sócio ativo (ClubMembershipService); a mensagem
+              // genérica de "pedido confirmado" não faz sentido aqui.
+              const allClubMembership = o.items.every((item) => item.product?.isClubMembership);
+              if (!allClubMembership) {
+                void this.orderWa.notifyOrderConfirmed({
+                  phone: o.customerPhone,
+                  name: o.buyerName ?? o.user?.name,
+                  orderId,
+                });
+              }
             })
             .catch(() => {});
         }
@@ -479,7 +491,13 @@ export class PaymentsService {
 
     if (becomingApproved) {
       this.prisma.order
-        .findUnique({ where: { id: payment.orderId }, include: { user: true } })
+        .findUnique({
+          where: { id: payment.orderId },
+          include: {
+            user: true,
+            items: { include: { product: { select: { isClubMembership: true } } } },
+          },
+        })
         .then((o) => {
           if (!o) return;
           if (o.user)
@@ -491,11 +509,17 @@ export class PaymentsService {
                 o.total.toNumber(),
               )
               .catch((e) => this.logger.error('Order confirmed email failed', e));
-          void this.orderWa.notifyOrderConfirmed({
-            phone: o.customerPhone,
-            name: o.buyerName ?? o.user?.name,
-            orderId: payment.orderId,
-          });
+          // Clube Reversa não é "pedido" físico — quem assina já recebe a
+          // confirmação de sócio ativo (ClubMembershipService); a mensagem
+          // genérica de "pedido confirmado" não faz sentido aqui.
+          const allClubMembership = o.items.every((item) => item.product?.isClubMembership);
+          if (!allClubMembership) {
+            void this.orderWa.notifyOrderConfirmed({
+              phone: o.customerPhone,
+              name: o.buyerName ?? o.user?.name,
+              orderId: payment.orderId,
+            });
+          }
         })
         .catch(() => {});
     }
