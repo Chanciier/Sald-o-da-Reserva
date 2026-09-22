@@ -53,6 +53,20 @@ export async function registerApi(
   });
 }
 
+export async function guestCheckoutApi(
+  name: string,
+  phone: string,
+  cpf: string,
+  turnstileToken?: string,
+): Promise<AuthTokens> {
+  return post<AuthTokens>('/auth/guest-checkout', {
+    name,
+    phone,
+    cpf,
+    ...(turnstileToken && { turnstileToken }),
+  });
+}
+
 export async function refreshApi(refreshToken: string): Promise<AuthTokens> {
   const res = await fetch(`${BASE}/auth/refresh`, {
     method: 'POST',

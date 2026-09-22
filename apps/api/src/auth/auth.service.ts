@@ -15,6 +15,7 @@ import { RateLimitService } from './services/rate-limit.service';
 import { AuditAction, AuditService } from './services/audit.service';
 import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
+import { GuestCheckoutDto } from './dto/guest-checkout.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -58,6 +59,46 @@ export class AuthService {
     // Conta fica ativa e utilizável imediatamente — a verificação roda em paralelo,
     // sem bloquear o cadastro (MailService.send() nunca lança, só loga e retorna false).
     await this.sendVerificationEmail(user.id, user.email, user.name);
+
+    return { user: this.toPublicUser(user), ...tokens };
+  }
+
+  /**
+   * Checkout sem cadastro visível — hoje usado só pelo produto Clube Reversa
+   * (não-físico, ver ClubMembershipModule). Cria (ou reaproveita) uma conta
+   * "fantasma" por trás dos panos, chaveada por um e-mail sintético
+   * determinístico a partir do CPF (mesma pessoa comprando de novo reaproveita
+   * a mesma conta — CPF já é a chave de identidade real do lado do Bling).
+   * Senha é um hash aleatório descartado na hora, nunca há login por senha
+   * pra essa conta. Mesmo padrão de "conta-sistema sem senha usável" que
+   * MlOrderImportService.ensureChannelUser()/ShopeeOrderImportService já usam
+   * pros pedidos importados de marketplace.
+   */
+  async guestCheckout(dto: GuestCheckoutDto, ip: string, userAgent: string): Promise<AuthResult> {
+    await this.rateLimitService.check(`guest-checkout:ip:${ip}`, 10, 3600);
+
+    const email = `guest+${dto.cpf}@saldaodareserva.com.br`;
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+
+    let user: User;
+    if (existing) {
+      user = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: { name: dto.name, phone: dto.phone, cpf: dto.cpf },
+      });
+    } else {
+      const passwordHash = await this.hashService.hashPassword(randomBytes(32).toString('hex'));
+      user = await this.prisma.user.create({
+        data: { email, name: dto.name, phone: dto.phone, cpf: dto.cpf, passwordHash },
+      });
+      await this.auditService.log(AuditAction.REGISTER, {
+        userId: user.id,
+        ipAddress: ip,
+        userAgent,
+      });
+    }
+
+    const tokens = await this.issueTokenPair(user.id, user.email, user.role, ip, userAgent);
 
     return { user: this.toPublicUser(user), ...tokens };
   }

@@ -19,6 +19,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
+import { GuestCheckoutDto } from './dto/guest-checkout.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -52,6 +53,27 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { user, accessToken, refreshToken } = await this.authService.register(
+      dto,
+      this.getIp(req),
+      this.getUserAgent(req),
+    );
+    this.setCookies(res, accessToken, refreshToken);
+    return { user, accessToken };
+  }
+
+  // Checkout sem cadastro visível — hoje só pro produto Clube Reversa (ver
+  // AuthService.guestCheckout). Mesma proteção de bot do /register.
+  @Post('guest-checkout')
+  @Public()
+  @UseGuards(TurnstileGuard)
+  @Throttle({ medium: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  async guestCheckout(
+    @Body() dto: GuestCheckoutDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { user, accessToken, refreshToken } = await this.authService.guestCheckout(
       dto,
       this.getIp(req),
       this.getUserAgent(req),
