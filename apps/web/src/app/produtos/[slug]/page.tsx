@@ -177,7 +177,11 @@ export default async function ProductPage({ params }: PageProps) {
 
           {/* CTAs */}
           {product.status === 'ACTIVE' && (
-            <AddToCartButton productId={product.id} stock={product.stock} />
+            <AddToCartButton
+              productId={product.id}
+              stock={product.stock}
+              isClubMembership={product.isClubMembership}
+            />
           )}
           <SaveButton product={product} />
 
