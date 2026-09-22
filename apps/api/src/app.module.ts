@@ -51,6 +51,7 @@ import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { PrintCenterModule } from './print-center/print-center.module';
 import { IntermediadorModule } from './intermediador/intermediador.module';
 import { ClubMembershipModule } from './club-membership/club-membership.module';
+import { ClubSignupModule } from './club-signup/club-signup.module';
 
 @Module({
   imports: [
@@ -103,6 +104,7 @@ import { ClubMembershipModule } from './club-membership/club-membership.module';
     PrintCenterModule,
     IntermediadorModule,
     ClubMembershipModule,
+    ClubSignupModule,
   ],
   controllers: [AppController],
   providers: [

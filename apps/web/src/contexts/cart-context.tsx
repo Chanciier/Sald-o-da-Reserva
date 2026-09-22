@@ -18,12 +18,6 @@ interface CartContextType {
   applyCoupon: (code: string) => Promise<void>;
   removeCoupon: () => Promise<void>;
   refresh: () => Promise<void>;
-  // Grava um Cart já obtido de outra chamada (ex: o retorno de
-  // cartApi.addToCart feito com um token recém-emitido, fora do fluxo normal
-  // addItem/token do contexto — ver GuestClubCheckoutForm em checkout/page.tsx).
-  // Ao contrário de `refresh`, não depende do `token` do contexto, então
-  // nunca sofre o problema de closure desatualizada logo após um login.
-  setCartData: (cart: Cart) => void;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -98,11 +92,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeCoupon = useCallback(() => wrap(() => cartApi.removeCoupon(token!)), [token, wrap]);
 
-  // setCart é o setter estável do useState — não depende de `token`, então
-  // (ao contrário de refresh/addItem/etc.) nunca fica preso a um closure
-  // desatualizado, mesmo chamado logo depois de um login.
-  const setCartData = useCallback((next: Cart) => setCart(next), []);
-
   return (
     <CartContext.Provider
       value={{
@@ -117,7 +106,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         applyCoupon,
         removeCoupon,
         refresh,
-        setCartData,
       }}
     >
       {children}
