@@ -127,7 +127,7 @@ const PAYMENT_METHODS: {
 // só de nome/telefone/CPF, sem tela de senha/e-mail.
 function GuestClubCheckoutForm() {
   const { guestCheckout } = useAuth();
-  const { refresh } = useCart();
+  const { setCartData } = useCart();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [cpf, setCpf] = useState('');
@@ -148,8 +148,12 @@ function GuestClubCheckoutForm() {
         cpf.replace(/\D/g, ''),
       );
       const product = await getProduct('clube-reversa');
-      await addToCart(accessToken, product.id, 1);
-      await refresh();
+      // addToCart já devolve o carrinho atualizado — gravamos ele direto
+      // (setCartData) em vez de chamar refresh(), que também ficaria preso
+      // ao token antigo pelo mesmo motivo (closure capturada neste render,
+      // de antes do login).
+      const updatedCart = await addToCart(accessToken, product.id, 1);
+      setCartData(updatedCart);
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);
