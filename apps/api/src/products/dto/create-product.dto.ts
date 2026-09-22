@@ -177,6 +177,12 @@ export class CreateProductDto {
   @IsBoolean()
   isUnique?: boolean;
 
+  // Não é produto físico — compra registra sócio do Clube Reversa via
+  // intermediador em vez de gerar separação/expedição.
+  @IsOptional()
+  @IsBoolean()
+  isClubMembership?: boolean;
+
   // OMS: marketplaces onde publicar ao salvar. SITE é incluído por padrão no
   // service quando a lista vier vazia.
   @IsOptional()

@@ -131,6 +131,50 @@ describe('PrintCenterService', () => {
     );
   });
 
+  it('pedido 100% Clube Reversa (não-físico): não gera etiqueta nem job, mesmo com flags ligadas', async () => {
+    flags({ PRINT_CENTER_ENABLED: 'true', AUTO_PRINT_PICKUP: 'true' });
+    prisma.order.findUnique.mockResolvedValue(
+      pickupOrder({
+        items: [
+          {
+            name: 'Clube Reversa',
+            sku: 'CLUBE-REVERSA',
+            quantity: 1,
+            product: { isClubMembership: true },
+          },
+        ],
+      }),
+    );
+
+    await events.handlers[OmsEvents.OrderPaid]({ orderId: ORDER_ID });
+
+    expect(pickupLabel.generate).not.toHaveBeenCalled();
+    expect(prisma.printJob.create).not.toHaveBeenCalled();
+  });
+
+  it('pedido misto (Clube Reversa + produto físico): gera etiqueta normalmente', async () => {
+    flags({ PRINT_CENTER_ENABLED: 'true', AUTO_PRINT_PICKUP: 'true' });
+    prisma.order.findUnique.mockResolvedValue(
+      pickupOrder({
+        items: [
+          {
+            name: 'Clube Reversa',
+            sku: 'CLUBE-REVERSA',
+            quantity: 1,
+            product: { isClubMembership: true },
+          },
+          { name: 'Produto A', sku: 'SKU-1', quantity: 1, product: { isClubMembership: false } },
+        ],
+      }),
+    );
+    prisma.printJob.create.mockResolvedValue({ id: 'job-1', orderId: ORDER_ID, type: 'PICKUP' });
+
+    await events.handlers[OmsEvents.OrderPaid]({ orderId: ORDER_ID });
+
+    expect(pickupLabel.generate).toHaveBeenCalledTimes(1);
+    expect(prisma.printJob.create).toHaveBeenCalledTimes(1);
+  });
+
   it('falha ao gerar a etiqueta de retirada: notifica erro (só a conta do dono) e não cria job', async () => {
     flags({ PRINT_CENTER_ENABLED: 'true', AUTO_PRINT_PICKUP: 'true' });
     prisma.order.findUnique.mockResolvedValue(pickupOrder());

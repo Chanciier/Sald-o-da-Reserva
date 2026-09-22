@@ -23,7 +23,12 @@ interface LoadedOrder {
   customerPhone: string | null;
   pickupCode: string | null;
   createdAt: Date;
-  items: Array<{ name: string; sku: string | null; quantity: number }>;
+  items: Array<{
+    name: string;
+    sku: string | null;
+    quantity: number;
+    product: { isClubMembership: boolean } | null;
+  }>;
 }
 
 /**
@@ -73,6 +78,12 @@ export class PrintCenterService implements OnModuleInit {
 
     const order = await this.loadOrder(orderId);
     if (!order) return null;
+
+    // Clube Reversa é 100% digital — não existe nada pra separar/embalar.
+    // Pedido misto (clube + item físico) segue normal; só pula quando NENHUM
+    // item precisa de manuseio físico.
+    const allClubMembership = order.items.every((item) => item.product?.isClubMembership);
+    if (allClubMembership) return null;
 
     if (order.deliveryMethod === DeliveryMethod.PICKUP) {
       return this.handlePickup(order, opts.manual);
@@ -156,7 +167,14 @@ export class PrintCenterService implements OnModuleInit {
         customerPhone: true,
         pickupCode: true,
         createdAt: true,
-        items: { select: { name: true, sku: true, quantity: true } },
+        items: {
+          select: {
+            name: true,
+            sku: true,
+            quantity: true,
+            product: { select: { isClubMembership: true } },
+          },
+        },
       },
     });
   }

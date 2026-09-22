@@ -54,9 +54,7 @@ async function main() {
 
   console.log(`Produtos ACTIVE encontrados: ${products.length}`);
   console.log(`  -> serão APAGADOS (sem pedidos): ${toDelete.length}`);
-  console.log(
-    `  -> serão ARQUIVADOS (têm pedidos, não podem ser apagados): ${toArchive.length}`,
-  );
+  console.log(`  -> serão ARQUIVADOS (têm pedidos, não podem ser apagados): ${toArchive.length}`);
 
   if (!confirm) {
     console.log('\nDry-run — nada foi alterado. Rode com --confirm para executar de verdade.');

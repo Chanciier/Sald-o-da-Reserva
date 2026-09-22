@@ -49,6 +49,8 @@ import { envValidation } from './config/env.validation';
 import { RecipientProfilesModule } from './recipient-profiles/recipient-profiles.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { PrintCenterModule } from './print-center/print-center.module';
+import { IntermediadorModule } from './intermediador/intermediador.module';
+import { ClubMembershipModule } from './club-membership/club-membership.module';
 
 @Module({
   imports: [
@@ -99,6 +101,8 @@ import { PrintCenterModule } from './print-center/print-center.module';
     FeatureFlagsModule,
     RecipientProfilesModule,
     PrintCenterModule,
+    IntermediadorModule,
+    ClubMembershipModule,
   ],
   controllers: [AppController],
   providers: [

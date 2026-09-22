@@ -314,6 +314,10 @@ model Product {
   // OMS: produto único (peça de saldão sem reposição). Reserva estoque já no
   // pedido e pausa o anúncio nos demais canais para evitar venda duplicada.
   isUnique            Boolean       @default(false) @map("is_unique")
+  // Não é um produto físico — comprar registra o cliente como sócio do Clube
+  // Reversa via intermediador (Bling), em vez de gerar separação/expedição.
+  // Ver ClubMembershipService.
+  isClubMembership    Boolean       @default(false) @map("is_club_membership")
   ncm                 String?
   origem              Int?          @default(0)
   cfop                String?       @db.VarChar(10)
