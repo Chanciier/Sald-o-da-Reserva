@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { AddClubMemberInput, AddClubMemberResult } from './intermediador.types';
+import type {
+  AddClubMemberInput,
+  AddClubMemberResult,
+  ClubMembershipStatus,
+} from './intermediador.types';
 
 /**
  * Cliente HTTP do intermediador (EasyPDV) — a única ponte entre este backend
@@ -48,5 +52,25 @@ export class IntermediadorService {
     }
 
     return (await response.json()) as AddClubMemberResult;
+  }
+
+  async checkClubMembership(document: string): Promise<ClubMembershipStatus> {
+    if (!this.isConfigured()) {
+      throw new Error(
+        'Intermediador não configurado (INTERMEDIADOR_BASE_URL/INTERMEDIADOR_API_KEY).',
+      );
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/integrations/ecommerce/club-members/${encodeURIComponent(document)}`,
+      { headers: { 'X-Ecommerce-Api-Key': this.apiKey } },
+    );
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Intermediador respondeu ${response.status}: ${body}`);
+    }
+
+    return (await response.json()) as ClubMembershipStatus;
   }
 }

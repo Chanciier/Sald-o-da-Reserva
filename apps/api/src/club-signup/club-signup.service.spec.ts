@@ -1,10 +1,11 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { StockService } from '../stock/stock.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EventBusService } from '../events/event-bus.service';
 import { OmsEvents } from '../events/oms-events';
+import { IntermediadorService } from '../intermediador/intermediador.service';
 import { ClubSignupService } from './club-signup.service';
 
 /**
@@ -23,6 +24,7 @@ describe('ClubSignupService.subscribe', () => {
   let stock: { reserveForOrder: jest.Mock };
   let notifications: { notifyNewOrder: jest.Mock };
   let events: { emit: jest.Mock };
+  let intermediador: { checkClubMembership: jest.Mock };
 
   const AUTH_RESULT = {
     user: { id: 'user-1', email: 'guest+11122233396@saldaodareserva.com.br' },
@@ -49,6 +51,9 @@ describe('ClubSignupService.subscribe', () => {
     stock = { reserveForOrder: jest.fn().mockResolvedValue({ reserved: [], conflicts: [] }) };
     notifications = { notifyNewOrder: jest.fn().mockResolvedValue(undefined) };
     events = { emit: jest.fn() };
+    intermediador = {
+      checkClubMembership: jest.fn().mockResolvedValue({ isMember: false, validUntil: null }),
+    };
 
     service = new ClubSignupService(
       prisma as unknown as PrismaService,
@@ -56,6 +61,7 @@ describe('ClubSignupService.subscribe', () => {
       stock as unknown as StockService,
       notifications as unknown as NotificationsService,
       events as unknown as EventBusService,
+      intermediador as unknown as IntermediadorService,
     );
   });
 
@@ -109,5 +115,68 @@ describe('ClubSignupService.subscribe', () => {
     );
     // Sem tokens novos — o front já tem sessão válida, nada pra persistir.
     expect(result).toEqual({ orderId: 'order-1' });
+  });
+
+  it('rejects a new signup when the CPF is already an active club member', async () => {
+    intermediador.checkClubMembership.mockResolvedValue({
+      isMember: true,
+      validUntil: '2027-01-15T00:00:00.000Z',
+    });
+
+    await expect(service.subscribe(DTO, '1.2.3.4', 'jest-agent')).rejects.toThrow(
+      ConflictException,
+    );
+    expect(authService.guestCheckout).not.toHaveBeenCalled();
+    expect(prisma.order.create).not.toHaveBeenCalled();
+  });
+
+  it('never blocks the signup if the membership check itself fails (fail-open)', async () => {
+    intermediador.checkClubMembership.mockRejectedValue(new Error('intermediador fora do ar'));
+
+    const result = await service.subscribe(DTO, '1.2.3.4', 'jest-agent');
+
+    expect(result.orderId).toBe('order-1');
+  });
+});
+
+describe('ClubSignupService.checkCpfStatus', () => {
+  let service: ClubSignupService;
+  let intermediador: { checkClubMembership: jest.Mock };
+
+  beforeEach(() => {
+    intermediador = { checkClubMembership: jest.fn() };
+    service = new ClubSignupService(
+      {} as unknown as PrismaService,
+      {} as unknown as AuthService,
+      {} as unknown as StockService,
+      {} as unknown as NotificationsService,
+      {} as unknown as EventBusService,
+      intermediador as unknown as IntermediadorService,
+    );
+  });
+
+  it('rejects a malformed CPF before calling the intermediador', async () => {
+    await expect(service.checkCpfStatus('123')).rejects.toThrow(BadRequestException);
+    expect(intermediador.checkClubMembership).not.toHaveBeenCalled();
+  });
+
+  it('returns the intermediador status for a well-formed CPF', async () => {
+    intermediador.checkClubMembership.mockResolvedValue({
+      isMember: true,
+      validUntil: '2027-01-15T00:00:00.000Z',
+    });
+
+    const result = await service.checkCpfStatus('11122233396');
+
+    expect(intermediador.checkClubMembership).toHaveBeenCalledWith('11122233396');
+    expect(result).toEqual({ isMember: true, validUntil: '2027-01-15T00:00:00.000Z' });
+  });
+
+  it('fails open (not a member) when the intermediador check errors out', async () => {
+    intermediador.checkClubMembership.mockRejectedValue(new Error('intermediador fora do ar'));
+
+    const result = await service.checkCpfStatus('11122233396');
+
+    expect(result).toEqual({ isMember: false, validUntil: null });
   });
 });

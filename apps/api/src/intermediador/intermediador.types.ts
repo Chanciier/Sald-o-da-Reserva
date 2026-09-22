@@ -16,3 +16,10 @@ export interface AddClubMemberResult {
   name: string;
   validUntil: string | null;
 }
+
+// Mesmo contrato de GET /integrations/ecommerce/club-members/:document.
+export interface ClubMembershipStatus {
+  isMember: boolean;
+  /** ISO 8601, presente só quando isMember é true. */
+  validUntil: string | null;
+}

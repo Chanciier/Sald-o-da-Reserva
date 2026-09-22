@@ -97,6 +97,23 @@ export async function clubSignupApi(
   return data as ClubSignupResponse;
 }
 
+export interface ClubMembershipStatus {
+  isMember: boolean;
+  validUntil: string | null;
+}
+
+// Chamado ao sair do campo CPF em /assinar-clube, antes de ir pro pagamento
+// — avisa "você já é sócio até DD/MM" pra quem já assinou (pelo site ou na
+// loja física). Fail-open no backend (ver ClubSignupService.checkCpfStatus):
+// erro aqui nunca deveria travar a tela, mas se travar, quem chama trata
+// como "não deu pra confirmar" e deixa seguir.
+export async function checkClubCpfApi(cpf: string): Promise<ClubMembershipStatus> {
+  const res = await fetch(`${BASE}/club-signup/check-cpf/${cpf}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { message?: string }).message ?? `Erro ${res.status}`);
+  return data as ClubMembershipStatus;
+}
+
 export async function refreshApi(refreshToken: string): Promise<AuthTokens> {
   const res = await fetch(`${BASE}/auth/refresh`, {
     method: 'POST',

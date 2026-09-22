@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { clubSignupApi } from '@/lib/auth-api';
+import { checkClubCpfApi, clubSignupApi } from '@/lib/auth-api';
 import { getProduct } from '@/lib/api';
 import { TurnstileWidget } from '@/components/auth/turnstile-widget';
 import type { Product } from '@/types/product';
@@ -28,6 +28,10 @@ function formatPhone(v: string) {
 
 function formatBRL(n: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+}
+
+function formatDatePtBR(iso: string) {
+  return new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 }
 
 const PAYMENT_METHODS: {
@@ -58,6 +62,8 @@ export default function AssinarClubePage() {
   const [turnstileToken, setTurnstileToken] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [existingMemberUntil, setExistingMemberUntil] = useState<string | null>(null);
+  const [checkingCpf, setCheckingCpf] = useState(false);
 
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -70,6 +76,22 @@ export default function AssinarClubePage() {
   useEffect(() => {
     if (user?.name) setName(user.name);
   }, [user?.name]);
+
+  async function handleCpfBlur() {
+    const cleanCpf = cpf.replace(/\D/g, '');
+    if (cleanCpf.length !== 11) return;
+    setCheckingCpf(true);
+    try {
+      const status = await checkClubCpfApi(cleanCpf);
+      setExistingMemberUntil(status.isMember ? status.validUntil : null);
+    } catch {
+      // Fail-open: não deu pra confirmar, não trava a tela — a checagem que
+      // realmente importa roda de novo no backend na hora de assinar.
+      setExistingMemberUntil(null);
+    } finally {
+      setCheckingCpf(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -87,6 +109,12 @@ export default function AssinarClubePage() {
     }
     if (turnstileSiteKey && !turnstileToken) {
       setError('Complete a verificação de segurança e tente novamente.');
+      return;
+    }
+    if (existingMemberUntil) {
+      setError(
+        `Este CPF já é sócio do Clube Reversa (válido até ${formatDatePtBR(existingMemberUntil)}).`,
+      );
       return;
     }
 
@@ -154,12 +182,23 @@ export default function AssinarClubePage() {
           <input
             required
             value={cpf}
-            onChange={(e) => setCpf(formatCpf(e.target.value))}
+            onChange={(e) => {
+              setCpf(formatCpf(e.target.value));
+              setExistingMemberUntil(null);
+            }}
+            onBlur={handleCpfBlur}
             placeholder="000.000.000-00"
             maxLength={14}
             inputMode="numeric"
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
+          {checkingCpf && <p className="mt-1 text-xs text-muted-foreground">Verificando CPF...</p>}
+          {existingMemberUntil && (
+            <p className="mt-1 text-xs text-destructive">
+              Este CPF já é sócio do Clube Reversa (válido até {formatDatePtBR(existingMemberUntil)}
+              ).
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -210,7 +249,7 @@ export default function AssinarClubePage() {
 
         <button
           type="submit"
-          disabled={submitting || !termsAccepted}
+          disabled={submitting || !termsAccepted || !!existingMemberUntil}
           className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
         >
           {submitting ? 'Processando...' : 'Assinar e pagar'}
