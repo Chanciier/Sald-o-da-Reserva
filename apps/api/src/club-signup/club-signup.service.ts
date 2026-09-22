@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockService } from '../stock/stock.service';
@@ -9,6 +15,8 @@ import { recordOrderEvent } from '../common/order-timeline';
 import { AuthService } from '../auth/auth.service';
 import { GuestCheckoutDto } from '../auth/dto/guest-checkout.dto';
 import type { PublicUser } from '../auth/types/auth.types';
+import { IntermediadorService } from '../intermediador/intermediador.service';
+import type { ClubMembershipStatus } from '../intermediador/intermediador.types';
 
 export interface ClubSignupResult {
   orderId: string;
@@ -43,7 +51,25 @@ export class ClubSignupService {
     private readonly stock: StockService,
     private readonly notifications: NotificationsService,
     private readonly events: EventBusService,
+    private readonly intermediador: IntermediadorService,
   ) {}
+
+  // Consulta usada pela tela ao sair do campo CPF, pra avisar "você já é
+  // sócio até DD/MM" antes mesmo de escolher forma de pagamento. Fail-open:
+  // se o intermediador não responder, não trava a UI — trata como "não é
+  // sócio" e deixa seguir (a checagem que realmente importa é a de
+  // subscribe() abaixo, que roda de novo na hora de criar o pedido).
+  async checkCpfStatus(cpf: string): Promise<ClubMembershipStatus> {
+    if (!/^\d{11}$/.test(cpf)) {
+      throw new BadRequestException('CPF deve conter 11 dígitos numéricos.');
+    }
+    try {
+      return await this.intermediador.checkClubMembership(cpf);
+    } catch (error) {
+      this.logger.warn(`Falha ao checar status de sócio: ${(error as Error).message}`);
+      return { isMember: false, validUntil: null };
+    }
+  }
 
   async subscribe(
     dto: GuestCheckoutDto,
@@ -51,6 +77,8 @@ export class ClubSignupService {
     userAgent: string,
     existingUserId?: string,
   ): Promise<ClubSignupResult> {
+    await this.rejectIfAlreadyMember(dto.cpf);
+
     let userId: string;
     let session: { user: PublicUser; accessToken: string; refreshToken: string } | undefined;
 
@@ -116,5 +144,32 @@ export class ClubSignupService {
     this.events.emit(OmsEvents.OrderCreated, { orderId: order.id });
 
     return { ...session, orderId: order.id };
+  }
+
+  // Enforço real (não só o aviso de checkCpfStatus) — bloqueia criar pedido
+  // novo pra quem já é sócio ativo, seja pela loja física ou por uma
+  // assinatura anterior do site. Fail-open na falha da checagem em si: uma
+  // instabilidade do intermediador não pode impedir uma compra legítima.
+  private async rejectIfAlreadyMember(cpf: string): Promise<void> {
+    let status: ClubMembershipStatus;
+    try {
+      status = await this.intermediador.checkClubMembership(cpf);
+    } catch (error) {
+      this.logger.warn(
+        `Não foi possível checar sócio existente antes da assinatura: ${(error as Error).message}`,
+      );
+      return;
+    }
+
+    if (!status.isMember) return;
+
+    const until = status.validUntil
+      ? new Date(status.validUntil).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      : null;
+    throw new ConflictException(
+      until
+        ? `Este CPF já é sócio do Clube Reversa (válido até ${until}).`
+        : 'Este CPF já é sócio do Clube Reversa.',
+    );
   }
 }
