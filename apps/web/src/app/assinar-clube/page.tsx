@@ -41,7 +41,7 @@ const PAYMENT_METHODS: {
   icon: string;
 }[] = [
   { method: 'PIX', label: 'PIX', description: 'Aprovação imediata', icon: '⚡' },
-  { method: 'CREDIT_CARD', label: 'Cartão de crédito', description: 'Em até 10x', icon: '💳' },
+  { method: 'CREDIT_CARD', label: 'Cartão de crédito', description: 'Em até 12x', icon: '💳' },
 ];
 
 // Assinatura do Clube Reversa: sem carrinho, sem escolha de entrega — clica
