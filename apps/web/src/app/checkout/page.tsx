@@ -121,6 +121,85 @@ const PAYMENT_METHODS: {
   },
 ];
 
+// Clube Reversa não é produto físico — não exige cadastro no site. Cria uma
+// sessão de verdade por trás dos panos (AuthProvider.guestCheckout) a partir
+// só de nome/telefone/CPF, sem tela de senha/e-mail.
+function GuestClubCheckoutForm() {
+  const { guestCheckout } = useAuth();
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      await guestCheckout(name.trim(), phone.replace(/\D/g, ''), cpf.replace(/\D/g, ''));
+    } catch (err) {
+      setError((err as Error).message);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-md px-4 py-16">
+      <h1 className="mb-2 text-xl font-bold">Assinar o Clube Reversa</h1>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Não precisa ter cadastro — é só preencher seus dados abaixo pra continuar.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Nome completo</label>
+          <input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={150}
+            autoComplete="name"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Celular / WhatsApp</label>
+          <input
+            required
+            value={phone}
+            onChange={(e) => setPhone(formatPhone(e.target.value))}
+            placeholder="(11) 91234-5678"
+            maxLength={16}
+            inputMode="tel"
+            autoComplete="tel"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">CPF</label>
+          <input
+            required
+            value={cpf}
+            onChange={(e) => setCpf(formatCpf(e.target.value))}
+            placeholder="000.000.000-00"
+            maxLength={14}
+            inputMode="numeric"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {submitting ? 'Continuando…' : 'Continuar'}
+        </button>
+      </form>
+    </main>
+  );
+}
+
 export default function CheckoutPage() {
   const { user, token } = useAuth();
   const { cart, refresh } = useCart();
@@ -155,6 +234,16 @@ export default function CheckoutPage() {
   const [newAddressLabel, setNewAddressLabel] = useState('');
 
   const isPickup = deliveryMethod === 'PICKUP';
+
+  // Clube Reversa não é produto físico — não faz sentido escolher entrega,
+  // e não é preciso estar logado pra comprar (ver GuestClubCheckoutForm acima).
+  const isClubOnlyCart = Boolean(
+    cart?.items.length && cart.items.every((item) => item.slug === 'clube-reversa'),
+  );
+
+  useEffect(() => {
+    if (isClubOnlyCart) setDeliveryMethod('PICKUP');
+  }, [isClubOnlyCart]);
 
   useEffect(() => {
     if (checkoutStartTracked.current || !cart?.items?.length) return;
@@ -404,6 +493,10 @@ export default function CheckoutPage() {
     }
   }
 
+  if (!user && isClubOnlyCart) {
+    return <GuestClubCheckoutForm />;
+  }
+
   if (!user) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16 text-center">
@@ -444,54 +537,57 @@ export default function CheckoutPage() {
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            {/* Delivery method selector */}
-            <section className="rounded-xl border border-border p-5 space-y-3">
-              <h2 className="font-semibold">Forma de recebimento</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                  <input
-                    type="radio"
-                    name="deliveryMethod"
-                    value="SHIPPING"
-                    checked={deliveryMethod === 'SHIPPING'}
-                    onChange={() => setDeliveryMethod('SHIPPING')}
-                    className="accent-primary"
-                  />
-                  <div>
-                    <p className="text-sm font-medium">Entrega</p>
-                    <p className="text-xs text-muted-foreground">Receber em casa</p>
-                  </div>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                  <input
-                    type="radio"
-                    name="deliveryMethod"
-                    value="PICKUP"
-                    checked={deliveryMethod === 'PICKUP'}
-                    onChange={() => setDeliveryMethod('PICKUP')}
-                    className="accent-primary"
-                  />
-                  <div>
-                    <p className="text-sm font-medium">Retirada na Loja</p>
-                    <p className="text-xs text-muted-foreground">Frete grátis</p>
-                  </div>
-                </label>
-              </div>
-
-              {isPickup && (
-                <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1.5">
-                  <p className="text-sm font-medium text-foreground">Local de retirada</p>
-                  <p className="text-sm font-semibold">{STORE.mall}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {STORE.address} — {STORE.neighborhood}, {STORE.city}/{STORE.state}
-                  </p>
-                  <p className="text-xs text-muted-foreground">CEP {STORE.cep}</p>
-                  <p className="text-xs text-muted-foreground pt-1">
-                    Você receberá uma notificação quando seu pedido estiver pronto para retirada.
-                  </p>
+            {/* Delivery method selector — não faz sentido para carrinho 100%
+                Clube Reversa (não é produto físico, sempre PICKUP por baixo). */}
+            {!isClubOnlyCart && (
+              <section className="rounded-xl border border-border p-5 space-y-3">
+                <h2 className="font-semibold">Forma de recebimento</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      value="SHIPPING"
+                      checked={deliveryMethod === 'SHIPPING'}
+                      onChange={() => setDeliveryMethod('SHIPPING')}
+                      className="accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">Entrega</p>
+                      <p className="text-xs text-muted-foreground">Receber em casa</p>
+                    </div>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 hover:bg-muted transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      value="PICKUP"
+                      checked={deliveryMethod === 'PICKUP'}
+                      onChange={() => setDeliveryMethod('PICKUP')}
+                      className="accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">Retirada na Loja</p>
+                      <p className="text-xs text-muted-foreground">Frete grátis</p>
+                    </div>
+                  </label>
                 </div>
-              )}
-            </section>
+
+                {isPickup && (
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1.5">
+                    <p className="text-sm font-medium text-foreground">Local de retirada</p>
+                    <p className="text-sm font-semibold">{STORE.mall}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {STORE.address} — {STORE.neighborhood}, {STORE.city}/{STORE.state}
+                    </p>
+                    <p className="text-xs text-muted-foreground">CEP {STORE.cep}</p>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Você receberá uma notificação quando seu pedido estiver pronto para retirada.
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* Perfis de destinatário salvos — só aparece com a flag ligada e
                 pelo menos um perfil já salvo; caso contrário o formulário

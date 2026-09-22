@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { loginApi, refreshApi, registerApi } from '@/lib/auth-api';
+import { guestCheckoutApi, loginApi, refreshApi, registerApi } from '@/lib/auth-api';
 
 interface AuthUser {
   id: string;
@@ -22,6 +22,14 @@ interface AuthContextType {
     name: string,
     email: string,
     password: string,
+    turnstileToken?: string,
+  ) => Promise<void>;
+  // Checkout sem cadastro visível (hoje só pro produto Clube Reversa) — cria
+  // uma sessão de verdade por trás dos panos, sem tela de login/senha.
+  guestCheckout: (
+    name: string,
+    phone: string,
+    cpf: string,
     turnstileToken?: string,
   ) => Promise<void>;
   logout: () => void;
@@ -143,6 +151,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persist],
   );
 
+  const guestCheckout = useCallback(
+    async (name: string, phone: string, cpf: string, turnstileToken?: string) => {
+      const data = await guestCheckoutApi(name, phone, cpf, turnstileToken);
+      persist(data);
+    },
+    [persist],
+  );
+
   const updateUser = useCallback((partial: Partial<AuthUser>) => {
     setUser((prev) => {
       if (!prev) return prev;
@@ -153,7 +169,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider
+      value={{ user, token, loading, login, register, guestCheckout, logout, updateUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
