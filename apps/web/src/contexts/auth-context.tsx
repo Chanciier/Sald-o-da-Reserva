@@ -41,6 +41,10 @@ interface AuthContextType {
     cpf: string,
     turnstileToken?: string,
   ) => Promise<AuthTokens>;
+  // Persiste uma sessão já emitida por outro endpoint (ex: club-signup para
+  // quem assinou o Clube Reversa como convidado). Quem já estava logado
+  // nunca chama isso — o backend não devolve tokens novos nesse caso.
+  applySession: (tokens: AuthTokens) => void;
   logout: () => void;
   updateUser: (partial: Partial<AuthUser>) => void;
 }
@@ -169,6 +173,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persist],
   );
 
+  const applySession = useCallback(
+    (tokens: AuthTokens) => {
+      persist(tokens);
+    },
+    [persist],
+  );
+
   const updateUser = useCallback((partial: Partial<AuthUser>) => {
     setUser((prev) => {
       if (!prev) return prev;
@@ -180,7 +191,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, register, guestCheckout, logout, updateUser }}
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        register,
+        guestCheckout,
+        applySession,
+        logout,
+        updateUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

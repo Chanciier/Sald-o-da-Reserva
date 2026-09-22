@@ -27,14 +27,13 @@ export function AddToCartButton({ productId, stock, isClubMembership }: Props) {
     );
   }
 
-  if (!user && isClubMembership) {
-    // Clube Reversa não exige cadastro — vai direto pro checkout, que mostra
-    // um formulário de nome/telefone/CPF em vez da tela de login (ver
-    // GuestClubCheckoutForm em app/checkout/page.tsx). Não passa por
-    // "adicionar ao carrinho" porque o carrinho em si exige login.
+  if (isClubMembership) {
+    // Clube Reversa não usa carrinho nem checkout normal — assinatura, dados
+    // e pagamento acontecem direto na página dedicada, pra quem já tem conta
+    // e pra quem não tem (ver ClubSignupController no backend).
     return (
       <a
-        href="/checkout?guestClub=1"
+        href="/assinar-clube"
         className="flex w-full items-center justify-center rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
       >
         Assinar agora

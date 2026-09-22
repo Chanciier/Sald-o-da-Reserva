@@ -67,6 +67,36 @@ export async function guestCheckoutApi(
   });
 }
 
+export interface ClubSignupResponse {
+  orderId: string;
+  // Só vêm quando quem assinou era convidado — o backend cria a sessão na
+  // mesma chamada (ver ClubSignupService). Quem já estava logado usa a
+  // própria sessão e o backend não devolve nada disso.
+  accessToken?: string;
+  refreshToken?: string;
+  user?: AuthUserDto;
+}
+
+export async function clubSignupApi(
+  name: string,
+  phone: string,
+  cpf: string,
+  token?: string,
+  turnstileToken?: string,
+): Promise<ClubSignupResponse> {
+  const res = await fetch(`${BASE}/club-signup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify({ name, phone, cpf, ...(turnstileToken && { turnstileToken }) }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { message?: string }).message ?? `Erro ${res.status}`);
+  return data as ClubSignupResponse;
+}
+
 export async function refreshApi(refreshToken: string): Promise<AuthTokens> {
   const res = await fetch(`${BASE}/auth/refresh`, {
     method: 'POST',
