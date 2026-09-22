@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DeliveryMethod, OrderStatus, Prisma } from '@prisma/client';
+import { DeliveryMethod, DocumentType, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { ShippingService, ShippingQuoteOption } from '../shipping/shipping.service';
@@ -115,6 +115,20 @@ export class CheckoutService {
           `Estoque insuficiente para "${item.name}". Disponível: ${product.stock}.`,
         );
       }
+    }
+
+    // Clube Reversa (produto não-físico) precisa de CPF válido — é o que vai
+    // pro Bling via intermediador quando o pagamento for aprovado (ver
+    // ClubMembershipService). Falha aqui, no checkout, é bem melhor do que
+    // falhar silenciosamente depois do pagamento já aprovado.
+    const hasClubMembershipItem = availableItems.some(
+      (item) => productMap.get(item.productId)?.isClubMembership,
+    );
+    if (
+      hasClubMembershipItem &&
+      (!identity.recipientDocument || identity.recipientDocumentType !== DocumentType.CPF)
+    ) {
+      throw new BadRequestException('CPF é obrigatório para assinar o Clube Reversa.');
     }
 
     // Frete: o preço NUNCA é confiado a partir do DTO. Para envio, recotamos no

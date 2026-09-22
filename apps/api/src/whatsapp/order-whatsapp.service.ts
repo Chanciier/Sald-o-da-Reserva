@@ -122,6 +122,20 @@ export class OrderWhatsappService {
     return this.send(t.phone, msg);
   }
 
+  // ── Clube Reversa ────────────────────────────────────────────────────────
+
+  /** Sócio ativado no Clube Reversa (Bling confirmado via intermediador). */
+  notifyClubMembershipActive(t: OrderNotifyTarget, validUntil: Date): Promise<boolean> {
+    const validUntilStr = validUntil.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const msg =
+      `${this.greeting(t.name)} 🎉\n\n` +
+      `Seu *Clube Reversa* está ativo! A partir de agora você já aproveita os benefícios de sócio.\n\n` +
+      `Válido até *${validUntilStr}*.\n\n` +
+      `Qualquer dúvida, é só chamar por aqui. 💛\n` +
+      `${STORE_NAME}`;
+    return this.send(t.phone, msg);
+  }
+
   // ── Envio (SHIPPING) ────────────────────────────────────────────────────────
 
   /** Pedido separado e indo para embalagem/postagem. */

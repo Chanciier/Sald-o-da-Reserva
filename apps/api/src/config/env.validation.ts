@@ -170,6 +170,17 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   WHATSAPP_DELETE_WINDOW_MINUTES: string = '3600';
+
+  // ClubMembershipModule: intermediador (EasyPDV) que registra o sócio do
+  // Clube Reversa no Bling. Vazio = módulo loga erro e não registra (nunca
+  // derruba o pagamento — ver ClubMembershipService).
+  @IsString()
+  @IsOptional()
+  INTERMEDIADOR_BASE_URL: string = '';
+
+  @IsString()
+  @IsOptional()
+  INTERMEDIADOR_API_KEY: string = '';
 }
 
 export function envValidation(config: Record<string, unknown>) {

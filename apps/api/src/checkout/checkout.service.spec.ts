@@ -419,4 +419,34 @@ describe('CheckoutService.createOrder', () => {
     ).rejects.toThrow(BadRequestException);
     expect(identityNormalizer.resolveIdentity).not.toHaveBeenCalled();
   });
+
+  it('Clube Reversa: rejects checkout without a valid CPF', async () => {
+    prisma.product.findMany.mockResolvedValue([
+      { id: 'prod-1', status: 'ACTIVE', stock: 10, isClubMembership: true },
+    ]);
+    identityNormalizer.resolveIdentity.mockResolvedValue({
+      recipientProfileId: null,
+      buyerName: 'Fulano',
+      recipientDocument: null,
+      recipientDocumentType: null,
+      recipientEmail: null,
+    });
+
+    await expect(
+      service.createOrder(USER_ID, baseDto({ deliveryMethod: DeliveryMethod.PICKUP })),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('Clube Reversa: allows checkout when a valid CPF is present', async () => {
+    prisma.product.findMany.mockResolvedValue([
+      { id: 'prod-1', status: 'ACTIVE', stock: 10, isClubMembership: true },
+    ]);
+    // identityNormalizer já retorna CPF válido por padrão (ver beforeEach).
+
+    await expect(
+      service.createOrder(USER_ID, baseDto({ deliveryMethod: DeliveryMethod.PICKUP })),
+    ).resolves.toBeDefined();
+    expect(prisma.$transaction).toHaveBeenCalled();
+  });
 });

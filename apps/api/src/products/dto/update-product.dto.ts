@@ -173,6 +173,12 @@ export class UpdateProductDto {
   @IsBoolean()
   isUnique?: boolean;
 
+  // Não é produto físico — compra registra sócio do Clube Reversa via
+  // intermediador em vez de gerar separação/expedição.
+  @IsOptional()
+  @IsBoolean()
+  isClubMembership?: boolean;
+
   // OMS: enfileira publicação imediata nos canais selecionados durante a edição.
   @IsOptional()
   @IsArray()

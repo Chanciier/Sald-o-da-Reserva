@@ -153,6 +153,7 @@ export class ProductsService {
         featuredOffer: dto.featuredOffer ?? false,
         status: dto.status,
         isUnique: dto.isUnique ?? false,
+        isClubMembership: dto.isClubMembership ?? false,
         autoPublishWhatsapp: dto.autoPublishWhatsapp ?? false,
         whatsappGroupIds: dto.whatsappGroupIds ?? [],
         categoryId: dto.categoryId,

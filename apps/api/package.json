@@ -18,7 +18,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "products:remove-active": "ts-node scripts/remove-active-products.ts"
+    "products:remove-active": "ts-node scripts/remove-active-products.ts",
+    "products:create-club-membership": "ts-node scripts/create-club-membership-product.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",
