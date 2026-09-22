@@ -115,7 +115,14 @@ export class WebhooksService {
     // ── Load payment from DB ──────────────────────────────────────────────────
     const payment = await this.prisma.payment.findUnique({
       where: { gatewayPaymentId: mpPaymentId },
-      include: { order: { include: { items: true, user: { select: { email: true } } } } },
+      include: {
+        order: {
+          include: {
+            items: { include: { product: { select: { isClubMembership: true } } } },
+            user: { select: { email: true } },
+          },
+        },
+      },
     });
 
     if (!payment) {
@@ -234,11 +241,17 @@ export class WebhooksService {
         orderId: payment.orderId,
         paymentId: payment.id,
       });
-      void this.orderWa.notifyOrderConfirmed({
-        phone: payment.order.customerPhone,
-        name: payment.order.buyerName,
-        orderId: payment.orderId,
-      });
+      // Clube Reversa não é "pedido" no sentido físico — quem assina já recebe
+      // a confirmação de sócio ativo (ClubMembershipService); a mensagem
+      // genérica de "pedido confirmado" some estoque/expedição sem sentido aqui.
+      const allClubMembership = payment.order.items.every((item) => item.product?.isClubMembership);
+      if (!allClubMembership) {
+        void this.orderWa.notifyOrderConfirmed({
+          phone: payment.order.customerPhone,
+          name: payment.order.buyerName,
+          orderId: payment.orderId,
+        });
+      }
     }
 
     if (newStatus === PaymentStatus.APPROVED) {
