@@ -5,7 +5,7 @@ import { Header } from './header';
 import { CartDrawer } from '@/components/cart/cart-drawer';
 
 const DASHBOARD_PREFIXES = ['/admin', '/vendedor', '/cliente'];
-const LANDING_PAGES = ['/produtos/clube-reversa'];
+export const LANDING_PAGES = ['/produtos/clube-reversa'];
 
 export function ConditionalHeader() {
   const pathname = usePathname();
