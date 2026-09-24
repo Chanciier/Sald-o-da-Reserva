@@ -10,12 +10,16 @@ import {
   TicketPercent,
 } from 'lucide-react';
 
+import { ClubStickyCta } from '@/components/club/club-sticky-cta';
 import { getProduct } from '@/lib/api';
 import { effectivePrice, formatBRL } from '@/lib/discovery';
 
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800', '900'] });
 
 const SIGNUP_HREF = '/assinar-clube';
+const HERO_CTA_ID = 'clube-cta-hero';
+const FINAL_CTA_ID = 'clube-cta-final';
+const WATCHED_CTA_IDS = [HERO_CTA_ID, FINAL_CTA_ID];
 
 export const metadata: Metadata = {
   title: 'Cliente Clube',
@@ -155,6 +159,7 @@ export default async function ClubeReversaPage() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a
+              id={HERO_CTA_ID}
               href={SIGNUP_HREF}
               className="group inline-flex items-center justify-center gap-3 rounded-2xl bg-[#e93732] px-6 py-4 text-sm font-black text-white shadow-[0_5px_0_#a92825] transition hover:-translate-y-0.5 hover:shadow-[0_7px_0_#a92825] active:translate-y-0 active:shadow-[0_3px_0_#a92825]"
             >
@@ -245,6 +250,7 @@ export default async function ClubeReversaPage() {
               Adesão anual de {price}, parcelada em até 12x no cartão. Sem complicação.
             </p>
             <a
+              id={FINAL_CTA_ID}
               href={SIGNUP_HREF}
               className="group relative mt-8 inline-flex items-center justify-center gap-3 rounded-2xl bg-[#ffd11a] px-7 py-4 text-sm font-black text-[#171717] shadow-[0_5px_0_#a88a00] transition hover:-translate-y-0.5 hover:shadow-[0_7px_0_#a88a00] active:translate-y-0 active:shadow-[0_3px_0_#a88a00]"
             >
@@ -259,12 +265,7 @@ export default async function ClubeReversaPage() {
         Cliente Clube Saldão da Reversa SJC · Vantagens para aproveitar mais.
       </p>
 
-      <a
-        href={SIGNUP_HREF}
-        className="fixed bottom-4 left-4 right-4 z-20 flex items-center justify-center gap-2 rounded-2xl bg-[#e93732] px-5 py-4 text-sm font-black text-white shadow-[0_5px_0_#a92825] sm:hidden"
-      >
-        Quero entrar para o clube <ArrowRight size={17} />
-      </a>
+      <ClubStickyCta href={SIGNUP_HREF} watchIds={WATCHED_CTA_IDS} />
     </main>
   );
 }
