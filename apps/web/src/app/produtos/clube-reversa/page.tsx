@@ -261,7 +261,7 @@ export default async function ClubeReversaPage() {
         </div>
       </section>
 
-      <p className="relative z-10 border-t border-[#171717]/10 px-5 py-7 text-center text-xs font-semibold text-[#918b82] sm:px-8">
+      <p className="relative z-10 border-t border-[#171717]/10 px-5 pb-28 pt-7 text-center text-xs font-semibold text-[#918b82] sm:px-8 sm:pb-7">
         Cliente Clube Saldão da Reversa SJC · Vantagens para aproveitar mais.
       </p>
 
