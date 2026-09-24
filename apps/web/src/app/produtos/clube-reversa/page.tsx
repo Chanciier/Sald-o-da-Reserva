@@ -142,7 +142,7 @@ export default async function ClubeReversaPage() {
               cliente comum não vê — e faça cada visita valer mais.
             </p>
 
-            <div className="flex items-stretch gap-0 self-start rounded-2xl border-2 border-[#171717] bg-white shadow-[6px_6px_0_#171717] sm:self-end">
+            <div className="flex items-stretch gap-0 self-start justify-self-start overflow-hidden rounded-2xl border-2 border-[#171717] bg-white shadow-[6px_6px_0_#171717] sm:self-end">
               <div className="px-5 py-3">
                 <p className="text-[9px] font-black uppercase tracking-wider text-[#77736c]">
                   Por ano
