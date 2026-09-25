@@ -7,7 +7,9 @@ import { CreateCommunityGroupDto } from './dto/create-community-group.dto';
 import { UpdateCommunityGroupDto } from './dto/update-community-group.dto';
 import { JoinCommunityDto } from './dto/join-community.dto';
 import { GROUP_PROVISIONER, GroupProvisioner } from './group-provisioner';
+import { DEFAULT_CATEGORY } from './category';
 
+// Um cache por categoria: community:groups:active:<categoria>.
 const GROUPS_CACHE_KEY = 'community:groups:active';
 const GROUPS_CACHE_TTL_SECONDS = 60;
 const PENDING_KEY_PREFIX = 'community:pending:';
@@ -45,14 +47,16 @@ export class CommunityService {
   // ── Distribuição (fluxo público) ───────────────────────────────────────────
 
   /**
-   * Escolhe o grupo para um novo membro e registra o acesso para analytics.
+   * Escolhe o grupo para um novo membro — só entre os grupos da categoria do
+   * link acessado — e registra o acesso para analytics.
    * Nunca consulta o WhatsApp no caminho quente: trabalha só com banco/cache.
    */
   async join(dto: JoinCommunityDto): Promise<JoinResult> {
-    const groups = await this.getDistributableGroups();
+    const category = dto.category ?? DEFAULT_CATEGORY;
+    const groups = await this.getDistributableGroups(category);
     const picked = pickGroupForNewMember(groups);
 
-    await this.recordRedirect(picked?.id ?? null, dto);
+    await this.recordRedirect(picked?.id ?? null, category, dto);
 
     if (!picked) return { available: false };
 
@@ -70,7 +74,11 @@ export class CommunityService {
     };
   }
 
-  private async recordRedirect(groupId: string | null, dto: JoinCommunityDto): Promise<void> {
+  private async recordRedirect(
+    groupId: string | null,
+    category: string,
+    dto: JoinCommunityDto,
+  ): Promise<void> {
     try {
       await this.prisma.communityRedirect.create({
         data: {
@@ -78,6 +86,7 @@ export class CommunityService {
           outcome: groupId
             ? CommunityRedirectOutcome.REDIRECTED
             : CommunityRedirectOutcome.ALL_FULL,
+          category,
           visitorId: dto.visitorId,
           utmSource: dto.utmSource,
           utmMedium: dto.utmMedium,
@@ -91,18 +100,19 @@ export class CommunityService {
     }
   }
 
-  /** Grupos ativos (cache 60s) enriquecidos com os contadores otimistas. */
-  private async getDistributableGroups(): Promise<DistributableGroup[]> {
+  /** Grupos ativos da categoria (cache 60s) enriquecidos com os contadores otimistas. */
+  private async getDistributableGroups(category: string): Promise<DistributableGroup[]> {
+    const cacheKey = `${GROUPS_CACHE_KEY}:${category}`;
     let cached: CachedGroup[] | null = null;
     try {
-      cached = await this.redis.getJson<CachedGroup[]>(GROUPS_CACHE_KEY);
+      cached = await this.redis.getJson<CachedGroup[]>(cacheKey);
     } catch (err) {
       this.logger.warn(`Cache de grupos indisponível: ${(err as Error).message}`);
     }
 
     if (!cached) {
       const rows = await this.prisma.communityGroup.findMany({
-        where: { active: true, status: { not: CommunityGroupStatus.ARCHIVED } },
+        where: { category, active: true, status: { not: CommunityGroupStatus.ARCHIVED } },
         orderBy: { createdAt: 'asc' },
       });
       cached = rows.map((g) => ({
@@ -117,7 +127,7 @@ export class CommunityService {
         createdAt: g.createdAt.toISOString(),
       }));
       try {
-        await this.redis.setJson(GROUPS_CACHE_KEY, cached, GROUPS_CACHE_TTL_SECONDS);
+        await this.redis.setJson(cacheKey, cached, GROUPS_CACHE_TTL_SECONDS);
       } catch {
         // cache é otimização, não requisito
       }
@@ -152,7 +162,8 @@ export class CommunityService {
 
   async invalidateCache(): Promise<void> {
     try {
-      await this.redis.del(GROUPS_CACHE_KEY);
+      // Todas as categorias (e a chave antiga, sem sufixo).
+      await this.redis.delPattern(`${GROUPS_CACHE_KEY}*`);
     } catch (err) {
       this.logger.warn(`Falha ao invalidar cache de grupos: ${(err as Error).message}`);
     }
@@ -178,10 +189,21 @@ export class CommunityService {
       createdAt: g.createdAt,
       pending: pending.get(g.id) ?? 0,
     }));
-    const recommended = pickGroupForNewMember(distributable);
+
+    // Grupo que recebe o próximo membro, por categoria (cada link distribui
+    // só entre os grupos da própria categoria).
+    const categories = [...new Set([DEFAULT_CATEGORY, ...groups.map((g) => g.category)])].sort(
+      (a, b) => (a === DEFAULT_CATEGORY ? -1 : b === DEFAULT_CATEGORY ? 1 : a.localeCompare(b)),
+    );
+    const recommendedByCategory: Record<string, string | null> = {};
+    for (const category of categories) {
+      const inCategory = distributable.filter((_, i) => groups[i].category === category);
+      recommendedByCategory[category] = pickGroupForNewMember(inCategory)?.id ?? null;
+    }
 
     return {
-      recommendedGroupId: recommended?.id ?? null,
+      categories,
+      recommendedByCategory,
       provisioner: this.provisioner.capabilities,
       groups: groups.map((g) => {
         const pendingCount = pending.get(g.id) ?? 0;
@@ -215,6 +237,7 @@ export class CommunityService {
         priority: dto.priority ?? 0,
         status: dto.status ?? CommunityGroupStatus.ACTIVE,
         active: dto.active ?? true,
+        category: dto.category ?? DEFAULT_CATEGORY,
       },
     });
     await this.invalidateCache();
@@ -250,6 +273,7 @@ export class CommunityService {
         participants: dto.participants,
         priority: dto.priority,
         active: dto.active,
+        category: dto.category,
         status,
       },
     });

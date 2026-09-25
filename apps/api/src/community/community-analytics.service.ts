@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommunityMemberEventType, CommunityRedirectOutcome } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { brazilDateKey, REPORT_TIME_ZONE } from '../analytics/report-range';
+import { CATEGORY_MESSAGE, CATEGORY_PATTERN } from './category';
 
 const MAX_DAYS = 180;
 
@@ -10,23 +11,36 @@ export class CommunityAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Visão consolidada do link único:
+   * Visão consolidada dos links de divulgação:
    *  - acessos totais e por dia (fuso de Brasília, como os demais relatórios);
    *  - redirecionamentos por grupo;
    *  - acessos que caíram em "todos lotados";
    *  - conversão por origem (UTM);
    *  - histórico de crescimento (snapshots das syncs).
+   *
+   * Com `category`, considera só o link e os grupos daquela categoria.
    */
-  async overview(daysParam?: string) {
+  async overview(daysParam?: string, category?: string) {
     const days = daysParam ? parseInt(daysParam, 10) : 30;
     if (!Number.isFinite(days) || days < 1 || days > MAX_DAYS) {
       throw new BadRequestException(`Informe um período entre 1 e ${MAX_DAYS} dias.`);
     }
+    if (category !== undefined && !CATEGORY_PATTERN.test(category)) {
+      throw new BadRequestException(CATEGORY_MESSAGE);
+    }
     const since = new Date(Date.now() - days * 86_400_000);
 
-    const [redirects, groups, snapshots, memberEvents] = await Promise.all([
+    const groups = await this.prisma.communityGroup.findMany({
+      select: { id: true, name: true, category: true },
+    });
+    // Eventos e snapshots não guardam categoria: filtra pelos grupos dela.
+    const groupFilter = category
+      ? { groupId: { in: groups.filter((g) => g.category === category).map((g) => g.id) } }
+      : {};
+
+    const [redirects, snapshots, memberEvents] = await Promise.all([
       this.prisma.communityRedirect.findMany({
-        where: { createdAt: { gte: since } },
+        where: { createdAt: { gte: since }, ...(category ? { category } : {}) },
         select: {
           groupId: true,
           outcome: true,
@@ -37,16 +51,13 @@ export class CommunityAnalyticsService {
         },
         orderBy: { createdAt: 'asc' },
       }),
-      this.prisma.communityGroup.findMany({
-        select: { id: true, name: true },
-      }),
       this.prisma.communityGroupSnapshot.findMany({
-        where: { capturedAt: { gte: since } },
+        where: { capturedAt: { gte: since }, ...groupFilter },
         select: { groupId: true, participants: true, capturedAt: true },
         orderBy: { capturedAt: 'asc' },
       }),
       this.prisma.communityMemberEvent.findMany({
-        where: { createdAt: { gte: since } },
+        where: { createdAt: { gte: since }, ...groupFilter },
         select: { groupId: true, type: true, source: true, count: true, createdAt: true },
         orderBy: { createdAt: 'asc' },
       }),
@@ -123,6 +134,7 @@ export class CommunityAnalyticsService {
 
     return {
       period: { days, since: since.toISOString(), timeZone: REPORT_TIME_ZONE },
+      category: category ?? null,
       totals: {
         accesses: totalAccesses,
         redirected: totalRedirected,

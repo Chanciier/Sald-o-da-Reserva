@@ -11,6 +11,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { CATEGORY_MAX_LENGTH, CATEGORY_MESSAGE, CATEGORY_PATTERN } from '../category';
 
 export class UpdateCommunityGroupDto {
   @IsOptional()
@@ -56,4 +57,11 @@ export class UpdateCommunityGroupDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  // Slug do link de divulgação (/grupos/<categoria>). Padrão: "geral" (/grupos).
+  @IsOptional()
+  @IsString()
+  @MaxLength(CATEGORY_MAX_LENGTH)
+  @Matches(CATEGORY_PATTERN, { message: CATEGORY_MESSAGE })
+  category?: string;
 }

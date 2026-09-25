@@ -82,7 +82,7 @@ export class CommunityAdminController {
   }
 
   @Get('analytics')
-  getAnalytics(@Query('days') days?: string) {
-    return this.analytics.overview(days);
+  getAnalytics(@Query('days') days?: string, @Query('category') category?: string) {
+    return this.analytics.overview(days, category || undefined);
   }
 }
