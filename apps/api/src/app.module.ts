@@ -52,6 +52,7 @@ import { PrintCenterModule } from './print-center/print-center.module';
 import { IntermediadorModule } from './intermediador/intermediador.module';
 import { ClubMembershipModule } from './club-membership/club-membership.module';
 import { ClubSignupModule } from './club-signup/club-signup.module';
+import { DataRetentionModule } from './data-retention/data-retention.module';
 
 @Module({
   imports: [
@@ -105,6 +106,7 @@ import { ClubSignupModule } from './club-signup/club-signup.module';
     IntermediadorModule,
     ClubMembershipModule,
     ClubSignupModule,
+    DataRetentionModule,
   ],
   controllers: [AppController],
   providers: [
