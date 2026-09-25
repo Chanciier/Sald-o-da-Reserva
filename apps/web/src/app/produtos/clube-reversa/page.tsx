@@ -180,10 +180,7 @@ export default async function ClubeReversaPage() {
         <Marquee />
       </div>
 
-      <section
-        id="beneficios"
-        className="relative z-10 scroll-mt-20 px-5 py-14 sm:px-8 lg:px-14"
-      >
+      <section id="beneficios" className="relative z-10 scroll-mt-20 px-5 py-14 sm:px-8 lg:px-14">
         <div className="mx-auto max-w-6xl">
           <div className="mb-2 flex items-baseline gap-3">
             <span className="text-5xl font-black leading-none text-[#e93732]">01</span>
