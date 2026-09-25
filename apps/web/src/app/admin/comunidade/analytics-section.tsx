@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import type { AnalyticsResponse } from './types';
+import { categoryLabel, categoryPath } from './category-links';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const PERIODS = [7, 30, 90] as const;
@@ -21,13 +22,17 @@ function Bar({ value, max, className }: { value: number; max: number; className:
   );
 }
 
-export function AnalyticsSection({ token }: { token: string }) {
+export function AnalyticsSection({ token, categories }: { token: string; categories: string[] }) {
   const [days, setDays] = useState<number>(30);
+  // '' = todos os links somados.
+  const [category, setCategory] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['community-analytics', days],
+    queryKey: ['community-analytics', days, category],
     queryFn: async () => {
-      const res = await fetch(`${BASE}/api/v1/community/admin/analytics?days=${days}`, {
+      const qs = new URLSearchParams({ days: String(days) });
+      if (category) qs.set('category', category);
+      const res = await fetch(`${BASE}/api/v1/community/admin/analytics?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Erro ao carregar analytics');
@@ -52,9 +57,23 @@ export function AnalyticsSection({ token }: { token: string }) {
 
   return (
     <section className="rounded-xl border bg-white p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-semibold">Analytics do link único</h2>
-        <div className="flex gap-1">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold">Analytics dos links</h2>
+        <div className="flex flex-wrap items-center gap-1">
+          {categories.length > 1 && (
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="mr-1 rounded-lg border px-2 py-1 text-xs"
+            >
+              <option value="">Todos os links</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {categoryLabel(c)} ({categoryPath(c)})
+                </option>
+              ))}
+            </select>
+          )}
           {PERIODS.map((p) => (
             <button
               key={p}
@@ -80,7 +99,9 @@ export function AnalyticsSection({ token }: { token: string }) {
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg bg-gray-50 p-4">
               <p className="text-2xl font-bold">{data.totals.accesses}</p>
-              <p className="text-xs text-gray-500">Acessos ao /grupos</p>
+              <p className="text-xs text-gray-500">
+                {category ? `Acessos ao ${categoryPath(category)}` : 'Acessos aos links'}
+              </p>
             </div>
             <div className="rounded-lg bg-gray-50 p-4">
               <p className="text-2xl font-bold text-green-600">{data.totals.redirected}</p>
@@ -306,8 +327,9 @@ export function AnalyticsSection({ token }: { token: string }) {
 
           {data.totals.accesses === 0 && (
             <p className="py-4 text-center text-sm text-gray-400">
-              Nenhum acesso registrado no período. Divulgue o link único{' '}
-              <span className="font-mono">/grupos</span> para começar a medir.
+              Nenhum acesso registrado no período. Divulgue o link{' '}
+              <span className="font-mono">{categoryPath(category || 'geral')}</span> para começar a
+              medir.
             </p>
           )}
         </div>

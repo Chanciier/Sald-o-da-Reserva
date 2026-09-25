@@ -8,8 +8,9 @@ import { JoinCommunityDto } from './dto/join-community.dto';
 export class CommunityController {
   constructor(private readonly community: CommunityService) {}
 
-  // Endpoint público por trás do link único /grupos: devolve o grupo com
-  // menor ocupação (ou available=false quando todos estão lotados). Nunca
+  // Endpoint público por trás dos links /grupos e /grupos/<categoria>: devolve
+  // o grupo da categoria com menor ocupação (ou available=false quando todos
+  // estão lotados). Nunca
   // toca o WhatsApp na requisição — só banco + cache.
   @Public()
   @Get('join')

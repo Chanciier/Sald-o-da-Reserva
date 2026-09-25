@@ -1129,6 +1129,10 @@ model CommunityGroup {
   // Desempate na distribuição: entre grupos com ocupação equivalente, o de
   // maior prioridade recebe primeiro.
   priority     Int                  @default(0)
+  // Categoria (slug) do link de divulgação: "geral" atende /grupos e as demais
+  // /grupos/<categoria> (ex.: sex-shop). Cada link só distribui entre os grupos
+  // da própria categoria.
+  category     String               @default("geral")
   active       Boolean              @default(true)
   lastSyncAt   DateTime?            @map("last_sync_at")
   syncError    String?              @map("sync_error")
@@ -1140,6 +1144,7 @@ model CommunityGroup {
   memberEvents CommunityMemberEvent[]
 
   @@index([active, status])
+  @@index([category])
   @@map("community_groups")
 }
 
@@ -1150,6 +1155,8 @@ model CommunityRedirect {
   groupId     String?                  @map("group_id")
   group       CommunityGroup?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
   outcome     CommunityRedirectOutcome
+  // Categoria do link acessado — separa os acessos por link nos analytics.
+  category    String                   @default("geral")
   visitorId   String?                  @map("visitor_id")
   utmSource   String?                  @map("utm_source")
   utmMedium   String?                  @map("utm_medium")
@@ -1159,6 +1166,7 @@ model CommunityRedirect {
 
   @@index([createdAt])
   @@index([groupId, createdAt])
+  @@index([category, createdAt])
   @@map("community_redirects")
 }
 

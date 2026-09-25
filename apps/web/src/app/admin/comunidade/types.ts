@@ -10,6 +10,7 @@ export interface CommunityGroup {
   participants: number;
   priority: number;
   active: boolean;
+  category: string;
   lastSyncAt: string | null;
   syncError: string | null;
   createdAt: string;
@@ -27,7 +28,10 @@ export interface SyncSummary {
 }
 
 export interface DashboardResponse {
-  recommendedGroupId: string | null;
+  /** Categorias existentes ("geral" sempre primeiro). */
+  categories: string[];
+  /** Grupo que recebe o próximo membro, por categoria. */
+  recommendedByCategory: Record<string, string | null>;
   whatsappConnected: boolean;
   lastSync: SyncSummary | null;
   provisioner: {

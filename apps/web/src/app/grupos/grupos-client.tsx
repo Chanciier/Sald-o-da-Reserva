@@ -19,7 +19,7 @@ type Status =
   | { kind: 'full' }
   | { kind: 'error' };
 
-export function GruposClient() {
+export function GruposClient({ category }: { category?: string }) {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const requested = useRef(false);
@@ -32,6 +32,7 @@ export function GruposClient() {
     async function join() {
       try {
         const qs = new URLSearchParams();
+        if (category) qs.set('category', category);
         for (const key of ['utm_source', 'utm_medium', 'utm_campaign'] as const) {
           const value = searchParams.get(key);
           if (value)
@@ -67,7 +68,7 @@ export function GruposClient() {
     }
 
     void join();
-  }, [searchParams]);
+  }, [searchParams, category]);
 
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-lg flex-col items-center justify-center px-4 py-16 text-center">

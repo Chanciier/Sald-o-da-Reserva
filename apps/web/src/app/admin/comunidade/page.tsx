@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import {
   AlertTriangle,
-  Copy,
   Link2,
   Loader2,
   Pencil,
@@ -16,6 +15,13 @@ import {
   X,
 } from 'lucide-react';
 import { AnalyticsSection } from './analytics-section';
+import {
+  CategoryLinks,
+  DEFAULT_CATEGORY,
+  categoryLabel,
+  categoryPath,
+  toCategorySlug,
+} from './category-links';
 import {
   type CommunityGroup,
   type DashboardResponse,
@@ -35,6 +41,7 @@ interface GroupForm {
   priority: number;
   active: boolean;
   paused: boolean;
+  category: string;
 }
 
 const emptyForm: GroupForm = {
@@ -46,6 +53,7 @@ const emptyForm: GroupForm = {
   priority: 0,
   active: true,
   paused: false,
+  category: DEFAULT_CATEGORY,
 };
 
 function formatSync(iso: string | null): string {
@@ -68,7 +76,6 @@ export default function AdminComunidadePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
   const [linkStatus, setLinkStatus] = useState<'idle' | 'loading' | 'manual'>('idle');
 
   const headers = () => ({
@@ -122,6 +129,7 @@ export default function AdminComunidadePage() {
         priority: form.priority,
         active: form.active,
         status: form.paused ? 'PAUSED' : 'ACTIVE',
+        category: form.category.replace(/-+$/, '') || DEFAULT_CATEGORY,
       };
       const jid = form.groupJid.trim();
       if (jid) payload.groupJid = jid;
@@ -174,6 +182,7 @@ export default function AdminComunidadePage() {
       priority: g.priority,
       active: g.active,
       paused: g.status === 'PAUSED',
+      category: g.category,
     });
     setEditingId(g.id);
     setError('');
@@ -214,13 +223,6 @@ export default function AdminComunidadePage() {
     }
   }
 
-  async function copyPublicLink() {
-    const url = `${window.location.origin}/grupos`;
-    await navigator.clipboard.writeText(url).catch(() => undefined);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   const totals = data
     ? {
         participants: data.groups.reduce((sum, g) => sum + g.participants, 0),
@@ -237,17 +239,10 @@ export default function AdminComunidadePage() {
         <div>
           <h1 className="text-xl font-bold">Hub de Grupos WhatsApp</h1>
           <p className="text-sm text-gray-500">
-            Link único que distribui novos membros para o grupo com mais vaga.
+            Links que distribuem novos membros para o grupo com mais vaga de cada categoria.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => void copyPublicLink()}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50"
-          >
-            <Copy className="h-4 w-4" />
-            {copied ? 'Copiado!' : 'Copiar link único'}
-          </button>
           <button
             onClick={() => syncNow.mutate()}
             disabled={syncNow.isPending || !data?.whatsappConnected}
@@ -321,6 +316,14 @@ export default function AdminComunidadePage() {
       )}
 
       {data && (
+        <CategoryLinks
+          categories={data.categories}
+          groups={data.groups}
+          recommendedByCategory={data.recommendedByCategory}
+        />
+      )}
+
+      {data && (
         <div className="overflow-x-auto rounded-xl border bg-white">
           <table className="w-full text-sm">
             <thead>
@@ -339,7 +342,12 @@ export default function AdminComunidadePage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 font-medium">
                       {g.name}
-                      {data.recommendedGroupId === g.id && (
+                      {g.category !== DEFAULT_CATEGORY && (
+                        <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">
+                          {categoryLabel(g.category)}
+                        </span>
+                      )}
+                      {data.recommendedByCategory[g.category] === g.id && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
                           title="Grupo que receberá o próximo novo membro"
@@ -427,7 +435,7 @@ export default function AdminComunidadePage() {
         </div>
       )}
 
-      {token && <AnalyticsSection token={token} />}
+      {token && <AnalyticsSection token={token} categories={data?.categories ?? []} />}
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -451,6 +459,28 @@ export default function AdminComunidadePage() {
                   placeholder="Saldão VIP 01"
                   className={inputCls}
                 />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Categoria</label>
+                <input
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: toCategorySlug(e.target.value) })}
+                  list="community-categories"
+                  placeholder="geral"
+                  className={inputCls}
+                />
+                <datalist id="community-categories">
+                  {data?.categories.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-xs text-gray-500">
+                  Recebe membros do link{' '}
+                  <span className="font-mono">
+                    {categoryPath(form.category.replace(/-+$/, '') || DEFAULT_CATEGORY)}
+                  </span>
+                  . Use uma categoria nova (ex.: sex-shop) para criar outro link.
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
