@@ -7,11 +7,13 @@ import { WhatsappBroadcastService } from './whatsapp-broadcast.service';
 import { AIContentService } from './ai-content.service';
 import { OrderWhatsappService } from './order-whatsapp.service';
 import { WhatsappController } from './whatsapp.controller';
+import { WhatsappRelayService } from './whatsapp-relay.service';
+import { WhatsappRelayController } from './whatsapp-relay.controller';
 
 @Global()
 @Module({
   imports: [PrismaModule],
-  controllers: [WhatsappController],
+  controllers: [WhatsappController, WhatsappRelayController],
   providers: [
     BaileysService,
     WhatsappProvider,
@@ -19,6 +21,7 @@ import { WhatsappController } from './whatsapp.controller';
     WhatsappBroadcastService,
     AIContentService,
     OrderWhatsappService,
+    WhatsappRelayService,
   ],
   exports: [BaileysService, WhatsappMarketingService, AIContentService, OrderWhatsappService],
 })
