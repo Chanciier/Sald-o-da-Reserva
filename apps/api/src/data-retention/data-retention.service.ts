@@ -12,8 +12,8 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * - Analytics: 730 dias. Os relatórios aceitam períodos de até 366 dias e
  *   comparam com o período anterior de mesmo tamanho, então 2 anos mantém
  *   qualquer relatório "recente" completo (inclusive visitante recorrente).
- * - Logs de WhatsApp: o prazo de "apagar para todos" é de minutos e o painel
- *   mostra só os 100 últimos envios — 90 dias sobra.
+ * - Logs de WhatsApp (envios e repasse): o prazo de "apagar para todos" é de
+ *   minutos e o painel mostra só os 100 últimos envios — 90 dias sobra.
  * - Webhooks e sync de marketplace: só servem pra depuração/replay recente.
  *
  * `audit_logs`, pagamentos, pedidos etc. NÃO entram aqui: são histórico do
@@ -22,6 +22,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export const RETENTION_DAYS = {
   analyticsSessions: 730,
   whatsappMessageLogs: 90,
+  whatsappRelayLogs: 90,
   webhookLogs: 90,
   marketplaceSyncLogs: 90,
 } as const;
@@ -77,6 +78,10 @@ export class DataRetentionService {
       sentAt: { lt: cutoff(RETENTION_DAYS.whatsappMessageLogs) },
     });
 
+    const whatsappRelayLogs = await this.deleteInBatches(this.prisma.whatsappRelayLog, {
+      createdAt: { lt: cutoff(RETENTION_DAYS.whatsappRelayLogs) },
+    });
+
     const webhookLogs = await this.deleteInBatches(this.prisma.webhookLog, {
       createdAt: { lt: cutoff(RETENTION_DAYS.webhookLogs) },
     });
@@ -89,7 +94,13 @@ export class DataRetentionService {
       ...(keepIds.length ? { id: { notIn: keepIds } } : {}),
     });
 
-    return { analyticsSessions, whatsappMessageLogs, webhookLogs, marketplaceSyncLogs };
+    return {
+      analyticsSessions,
+      whatsappMessageLogs,
+      whatsappRelayLogs,
+      webhookLogs,
+      marketplaceSyncLogs,
+    };
   }
 
   private async latestSuccessfulSyncIds(): Promise<string[]> {

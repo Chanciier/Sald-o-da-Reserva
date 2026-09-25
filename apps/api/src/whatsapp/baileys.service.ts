@@ -4,6 +4,7 @@ import makeWASocket, {
   AuthenticationState,
   DisconnectReason,
   SignalKeyStore,
+  WAMessage,
   initAuthCreds,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
@@ -27,6 +28,9 @@ export type GroupParticipantsUpdateHandler = (update: {
   action: 'add' | 'remove' | 'promote' | 'demote' | 'modify';
   participants: string[];
 }) => void;
+
+/** Mensagem nova recebida ao vivo num grupo (inclui as enviadas pelo celular da loja). */
+export type GroupMessageHandler = (message: WAMessage) => void;
 
 function serialize(v: unknown): string {
   return JSON.stringify(v, (_k, val) => {
@@ -78,6 +82,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
   // Handlers externos de eventos de participantes — re-registrados a cada
   // reconexão, já que o socket é recriado do zero em connect().
   private readonly groupParticipantsHandlers: GroupParticipantsUpdateHandler[] = [];
+  private readonly groupMessageHandlers: GroupMessageHandler[] = [];
 
   constructor(private readonly redis: RedisService) {}
 
@@ -166,6 +171,23 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
           handler(payload);
         } catch (err) {
           this.logger.error('Handler de group-participants.update falhou', err as Error);
+        }
+      }
+    });
+
+    // Só 'notify' (mensagem ao vivo). O que o próprio socket envia chega como
+    // 'append' — ignorar evita que o robô reprocesse as próprias mensagens — e o
+    // que chegou enquanto estava desconectado também vem como 'append'.
+    this.socket.ev.on('messages.upsert', ({ messages, type }) => {
+      if (type !== 'notify' || !this.groupMessageHandlers.length) return;
+      for (const message of messages) {
+        if (!message.key.remoteJid?.endsWith('@g.us')) continue;
+        for (const handler of this.groupMessageHandlers) {
+          try {
+            handler(message);
+          } catch (err) {
+            this.logger.error('Handler de messages.upsert falhou', err as Error);
+          }
         }
       }
     });
@@ -300,6 +322,22 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
   /** Registra um handler para entradas/saídas de participantes (tempo real). */
   onGroupParticipantsUpdate(handler: GroupParticipantsUpdateHandler): void {
     this.groupParticipantsHandlers.push(handler);
+  }
+
+  /** Registra um handler para mensagens novas em grupos (tempo real). */
+  onGroupMessage(handler: GroupMessageHandler): void {
+    this.groupMessageHandlers.push(handler);
+  }
+
+  /**
+   * Reenvia uma mensagem enviada pela própria conta (texto, foto, vídeo...) para
+   * outro chat, reaproveitando a mídia já enviada. Como a original é nossa, o
+   * WhatsApp não marca a cópia como "Encaminhada".
+   */
+  async copyMessage(jid: string, message: WAMessage): Promise<string | undefined> {
+    if (!this.socket || !this.connected) throw new Error('WhatsApp não conectado');
+    const result = await this.socket.sendMessage(jid, { forward: message });
+    return result?.key?.id ?? undefined;
   }
 
   async sendMessage(jid: string, text: string): Promise<string | undefined> {

@@ -16,6 +16,7 @@ import {
   Clock,
   Send,
 } from 'lucide-react';
+import { RelayTab } from './relay-tab';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -165,7 +166,7 @@ function WhatsappStatusBanner({ token }: { token: string }) {
 export default function AdminWhatsappPage() {
   const { token } = useAuth();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'grupos' | 'conteudo'>('grupos');
+  const [tab, setTab] = useState<'grupos' | 'conteudo' | 'repasse'>('grupos');
 
   // --- Grupos state ---
   const [form, setForm] = useState<GroupForm>(emptyForm);
@@ -407,7 +408,7 @@ export default function AdminWhatsappPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b">
-        {(['grupos', 'conteudo'] as const).map((t) => (
+        {(['grupos', 'conteudo', 'repasse'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -417,7 +418,7 @@ export default function AdminWhatsappPage() {
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            {t === 'grupos' ? 'Grupos' : 'Conteúdo IA'}
+            {t === 'grupos' ? 'Grupos' : t === 'conteudo' ? 'Conteúdo IA' : 'Repasse'}
           </button>
         ))}
       </div>
@@ -803,6 +804,9 @@ export default function AdminWhatsappPage() {
           </div>
         </>
       )}
+
+      {/* === TAB REPASSE === */}
+      {tab === 'repasse' && <RelayTab token={token ?? ''} />}
 
       {/* === TAB CONTEÚDO IA === */}
       {tab === 'conteudo' && (

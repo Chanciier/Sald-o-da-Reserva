@@ -20,6 +20,7 @@ describe('DataRetentionService', () => {
   let prisma: {
     analyticsSession: Delegate;
     whatsappMessageLog: Delegate;
+    whatsappRelayLog: Delegate;
     webhookLog: Delegate;
     marketplaceSyncLog: Delegate & { findFirst: jest.Mock };
   };
@@ -29,6 +30,7 @@ describe('DataRetentionService', () => {
     prisma = {
       analyticsSession: delegate(['s1', 's2']),
       whatsappMessageLog: delegate(['w1']),
+      whatsappRelayLog: delegate(['r1', 'r2', 'r3']),
       webhookLog: delegate(),
       marketplaceSyncLog: { ...delegate(['m1']), findFirst: jest.fn().mockResolvedValue(null) },
     };
@@ -41,6 +43,7 @@ describe('DataRetentionService', () => {
     expect(summary).toEqual({
       analyticsSessions: 2,
       whatsappMessageLogs: 1,
+      whatsappRelayLogs: 3,
       webhookLogs: 0,
       marketplaceSyncLogs: 1,
     });
@@ -51,6 +54,9 @@ describe('DataRetentionService', () => {
     });
     expect(prisma.whatsappMessageLog.findMany.mock.calls[0][0].where).toEqual({
       sentAt: { lt: cutoff(RETENTION_DAYS.whatsappMessageLogs) },
+    });
+    expect(prisma.whatsappRelayLog.findMany.mock.calls[0][0].where).toEqual({
+      createdAt: { lt: cutoff(RETENTION_DAYS.whatsappRelayLogs) },
     });
     expect(prisma.webhookLog.findMany.mock.calls[0][0].where).toEqual({
       createdAt: { lt: cutoff(RETENTION_DAYS.webhookLogs) },

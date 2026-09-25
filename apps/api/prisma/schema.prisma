@@ -391,6 +391,47 @@ model WhatsappMessageLog {
   @@map("whatsapp_message_logs")
 }
 
+// Repasse automático: tudo que o número da loja posta num grupo SOURCE (lotes)
+// é copiado, como mensagem nova, para os grupos TARGET (venda) ativos.
+enum WhatsappRelayRole {
+  SOURCE
+  TARGET
+}
+
+model WhatsappRelayGroup {
+  id        String            @id @default(cuid())
+  // JID do grupo no WhatsApp (xxx@g.us).
+  jid       String            @unique
+  name      String
+  role      WhatsappRelayRole
+  active    Boolean           @default(true)
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  @@map("whatsapp_relay_groups")
+}
+
+// Um registro por cópia enviada (mensagem de origem × grupo de destino).
+model WhatsappRelayLog {
+  id              String   @id @default(cuid())
+  sourceJid       String   @map("source_jid")
+  sourceName      String   @map("source_name")
+  sourceMessageId String   @map("source_message_id")
+  targetJid       String   @map("target_jid")
+  targetName      String   @map("target_name")
+  // text | image | video | document | audio
+  kind            String
+  // Início do texto/legenda, só para identificar a mensagem no painel.
+  preview         String?  @db.VarChar(120)
+  success         Boolean
+  error           String?
+  messageId       String?  @map("message_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("whatsapp_relay_logs")
+}
+
 model WhatsappContentHistory {
   id        String   @id @default(cuid())
   productId String   @map("product_id")
