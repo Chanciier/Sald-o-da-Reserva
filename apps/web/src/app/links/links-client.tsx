@@ -17,7 +17,7 @@ import styles from './links.module.css';
 const LINKS = [
   {
     label: 'Assinatura Clube Saldão',
-    description: 'Assine e receba seus achados em casa',
+    description: 'Assine e receba seus achados com preços únicos',
     icon: Crown,
     tone: 'link-card-yellow',
     href: '/produtos/clube-reversa',
