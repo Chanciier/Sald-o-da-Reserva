@@ -85,7 +85,7 @@ export default function VendedorNotasFiscais() {
                   (inv: {
                     id: string;
                     invoiceNumber: string | null;
-                    orderId: string;
+                    orderId: string | null;
                     status: string;
                     issueDate: string | null;
                     xmlUrl: string | null;
@@ -97,7 +97,7 @@ export default function VendedorNotasFiscais() {
                         <span className="font-mono text-sm">{inv.invoiceNumber ?? '—'}</span>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-primary">
-                        #{inv.orderId.slice(-8).toUpperCase()}
+                        #{inv.orderId?.slice(-8).toUpperCase()}
                       </td>
                       <td className="px-4 py-3">
                         <span

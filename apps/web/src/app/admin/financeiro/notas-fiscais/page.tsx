@@ -3,9 +3,17 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Search, RefreshCw, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import {
+  FileText,
+  Search,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  FilePlus,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchInvoices, type Invoice } from '@/actions/invoices';
+import { fetchInvoices, invoiceView, type Invoice } from '@/actions/invoices';
 import { SectionGate } from '@/components/admin/section-gate';
 
 const STATUS_OPTIONS = [
@@ -100,14 +108,23 @@ function NotasFiscaisPage() {
           <h1 className="text-xl font-bold">Notas Fiscais</h1>
           <p className="text-sm text-muted-foreground">NF-e emitidas pela plataforma</p>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/financeiro/notas-fiscais/avulsa"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            <FilePlus className="h-3.5 w-3.5" />
+            Emitir nota avulsa
+          </Link>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -205,58 +222,67 @@ function NotasFiscaisPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {data.data.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-mono text-xs font-medium">{inv.invoiceNumber ?? '—'}</p>
-                      {inv.focusReference && (
-                        <p className="text-[10px] text-muted-foreground">
-                          ref: {inv.focusReference.slice(0, 8)}…
+                {data.data.map((inv) => {
+                  const view = invoiceView(inv);
+                  return (
+                    <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-mono text-xs font-medium">{inv.invoiceNumber ?? '—'}</p>
+                        {inv.focusReference && (
+                          <p className="text-[10px] text-muted-foreground">
+                            ref: {inv.focusReference.slice(0, 8)}…
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {view.isManual ? (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                            Avulsa
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs">
+                            {inv.orderId?.slice(-8).toUpperCase()}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-xs font-medium truncate max-w-[160px]">
+                          {view.customerName ?? '—'}
                         </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs">
-                        {inv.orderId.slice(-8).toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs font-medium truncate max-w-[160px]">
-                        {inv.order.user.name ?? '—'}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground truncate max-w-[160px]">
-                        {inv.order.user.email}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-xs font-medium">{fmt(inv.order.total)}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={inv.status} />
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {fmtDate(inv.issueDate)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <Link
-                          href={`/admin/financeiro/notas-fiscais/${inv.id}`}
-                          className="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
-                        >
-                          <ExternalLink className="h-3 w-3" /> Ver
-                        </Link>
-                        {inv.danfeUrl && (
-                          <a
-                            href={inv.danfeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[160px]">
+                          {view.customerEmail ?? view.customerDocument ?? ''}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium">{fmt(view.total)}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={inv.status} />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {fmtDate(inv.issueDate)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <Link
+                            href={`/admin/financeiro/notas-fiscais/${inv.id}`}
                             className="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
                           >
-                            DANFE
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                            <ExternalLink className="h-3 w-3" /> Ver
+                          </Link>
+                          {inv.danfeUrl && (
+                            <a
+                              href={inv.danfeUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted transition-colors"
+                            >
+                              DANFE
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

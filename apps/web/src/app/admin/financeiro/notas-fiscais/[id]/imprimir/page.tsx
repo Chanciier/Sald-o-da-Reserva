@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchInvoice, type Invoice } from '@/actions/invoices';
+import { fetchInvoice, invoiceView, type Invoice } from '@/actions/invoices';
 
 function fmt(n: number | string | null | undefined) {
   return Number(n ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -61,10 +61,10 @@ export default function ImprimirDanfePage() {
     );
   }
 
-  const order = invoice.order;
+  const view = invoiceView(invoice);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ord = order as any;
-  const address = ord.shippingAddress as
+  const ord = (invoice.order ?? {}) as any;
+  const address = (invoice.manualData?.buyer.address ?? ord.shippingAddress) as
     | {
         street?: string;
         number?: string;
@@ -75,7 +75,7 @@ export default function ImprimirDanfePage() {
       }
     | undefined;
 
-  const total = Number(ord.total ?? 0);
+  const total = invoice.order ? Number(ord.total ?? 0) : view.total;
   const discount = Number(ord.discount ?? 0);
   const shipping = Number(ord.shipping ?? 0);
   const subtotal = total + discount - shipping;
@@ -149,7 +149,7 @@ export default function ImprimirDanfePage() {
               </td>
               <td>
                 <span className="label">DESTINATÁRIO</span>
-                <span className="val">{order.user.name ?? order.user.email}</span>
+                <span className="val">{view.customerName ?? view.customerEmail}</span>
               </td>
             </tr>
           </tbody>
@@ -239,11 +239,11 @@ export default function ImprimirDanfePage() {
             <tr>
               <td style={{ width: '50%' }}>
                 <span className="label">NOME / RAZÃO SOCIAL</span>
-                <span className="val">{order.user.name ?? '—'}</span>
+                <span className="val">{view.customerName ?? '—'}</span>
               </td>
               <td>
                 <span className="label">E-MAIL</span>
-                <span className="val">{order.user.email}</span>
+                <span className="val">{view.customerEmail ?? '—'}</span>
               </td>
               <td style={{ width: 100 }}>
                 <span className="label">DATA DA EMISSÃO</span>
@@ -296,7 +296,7 @@ export default function ImprimirDanfePage() {
             </tr>
           </thead>
           <tbody>
-            {order.items.map((item, i) => (
+            {view.items.map((item, i) => (
               <tr key={i}>
                 <td style={{ textAlign: 'center' }}>{item.sku}</td>
                 <td>{item.name}</td>
@@ -345,15 +345,17 @@ export default function ImprimirDanfePage() {
               <td>
                 <span className="label">FORMA DE PAGAMENTO</span>
                 <span className="val">
-                  {order.payment?.method === 'PIX'
+                  {view.paymentMethod === 'PIX'
                     ? 'PIX'
-                    : order.payment?.method === 'CREDIT_CARD'
+                    : view.paymentMethod === 'CREDIT_CARD'
                       ? 'Cartão de Crédito'
-                      : order.payment?.method === 'DEBIT_CARD'
+                      : view.paymentMethod === 'DEBIT_CARD'
                         ? 'Cartão de Débito'
-                        : order.payment?.method === 'BOLETO'
+                        : view.paymentMethod === 'BOLETO'
                           ? 'Boleto'
-                          : '—'}
+                          : view.paymentMethod === 'CASH'
+                            ? 'Dinheiro'
+                            : '—'}
                 </span>
               </td>
               <td>
@@ -362,7 +364,7 @@ export default function ImprimirDanfePage() {
               </td>
               <td>
                 <span className="label">STATUS</span>
-                <span className="val">{order.payment?.status ?? '—'}</span>
+                <span className="val">{view.paymentStatus ?? '—'}</span>
               </td>
             </tr>
           </tbody>
@@ -376,7 +378,7 @@ export default function ImprimirDanfePage() {
               <td style={{ height: 40 }}>
                 <span className="label">INFORMAÇÕES COMPLEMENTARES</span>
                 <span className="val">
-                  Pedido #{invoice.orderId.slice(-8).toUpperCase()} — NF-e emitida por {emitterName}
+                  {view.reference} — NF-e emitida por {emitterName}
                   {invoice.protocol ? ` — Protocolo: ${invoice.protocol}` : ''}
                 </span>
               </td>

@@ -78,6 +78,13 @@ export class InvoiceRepository {
           { orderId: { contains: search, mode: 'insensitive' } },
           { order: { user: { name: { contains: search, mode: 'insensitive' } } } },
           { order: { user: { email: { contains: search, mode: 'insensitive' } } } },
+          { manualData: { path: ['buyer', 'name'], string_contains: search } },
+          {
+            manualData: {
+              path: ['buyer', 'document'],
+              string_contains: search.replace(/\D/g, '') || search,
+            },
+          },
         ],
       }),
       ...(createdById && { order: { userId: createdById } }),
