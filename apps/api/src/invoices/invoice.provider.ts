@@ -33,8 +33,9 @@ export interface InvoiceItemPayload {
 
 export interface InvoiceCustomerPayload {
   name: string;
-  email: string;
+  email?: string;
   cpf?: string;
+  cnpj?: string;
   address?: {
     cep: string;
     street: string;

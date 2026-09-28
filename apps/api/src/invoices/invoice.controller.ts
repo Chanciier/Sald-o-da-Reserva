@@ -14,6 +14,7 @@ import type { Response } from 'express';
 import { AdminSection } from '@prisma/client';
 import { InvoiceService } from './invoice.service';
 import { QueryInvoiceDto } from './dto/query-invoice.dto';
+import { CreateManualInvoiceDto } from './dto/create-manual-invoice.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -58,6 +59,13 @@ export class InvoiceController {
     @Body('name') name?: string,
   ) {
     return this.invoiceService.emit(orderId, user, cpf || name ? { cpf, name } : undefined);
+  }
+
+  @Post('manual')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  emitManual(@Body() dto: CreateManualInvoiceDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.invoiceService.emitManual(dto, user);
   }
 
   @Post(':id/reemit')

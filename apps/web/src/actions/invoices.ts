@@ -9,9 +9,57 @@ export interface InvoiceOrder {
   payment: { method: string; status: string; amount: number } | null;
 }
 
+export type ManualPaymentMethod =
+  | 'PIX'
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'BOLETO'
+  | 'CASH'
+  | 'OTHER';
+
+export interface ManualInvoiceInput {
+  buyer: {
+    name: string;
+    document: string;
+    email?: string;
+    address: {
+      cep: string;
+      street: string;
+      number: string;
+      complement?: string;
+      neighborhood: string;
+      city: string;
+      state: string;
+    };
+  };
+  items: Array<{
+    description: string;
+    sku?: string;
+    ncm?: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  paymentMethod: ManualPaymentMethod;
+  inPerson?: boolean;
+  additionalInfo?: string;
+}
+
+export interface ManualInvoiceData extends Omit<ManualInvoiceInput, 'items'> {
+  items: Array<{
+    description: string;
+    sku: string;
+    ncm?: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
+  total: number;
+}
+
 export interface Invoice {
   id: string;
-  orderId: string;
+  orderId: string | null;
+  manualData: ManualInvoiceData | null;
   focusReference: string | null;
   invoiceNumber: string | null;
   accessKey: string | null;
@@ -24,7 +72,53 @@ export interface Invoice {
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;
-  order: InvoiceOrder;
+  order: InvoiceOrder | null;
+}
+
+export interface InvoiceView {
+  isManual: boolean;
+  reference: string;
+  customerName: string | null;
+  customerEmail: string | null;
+  customerDocument: string | null;
+  total: number;
+  paymentMethod: string | null;
+  paymentStatus: string | null;
+  items: Array<{ name: string; sku: string; quantity: number; price: number; subtotal: number }>;
+}
+
+export function invoiceView(inv: Invoice): InvoiceView {
+  if (inv.order) {
+    return {
+      isManual: false,
+      reference: `Pedido ${inv.order.id.slice(-8).toUpperCase()}`,
+      customerName: inv.order.user.name,
+      customerEmail: inv.order.user.email,
+      customerDocument: null,
+      total: Number(inv.order.total),
+      paymentMethod: inv.order.payment?.method ?? null,
+      paymentStatus: inv.order.payment?.status ?? null,
+      items: inv.order.items,
+    };
+  }
+  const data = inv.manualData;
+  return {
+    isManual: true,
+    reference: 'Venda avulsa',
+    customerName: data?.buyer.name ?? null,
+    customerEmail: data?.buyer.email ?? null,
+    customerDocument: data?.buyer.document ?? null,
+    total: data?.total ?? 0,
+    paymentMethod: data?.paymentMethod ?? null,
+    paymentStatus: null,
+    items: (data?.items ?? []).map((i) => ({
+      name: i.description,
+      sku: i.sku,
+      quantity: i.quantity,
+      price: i.unitPrice,
+      subtotal: i.total,
+    })),
+  };
 }
 
 export interface InvoicesResponse {
@@ -77,6 +171,16 @@ export async function emitInvoice(
   return apiFetch<Invoice>(token, `/invoices/emit/${orderId}`, {
     method: 'POST',
     body: JSON.stringify(overrides ?? {}),
+  });
+}
+
+export async function emitManualInvoice(
+  token: string,
+  input: ManualInvoiceInput,
+): Promise<Invoice> {
+  return apiFetch<Invoice>(token, '/invoices/manual', {
+    method: 'POST',
+    body: JSON.stringify(input),
   });
 }
 

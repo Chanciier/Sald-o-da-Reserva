@@ -7,13 +7,17 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { AuthenticatedUser } from '../auth/types/auth.types';
 import { FocusNfeProvider } from './focusnfe.provider';
 import { InvoiceRepository } from './invoice.repository';
 import { QueryInvoiceDto } from './dto/query-invoice.dto';
+import { CreateManualInvoiceDto } from './dto/create-manual-invoice.dto';
+import { ManualInvoiceData, manualInvoicePayload, normalizeManualInvoice } from './manual-invoice';
+
+type InvoiceWithOrder = NonNullable<Awaited<ReturnType<InvoiceRepository['findById']>>>;
 
 @Injectable()
 export class InvoiceService {
@@ -206,13 +210,73 @@ export class InvoiceService {
       errorMessage: null,
     });
 
-    await this.emitForOrder(invoice.orderId, overrides);
+    if (invoice.orderId) {
+      await this.emitForOrder(invoice.orderId, overrides);
+    } else {
+      await this.submitManual(invoice.id, invoice.manualData as unknown as ManualInvoiceData);
+    }
     await this.audit('INVOICE_REEMITTED', user.id, {
       invoiceId,
       orderId: invoice.orderId,
       usedOverrides: !!overrides,
     });
     return this.repo.findById(invoiceId);
+  }
+
+  // ── Standalone invoice (sale made outside the site) ──────────────────────
+
+  async emitManual(dto: CreateManualInvoiceDto, user: AuthenticatedUser) {
+    const data = normalizeManualInvoice(dto);
+    if (!this.focus.isConfigured()) {
+      throw new BadRequestException('Focus NFe não configurado.');
+    }
+    const invoice = await this.repo.create({
+      manualData: data as unknown as Prisma.InputJsonValue,
+    });
+    await this.submitManual(invoice.id, data);
+    await this.audit('INVOICE_MANUAL_STANDALONE', user.id, {
+      invoiceId: invoice.id,
+      document: data.buyer.document,
+      total: data.total,
+    });
+    return this.repo.findById(invoice.id);
+  }
+
+  private async submitManual(invoiceId: string, data: ManualInvoiceData): Promise<void> {
+    const reference = `${invoiceId.slice(0, 20)}${Date.now()}`;
+    try {
+      const result = await this.focus.issueInvoice(manualInvoicePayload(data, reference));
+      await this.repo.update(invoiceId, {
+        focusReference: reference,
+        status: result.status,
+        invoiceNumber: result.invoiceNumber ?? null,
+        accessKey: result.accessKey ?? null,
+        protocol: result.protocol ?? null,
+        xmlUrl: result.xmlUrl ?? null,
+        danfeUrl: result.danfeUrl ?? null,
+        issueDate: result.issueDate ?? null,
+        errorMessage: result.errorMessage ?? null,
+      });
+      if (result.status === 'AUTHORIZED' && result.danfeUrl && data.buyer.email) {
+        this.mail
+          .sendInvoiceEmail(
+            data.buyer.email,
+            data.buyer.name,
+            result.danfeUrl,
+            result.xmlUrl,
+            result.invoiceNumber,
+            result.accessKey,
+          )
+          .catch((e) => this.logger.warn('Invoice email failed', e));
+      }
+      this.logger.log(`Standalone invoice ${invoiceId} → ref=${reference} status=${result.status}`);
+    } catch (err) {
+      this.logger.error(`submitManual failed for invoice ${invoiceId}`, err);
+      await this.repo.update(invoiceId, {
+        status: 'REJECTED',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   // ── Cancel ────────────────────────────────────────────────────────────────
@@ -268,12 +332,17 @@ export class InvoiceService {
       });
     }
 
-    if (result.status === 'AUTHORIZED' && invoice.status !== 'AUTHORIZED' && result.danfeUrl) {
-      const { user } = invoice.order;
+    const recipient = this.recipientOf(invoice);
+    if (
+      result.status === 'AUTHORIZED' &&
+      invoice.status !== 'AUTHORIZED' &&
+      result.danfeUrl &&
+      recipient
+    ) {
       this.mail
         .sendInvoiceEmail(
-          user.email,
-          user.name,
+          recipient.email,
+          recipient.name,
           result.danfeUrl,
           result.xmlUrl ?? undefined,
           result.invoiceNumber,
@@ -384,10 +453,16 @@ export class InvoiceService {
     const invoice = await this.repo.findById(invoiceId);
     if (!invoice) throw new NotFoundException('Nota não encontrada.');
 
-    if (user.role === Role.VENDEDOR && invoice.order.user.id !== user.id) {
+    if (user.role === Role.VENDEDOR && invoice.order?.user.id !== user.id) {
       throw new ForbiddenException('Acesso negado.');
     }
     return invoice;
+  }
+
+  private recipientOf(invoice: InvoiceWithOrder): { email: string; name: string | null } | null {
+    if (invoice.order) return { email: invoice.order.user.email, name: invoice.order.user.name };
+    const buyer = (invoice.manualData as unknown as ManualInvoiceData | null)?.buyer;
+    return buyer?.email ? { email: buyer.email, name: buyer.name } : null;
   }
 
   private async audit(action: string, userId?: string, metadata?: object) {

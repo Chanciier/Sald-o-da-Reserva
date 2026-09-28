@@ -813,7 +813,9 @@ model PaymentLog {
 
 model Invoice {
   id               String        @id @default(cuid())
-  orderId          String        @map("order_id")
+  orderId          String?       @map("order_id")
+  // Venda feita fora do site: comprador, itens e pagamento que foram para a nota.
+  manualData       Json?         @map("manual_data")
   focusReference   String?       @unique @map("focus_reference")
   invoiceNumber    String?       @map("invoice_number")
   accessKey        String?       @map("access_key") @db.VarChar(60)
@@ -827,7 +829,7 @@ model Invoice {
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([focusReference])

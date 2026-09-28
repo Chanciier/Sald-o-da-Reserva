@@ -300,6 +300,7 @@ export class FocusNfeProvider implements InvoiceProvider {
 
   private mapPaymentMethod(method: string): string {
     const map: Record<string, string> = {
+      CASH: '01',
       PIX: '17',
       CREDIT_CARD: '03',
       DEBIT_CARD: '04',
@@ -389,9 +390,13 @@ export class FocusNfeProvider implements InvoiceProvider {
       cep_emitente: this.cep.replace(/\D/g, ''),
 
       // Customer
-      ...(customer.cpf ? { cpf_destinatario: customer.cpf.replace(/\D/g, '') } : {}),
+      ...(customer.cnpj
+        ? { cnpj_destinatario: customer.cnpj.replace(/\D/g, '') }
+        : customer.cpf
+          ? { cpf_destinatario: customer.cpf.replace(/\D/g, '') }
+          : {}),
       nome_destinatario: customer.name,
-      email_destinatario: customer.email,
+      ...(customer.email ? { email_destinatario: customer.email } : {}),
       indicador_inscricao_estadual_destinatario: 9,
       consumidor_final: 1,
       presenca_comprador: isPickup ? 1 : 2,

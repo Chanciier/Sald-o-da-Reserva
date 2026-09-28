@@ -23,6 +23,7 @@ import {
   syncInvoice,
   fetchInvoiceXml,
   fetchInvoiceDanfe,
+  invoiceView,
 } from '@/actions/invoices';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -46,6 +47,8 @@ const PAYMENT_METHOD: Record<string, string> = {
   CREDIT_CARD: 'Cartão de Crédito',
   DEBIT_CARD: 'Cartão de Débito',
   BOLETO: 'Boleto',
+  CASH: 'Dinheiro',
+  OTHER: 'Outro',
 };
 
 function fmt(n: number) {
@@ -86,7 +89,7 @@ export default function InvoiceDetailPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['invoice', id] });
 
   const emitMut = useMutation({
-    mutationFn: () => emitInvoice(token!, invoice!.orderId),
+    mutationFn: () => emitInvoice(token!, invoice!.orderId!),
     onSuccess: invalidate,
     onError: (e: Error) => setError(e.message),
   });
@@ -137,6 +140,7 @@ export default function InvoiceDetailPage() {
 
   if (!invoice) return <p className="text-sm text-muted-foreground">Nota não encontrada.</p>;
 
+  const view = invoiceView(invoice);
   const isProcessing =
     emitMut.isPending ||
     reemitMut.isPending ||
@@ -158,9 +162,7 @@ export default function InvoiceDetailPage() {
           <h1 className="text-xl font-bold">
             NF-e {invoice.invoiceNumber ? `#${invoice.invoiceNumber}` : '—'}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Pedido {invoice.orderId.slice(-8).toUpperCase()}
-          </p>
+          <p className="text-sm text-muted-foreground">{view.reference}</p>
         </div>
         <span
           className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${STATUS_BADGE[invoice.status]}`}
@@ -180,7 +182,7 @@ export default function InvoiceDetailPage() {
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
-        {(invoice.status === 'PENDING' || invoice.status === 'REJECTED') && (
+        {invoice.orderId && (invoice.status === 'PENDING' || invoice.status === 'REJECTED') && (
           <button
             onClick={() => emitMut.mutate()}
             disabled={isProcessing}
@@ -295,29 +297,33 @@ export default function InvoiceDetailPage() {
 
         {/* Order / Customer data */}
         <div className="rounded-xl border bg-card p-4">
-          <h2 className="text-sm font-semibold mb-3">Pedido e Cliente</h2>
-          <Row
-            label="Pedido"
-            value={<span className="font-mono">{invoice.orderId.slice(-8).toUpperCase()}</span>}
-          />
-          <Row label="Status pedido" value={invoice.order.status} />
-          <Row label="Total" value={fmt(invoice.order.total)} />
+          <h2 className="text-sm font-semibold mb-3">
+            {view.isManual ? 'Venda avulsa e Comprador' : 'Pedido e Cliente'}
+          </h2>
+          <Row label="Origem" value={view.reference} />
+          {invoice.order && <Row label="Status pedido" value={invoice.order.status} />}
+          <Row label="Total" value={fmt(view.total)} />
           <Row
             label="Pagamento"
             value={
-              invoice.order.payment
-                ? `${PAYMENT_METHOD[invoice.order.payment.method] ?? invoice.order.payment.method} · ${invoice.order.payment.status}`
+              view.paymentMethod
+                ? [PAYMENT_METHOD[view.paymentMethod] ?? view.paymentMethod, view.paymentStatus]
+                    .filter(Boolean)
+                    .join(' · ')
                 : null
             }
           />
           <div className="border-t my-2" />
-          <Row label="Cliente" value={invoice.order.user.name} />
-          <Row label="E-mail" value={invoice.order.user.email} />
+          <Row label="Cliente" value={view.customerName} />
+          {view.customerDocument && <Row label="CPF/CNPJ" value={view.customerDocument} />}
+          <Row label="E-mail" value={view.customerEmail} />
         </div>
 
         {/* Items */}
         <div className="rounded-xl border bg-card p-4 lg:col-span-2">
-          <h2 className="text-sm font-semibold mb-3">Itens do Pedido</h2>
+          <h2 className="text-sm font-semibold mb-3">
+            {view.isManual ? 'Itens da Venda' : 'Itens do Pedido'}
+          </h2>
           <table className="w-full text-xs">
             <thead className="border-b">
               <tr className="text-left text-muted-foreground">
@@ -329,7 +335,7 @@ export default function InvoiceDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {invoice.order.items.map((item, i) => (
+              {view.items.map((item, i) => (
                 <tr key={i} className="py-1">
                   <td className="py-2">{item.name}</td>
                   <td className="py-2 font-mono text-muted-foreground">{item.sku}</td>
