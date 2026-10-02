@@ -9,4 +9,4 @@ nixPkgs = ["nodejs_20", "dejavu_fonts", "fontconfig"]
 cmds = []
 
 [phases.build]
-cmds = ["npm install --include=dev && cd apps/api && npx prisma generate && npx nest build"]
+cmds = ["npm install --workspace=apps/api --include-workspace-root --include=dev && cd apps/api && npx prisma generate && npx nest build"]
